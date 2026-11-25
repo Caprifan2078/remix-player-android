@@ -1,0 +1,129 @@
+--- a/app/src/main/java/app/remix/player/SubtitleExport.kt
++++ b/app/src/main/java/app/remix/player/SubtitleExport.kt
+@@ -2,9 +2,21 @@
+ import java.util.Locale
+-/** SRT requires end times: derive them from the next line and cap silent gaps. */
++/** SRT lacks word timestamps. Derive end times without cutting off a late timed word. */
+ object SubtitleExport {
+     fun srt(raw:String):String{
+-        val lines=Lrc.parse(raw).filter{it.ms in 0..(24*3600000L)}.groupBy{it.ms}.toSortedMap().map{(ms,items)->ms to items.map{WordLyrics.parse(it).text.trim()}.filter{it.isNotBlank()}.distinct().joinToString("\n")}.filter{it.second.isNotBlank()}
++        val lines=Lrc.parse(raw).filter{it.ms in 0..(24*3600000L)}.groupBy{it.ms}.toSortedMap().mapNotNull{(ms,items)->
++            val parsed=items.map(WordLyrics::parse)
++            val text=parsed.map{it.text.trim()}.filter{it.isNotBlank()}.distinct().joinToString("\n")
++            if(text.isBlank())null else Triple(ms,text,parsed.flatMap{it.words}.map{it.ms})
++        }
+         require(lines.isNotEmpty()){"Нет синхронизированного текста"}
+         fun stamp(ms:Long)=String.format(Locale.ROOT,"%02d:%02d:%02d,%03d",ms/3600000,ms/60000%60,ms/1000%60,ms%1000)
+-        return lines.mapIndexed{i,(start,text)->val end=minOf(start+6000,lines.getOrNull(i+1)?.first?:start+4000);"${i+1}\n${stamp(start)} --> ${stamp(end)}\n$text"}.joinToString("\n\n",postfix="\n")
++        return lines.mapIndexed{i,(start,text,words)->
++            val next=lines.getOrNull(i+1)?.first
++            val defaultEnd=start+if(next==null)4000 else 6000
++            // Keep a measured word onset visible, with a bounded estimated tail. Never overlap the next cue.
++            val lastWord=words.filter{next==null||it<next}.maxOrNull()
++            val desired=maxOf(defaultEnd,lastWord?.plus(1000)?:defaultEnd)
++            val end=minOf(desired,next?:Long.MAX_VALUE)
++            "${i+1}\n${stamp(start)} --> ${stamp(end)}\n$text"
++        }.joinToString("\n\n",postfix="\n")
+     }
+--- a/app/src/main/java/app/remix/player/WordLyrics.kt
++++ b/app/src/main/java/app/remix/player/WordLyrics.kt
+@@ -20,2 +20,8 @@
+     }
++    data class Highlight(val completedEnd:Int,val activeStart:Int,val activeEnd:Int)
++    /** Explicit timed spans only; no fabricated per-word or syllable timing for plain LRC. */
++    fun highlight(line:Line,index:Int):Highlight? {
++        val word=line.words.getOrNull(index)?:return null
++        return Highlight(if(index>0)line.words[index-1].end else 0,word.start,word.end)
++    }
+     fun current(line:Line,ms:Long):Int {
+--- a/app/src/main/java/app/remix/player/OverlapCore.kt
++++ b/app/src/main/java/app/remix/player/OverlapCore.kt
+@@ -13,2 +13,11 @@
+     }
++    /** A late decoder gets a shorter overlap instead of dropping/skipping the incoming intro. */
++    fun startWindow(planned:Window,position:Long):Window? {
++        val start=maxOf(planned.start,position)
++        val remaining=planned.start+planned.duration-start
++        return if(remaining>=500)Window(start,remaining)else null
++    }
++    /** Never fade the primary ahead of samples that the incoming decoder has actually reached. */
++    fun synchronizedElapsed(outgoing:Long,incoming:Long,duration:Long):Long =
++        minOf(outgoing,incoming).coerceIn(0L,duration)
+     fun gains(elapsed:Long,duration:Long):Gains {
+--- a/app/src/main/java/app/remix/player/LiveOverlap.kt
++++ b/app/src/main/java/app/remix/player/LiveOverlap.kt
+@@ -20,3 +20,3 @@
+     private var started=false;private var handing=false;private var handoffAt=0L;private var handoffTarget=-1L;private var internalSeek=false;private var autoPending=false
+-    private var lastPosition=-1L;private var lastTime=0L;private var rejectedId:String?=null
++    private var fadeWindow:OverlapCore.Window?=null;private var startedAt=0L;private var lagSince=0L;private var blendSince=0L;private var rejectedId:String?=null
+     private val listener=object:Player.Listener {
+@@ -31,9 +31,10 @@
+     init{main.addListener(listener)}
++    private fun debug(message:String){if((context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE)!=0)android.util.Log.d("RemixOverlap",message)}
+     private fun queueMatches():Boolean=from in 0 until main.mediaItemCount&&to in 0 until main.mediaItemCount&&main.getMediaItemAt(from).mediaId==fromId&&main.getMediaItemAt(to).mediaId==toId
+-    private fun abort(reject:Boolean){if(reject&&preview!=null)rejectedId=fromId;preview?.release();preview=null;started=false;handing=false;internalSeek=false;autoPending=false;handoffTarget=-1L;lastPosition=-1;main.volume=1f}
++    private fun abort(reject:Boolean){if(preview!=null)debug("finish reject="+reject+" started="+started+" handing="+handing);if(reject&&preview!=null)rejectedId=fromId;preview?.release();preview=null;started=false;handing=false;internalSeek=false;autoPending=false;handoffTarget=-1L;fadeWindow=null;startedAt=0L;lagSince=0L;blendSince=0L;main.volume=1f}
+     fun close(){main.removeListener(listener);abort(false)}
+     private fun handoff(){val p=preview?:return;if(handing)return
+-        if(!queueMatches()||p.playbackState!=Player.STATE_READY){abort(true);return}
+-        handing=true;handoffAt=SystemClock.elapsedRealtime();main.volume=0f;p.volume=1f
+-        handoffTarget=OverlapCore.handoffPosition(p.currentPosition,p.duration);internalSeek=true;try{main.seekTo(to,handoffTarget)}finally{internalSeek=false}
++        if(!queueMatches()||p.playbackState!=Player.STATE_READY||!p.isPlaying){abort(true);return}
++        handing=true;handoffAt=SystemClock.elapsedRealtime();blendSince=0L;main.volume=0f;p.volume=1f
++        handoffTarget=OverlapCore.handoffPosition(p.currentPosition,p.duration);debug("handoff position="+handoffTarget);internalSeek=true;try{main.seekTo(to,handoffTarget)}finally{internalSeek=false}
+     }
+@@ -45,5 +46,12 @@
+         if(handing){val p=preview?:return false
+-            if(!queueMatches()||main.currentMediaItemIndex!=to||now-handoffAt>1200||p.playbackState!=Player.STATE_READY){abort(true);return false}
+-            // Once the primary has resumed at the incoming position, release the preview.
+-            if(main.isPlaying){val error=kotlin.math.abs(main.currentPosition-p.currentPosition);if(error<=200||now-handoffAt>300){abort(false);return false}}
++            if(!queueMatches()||now-handoffAt>1800||p.playbackState!=Player.STATE_READY){abort(true);return false}
++            // Wait for the seek to reach the incoming item; the preview fills the decoder startup gap.
++            if(main.currentMediaItemIndex==to&&main.isPlaying){
++                val error=kotlin.math.abs(main.currentPosition-p.currentPosition)
++                if(error<=250||now-handoffAt>=1000){
++                    if(blendSince==0L)blendSince=now
++                    val g=OverlapCore.gains(now-blendSince,120);p.volume=g.outgoing;main.volume=g.incoming
++                    if(now-blendSince>=120){abort(false);return false}
++                }else{blendSince=0L;main.volume=0f;p.volume=1f}
++            }else{blendSince=0L;main.volume=0f;p.volume=1f}
+             return true
+@@ -64,10 +72,24 @@
+         if(p.playerError!=null){abort(true);return false}
+-        if(p.playbackState!=Player.STATE_READY){if(started||duration-pos<300)abort(true);return false}
+-        val w=OverlapCore.window(duration,p.duration,requested)?:run{abort(true);return false}
+-        if(pos<w.start){if(started){abort(true);return false};return false}
++        if(p.playbackState!=Player.STATE_READY){
++            // A short preparation stall should not attenuate the only audible stream.
++            if(started){main.volume=1f;p.volume=0f;if(now-startedAt>1200){abort(true);return false};return true}
++            if(duration-pos<500)abort(true);return false
++        }
++        val planned=OverlapCore.window(duration,p.duration,requested)?:run{abort(true);return false}
++        if(pos<planned.start){if(started){abort(true);return false};return false}
++        if(!started){
++            val actual=OverlapCore.startWindow(planned,pos)?:run{abort(true);return false}
++            fadeWindow=actual;started=true;startedAt=now;lagSince=0L;debug("start window="+actual.duration+" late="+(actual.start-planned.start))
++            // The incoming song starts at its intro, even if preparation completed late.
++            p.play();main.volume=1f;p.volume=0f;return true
++        }
++        val w=fadeWindow?:run{abort(true);return false}
+         val elapsed=(pos-w.start).coerceAtLeast(0)
+-        if(!started){if(elapsed>350){abort(true);return false};started=true;p.seekTo(elapsed);p.play();lastPosition=pos;lastTime=now;return true}
+-        if(lastPosition>=0&&kotlin.math.abs((pos-lastPosition)-(now-lastTime))>350){abort(true);return false};lastPosition=pos;lastTime=now
+-        if(OverlapCore.drift(elapsed,p.currentPosition)&&elapsed>400){abort(true);return false}
+-        val g=OverlapCore.gains(elapsed,w.duration);main.volume=g.outgoing;p.volume=g.incoming
++        if(!p.isPlaying){main.volume=1f;p.volume=0f;if(now-startedAt>1200){abort(true);return false};return true}
++        if(OverlapCore.drift(elapsed,p.currentPosition)&&elapsed>400){
++            if(lagSince==0L)lagSince=now
++            if(now-lagSince>900&&kotlin.math.abs(elapsed-p.currentPosition)>850){abort(true);return false}
++        }else lagSince=0L
++        val audible=OverlapCore.synchronizedElapsed(elapsed,p.currentPosition,w.duration)
++        val g=OverlapCore.gains(audible,w.duration);main.volume=g.outgoing;p.volume=g.incoming
+         if(duration-pos<=100)handoff()
+--- a/app/src/main/java/app/remix/player/PlaybackService.kt
++++ b/app/src/main/java/app/remix/player/PlaybackService.kt
+@@ -70,3 +70,3 @@
+         if(!mixing){val target=PlaybackTiming.gain(p.currentPosition,p.duration,if(PlaybackOptions.overlapMs>0)0 else PlaybackOptions.fadeMs,true,true);if(kotlin.math.abs(p.volume-target)>.002f)p.volume=target}
+-        handler.postDelayed(this,if((PlaybackOptions.fadeMs>0||PlaybackOptions.overlapMs>0||RepeatRegion.active!=null)&&p.isPlaying)50 else 500)
++        handler.postDelayed(this,if(PlaybackOptions.overlapMs>0&&p.playWhenReady)25 else if((PlaybackOptions.fadeMs>0||RepeatRegion.active!=null)&&p.isPlaying)50 else 500)
+     }}
