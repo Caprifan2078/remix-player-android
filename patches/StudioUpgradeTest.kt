@@ -1,0 +1,18 @@
+package app.remix.player
+import java.io.File
+import kotlin.math.*
+fun main(){
+ val root=kotlin.io.path.createTempDirectory("studio-upgrade").toFile(); val failures=mutableListOf<String>()
+ fun test(label:String,block:()->Unit){try{block();println("PASS $label")}catch(e:Throwable){failures.add(label);println("FAIL $label: ${e.message}")}}
+ try{
+ val n=44100;val style=GenreEngine.styles.first().copy(snare=intArrayOf(),hat=intArrayOf(),kick=intArrayOf(0));val section=listOf(Arrangement.Section(0.0,1.0,Arrangement.Part.DROP));val control=GenreMix(drums=1f,bass=0f,lead=0f);val zero=File(root,"zero.pcm").apply{writeBytes(ByteArray(n*4))}
+ fun tone(hz:Double, name:String)=File(root,name).apply{outputStream().buffered().use{w->repeat(n){i->val x=(sin(2*PI*hz*i/44100)*2500).roundToInt().toShort();StemCore.writeShort(w,x);StemCore.writeShort(w,(-x).toShort())}}}
+ fun wav(f:File,name:String,c:GenreMix=control):ShortArray{val o=File(root,name);GenreEngine.renderFromMix(f,o,style,120.0,0.0,emptyList(),listOf(.1),controls=c,sections=section);check(o.length()==44+n*4L);return o.inputStream().buffered().use{it.skip(44);ShortArray(n*2){_->StemCore.readShort(it)}}}
+ val kick=wav(zero,"kick.wav");val bass=tone(60.0,"bass.pcm");val treble=tone(2400.0,"treble.pcm")
+ fun attenuation(raw:File,hz:Double):Double{val mixed=wav(raw,"mixed.wav");val solo=wav(raw,"solo.wav",control.copy(drums=0f));var a=0.0;var b=0.0;for(i in 441..2645){val y=(mixed[i*2]-kick[i*2]).toDouble();a+=y*y;b+=solo[i*2].toDouble().pow(2)};val db=10*log10(a/b);println("MEASURE original $hz Hz during kick: $db dB");return db}
+ test("stereo mix low-band sidechain"){val low=attenuation(bass,60.0);val high=attenuation(treble,2400.0);check(low< -2.0&&abs(high)<.3){"low=$low high=$high"}}
+ test("drums muted preserves original stereo gain"){val s=wav(treble,"muted.wav",control.copy(drums=0f));treble.inputStream().buffered().use{r->for(x in s){check(x==StemCore.pcm(StemCore.readShort(r)/32768f*.72f))}}}
+ test("separated bass sidechain"){val d=File(root,"stems").apply{mkdir()};repeat(4){zero.copyTo(File(d,"$it.pcm"))};fun stem(name:String,c:GenreMix):ShortArray{val o=File(root,name);GenreEngine.render(d,n.toLong(),4,o,style,120.0,0.0,controls=c,sections=section){};return o.inputStream().buffered().use{it.skip(44);ShortArray(n*2){_->StemCore.readShort(it)}}};val k=stem("stem-kick.wav",control);bass.copyTo(File(d,"1.pcm"),true);val mix=stem("stem-mix.wav",control);val solo=stem("stem-solo.wav",control.copy(drums=0f));var a=0.0;var b=0.0;for(i in 441..2645){val y=(mix[i*2]-k[i*2]).toDouble();a+=y*y;b+=solo[i*2].toDouble().pow(2)};val db=10*log10(a/b);println("MEASURE separated bass during kick: $db dB");check(db< -2.0){"$db dB"}}
+ test("eight genre lead colors; deterministic, bounded, harmonically gated"){val names=listOf("House","Hardstyle","Drift Phonk","Brazilian Funk","UK Garage","Synthwave","Amapiano","Dubstep");val chords=List(10){Harmony.Chord(it*.4,0,false,.9)};val fingerprints=mutableSetOf<Long>();for(name in names){val s=GenreEngine.styles.first{it.name==name}.copy(drive=.2f);val a=LeadSynth(chords,120.0,0.0,s);val b=LeadSynth(chords,120.0,0.0,s);var hash=0L;var peak=0f;repeat(44100){i->val v=a.sample(i.toLong(),1f);check(v==b.sample(i.toLong(),1f)&&v.isFinite()&&abs(v)<.1f);peak=max(peak,abs(v));hash=31*hash+v.toBits()};check(peak>.01f);fingerprints.add(hash);val unknown=LeadSynth(emptyList(),120.0,0.0,s);repeat(1000){check(unknown.sample(it.toLong(),1f)==0f)}};println("MEASURE unique lead fingerprints ${fingerprints.size}/${names.size}");check(fingerprints.size==names.size)}
+ }finally{root.deleteRecursively()};check(failures.isEmpty()){failures.joinToString()}
+}
