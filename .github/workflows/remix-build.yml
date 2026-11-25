@@ -43,6 +43,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/012-whisper-window.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/013-transition-energy.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/014-stem-finite.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/015-download-cancel.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
           test -f "source/$PROJECT/app/build.gradle.kts"
@@ -125,6 +126,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/012-whisper-window.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/013-transition-energy.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/014-stem-finite.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/015-download-cancel.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/setup-java@v4
@@ -155,6 +157,8 @@ jobs:
         run: python3 patches/test-startup-ui.py
       - name: Finite neural stem checkpoint regression
         run: bash patches/run-stem-finite.sh "source/$PROJECT"
+      - name: Model download cancellation and verified completion
+        run: bash patches/run-download-regression.sh "source/$PROJECT"
       - name: Full regression
         working-directory: source/RemixPlayer_v0.66
         env:
@@ -204,6 +208,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/012-whisper-window.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/013-transition-energy.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/014-stem-finite.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/015-download-cancel.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/download-artifact@v4
@@ -248,6 +253,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/012-whisper-window.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/013-transition-energy.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/014-stem-finite.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/015-download-cancel.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/download-artifact@v4
@@ -299,6 +305,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/012-whisper-window.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/013-transition-energy.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/014-stem-finite.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/015-download-cancel.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/setup-java@v4
