@@ -114,15 +114,22 @@ class StudioAcceptanceTest {
             val restored=BackupCore.read(ByteArrayInputStream(archive.toByteArray()),File(dir,"restore"))
             assertArrayEquals(metadata,restored.metadata);assertArrayEquals(source.readBytes(),restored.files.single().readBytes())
             val decoded=File(dir,"restored.pcm");assertEquals(2205L,decode(restored.files.single(),decoded))
-            val malicious=ByteArrayOutputStream()
-            java.util.zip.ZipOutputStream(malicious).use{z->
-                for((name,data) in listOf("remix-backup-v1" to "1".toByteArray(),"library.json" to metadata,"../escape.wav" to source.readBytes())){
-                    z.putNextEntry(java.util.zip.ZipEntry(name));z.write(data);z.closeEntry()
+            // Android 14+ can reject traversal inside ZipInputStream before application validation.
+            // A syntactically safe but invalid ordinal independently exercises our own validator.
+            for(entryName in listOf("audio/00.wav","../escape.wav")){
+                val malicious=ByteArrayOutputStream()
+                java.util.zip.ZipOutputStream(malicious).use{z->
+                    for((name,data) in listOf("remix-backup-v1" to "1".toByteArray(),"library.json" to metadata,entryName to source.readBytes())){
+                        z.putNextEntry(java.util.zip.ZipEntry(name));z.write(data);z.closeEntry()
+                    }
                 }
+                val bad=File(dir,"bad")
+                val rejected=runCatching{BackupCore.read(ByteArrayInputStream(malicious.toByteArray()),bad)}.exceptionOrNull()
+                val appRejection=rejected is IllegalArgumentException&&rejected.message=="Недопустимая запись архива"
+                val platformRejection=entryName=="../escape.wav"&&android.os.Build.VERSION.SDK_INT>=34&&rejected is java.util.zip.ZipException&&rejected.message.orEmpty().contains(entryName)
+                assertTrue("Expected specific path rejection: "+rejected?.javaClass?.simpleName+": "+rejected?.message,appRejection||platformRejection)
+                assertFalse(bad.exists());assertFalse(File(dir,"escape.wav").exists())
             }
-            val bad=File(dir,"bad");val rejected=runCatching{BackupCore.read(ByteArrayInputStream(malicious.toByteArray()),bad)}.exceptionOrNull()
-            assertTrue("Expected path validation, not an unrelated exception",rejected is IllegalArgumentException && rejected.message=="Недопустимая запись архива")
-            assertFalse(bad.exists());assertFalse(File(dir,"escape.wav").exists())
             println("PASS Android: portable audio backup restore, playable file and traversal rollback")
         }finally{dir.deleteRecursively()}
     }
