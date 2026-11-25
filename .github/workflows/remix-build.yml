@@ -45,6 +45,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/014-stem-finite.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/015-download-cancel.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/016-whisper-input.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/017-model-cdn.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
           test -f "source/$PROJECT/app/build.gradle.kts"
@@ -129,6 +130,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/014-stem-finite.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/015-download-cancel.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/016-whisper-input.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/017-model-cdn.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/setup-java@v4
@@ -163,6 +165,8 @@ jobs:
         run: bash patches/run-download-regression.sh "source/$PROJECT"
       - name: Quiet-window Whisper input regression
         run: bash patches/run-whisper-input.sh "source/$PROJECT"
+      - name: Model CDN redirect regression
+        run: bash patches/run-model-redirect.sh "source/$PROJECT"
       - name: Full regression
         working-directory: source/RemixPlayer_v0.66
         env:
@@ -214,6 +218,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/014-stem-finite.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/015-download-cancel.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/016-whisper-input.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/017-model-cdn.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/download-artifact@v4
@@ -260,6 +265,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/014-stem-finite.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/015-download-cancel.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/016-whisper-input.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/017-model-cdn.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/download-artifact@v4
@@ -313,6 +319,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/014-stem-finite.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/015-download-cancel.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/016-whisper-input.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/017-model-cdn.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/setup-java@v4
