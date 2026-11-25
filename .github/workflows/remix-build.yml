@@ -1,0 +1,216 @@
+# Place at .github/workflows/remix-build.yml in a dedicated private repository.
+# Place RemixPlayer_v0.64_source.zip at the repository root, unchanged.
+name: Remix Player 0.64 - first APK
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'RemixPlayer_v0.64_source.zip'
+permissions:
+  contents: read
+concurrency:
+  group: remix-build-${{ github.ref }}
+  cancel-in-progress: false
+env:
+  SOURCE_ZIP: RemixPlayer_v0.64_source.zip
+  SOURCE_SHA256: 042462f7655388f624e36cc1291e83fe63426c1c7a42fc1418ac5a3913387981
+  PROJECT: RemixPlayer_v0.64
+jobs:
+  apk:
+    name: Compile and package APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify and extract original source
+        run: |
+          printf '%s  %s\n' "$SOURCE_SHA256" "$SOURCE_ZIP" | sha256sum -c -
+          unzip -q "$SOURCE_ZIP" -d source
+          test -f "source/$PROJECT/app/build.gradle.kts"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android toolchain
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;28.2.13676358'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Build native MP3 and Whisper
+        working-directory: source/RemixPlayer_v0.64
+        run: |
+          set -o pipefail
+          mkdir -p "$GITHUB_WORKSPACE/diagnostics"
+          bash scripts/build-mp3-android.sh 2>&1 | tee "$GITHUB_WORKSPACE/diagnostics/mp3.log"
+          bash scripts/build-whisper-android.sh 2>&1 | tee "$GITHUB_WORKSPACE/diagnostics/whisper.log"
+      - name: Compile application
+        working-directory: source/RemixPlayer_v0.64
+        run: |
+          set -o pipefail
+          gradle --no-daemon :app:assembleDebug --stacktrace 2>&1 | tee "$GITHUB_WORKSPACE/diagnostics/assemble.log"
+          test -s app/build/outputs/apk/debug/app-debug.apk
+          sha256sum app/build/outputs/apk/debug/app-debug.apk | tee "$GITHUB_WORKSPACE/diagnostics/apk.sha256"
+      - name: Save APK before further checks
+        uses: actions/upload-artifact@v4
+        with:
+          name: RemixPlayer-v0.64-debug-UNVERIFIED
+          path: source/RemixPlayer_v0.64/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+      - name: Compile instrumentation tests
+        working-directory: source/RemixPlayer_v0.64
+        run: |
+          set -o pipefail
+          gradle --no-daemon :app:assembleDebugAndroidTest --stacktrace 2>&1 | tee "$GITHUB_WORKSPACE/diagnostics/instrumentation-build.log"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RemixPlayer-v0.64-instrumentation
+          path: source/RemixPlayer_v0.64/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: APK-build-diagnostics
+          path: diagnostics/
+          if-no-files-found: ignore
+  host:
+    name: JVM regression and MP3
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          printf '%s  %s\n' "$SOURCE_SHA256" "$SOURCE_ZIP" | sha256sum -c -
+          unzip -q "$SOURCE_ZIP" -d source
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg libmp3lame0 gcc
+          if ! command -v kotlinc >/dev/null; then
+            curl --fail --location --retry 3 -o "$RUNNER_TEMP/kotlin.zip" https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip
+            unzip -q "$RUNNER_TEMP/kotlin.zip" -d "$RUNNER_TEMP/kotlin"
+            echo "$RUNNER_TEMP/kotlin/kotlinc/bin" >> "$GITHUB_PATH"
+          fi
+      - name: Full regression
+        working-directory: source/RemixPlayer_v0.64
+        env:
+          JAVA_OPTS: -Xmx2g
+        run: |
+          set -o pipefail
+          mkdir -p "$GITHUB_WORKSPACE/host-logs"
+          bash tests/run-core.sh 2>&1 | tee "$GITHUB_WORKSPACE/host-logs/core.log"
+      - name: Native and syntax checks
+        if: always()
+        working-directory: source/RemixPlayer_v0.64
+        run: |
+          set -o pipefail
+          mkdir -p "$GITHUB_WORKSPACE/host-logs"
+          bash tests/run-syntax-audit.sh 2>&1 | tee "$GITHUB_WORKSPACE/host-logs/syntax.log"
+          bash tests/run-mp3-host.sh 2>&1 | tee "$GITHUB_WORKSPACE/host-logs/mp3.log"
+          python3 tests/test-native-audit.py 2>&1 | tee "$GITHUB_WORKSPACE/host-logs/native-test.log"
+          python3 tests/test-release-gates.py 2>&1 | tee "$GITHUB_WORKSPACE/host-logs/release-gates.log"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Host-test-logs
+          path: host-logs/
+          if-no-files-found: ignore
+  native:
+    name: Audit native APK alignment
+    needs: apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          printf '%s  %s\n' "$SOURCE_SHA256" "$SOURCE_ZIP" | sha256sum -c -
+          unzip -q "$SOURCE_ZIP" -d source
+      - uses: actions/download-artifact@v4
+        with:
+          name: RemixPlayer-v0.64-debug-UNVERIFIED
+          path: apk
+      - run: |
+          set -o pipefail
+          python3 "source/$PROJECT/scripts/check-native-apk.py" apk/app-debug.apk | tee native-audit.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Native-audit
+          path: native-audit.log
+          if-no-files-found: ignore
+  smoke:
+    name: Android emulator API ${{ matrix.api }}
+    needs: apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [29, 35]
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          printf '%s  %s\n' "$SOURCE_SHA256" "$SOURCE_ZIP" | sha256sum -c -
+          unzip -q "$SOURCE_ZIP" -d source
+      - uses: actions/download-artifact@v4
+        with:
+          name: RemixPlayer-v0.64-debug-UNVERIFIED
+          path: apk
+      - uses: actions/download-artifact@v4
+        with:
+          name: RemixPlayer-v0.64-instrumentation
+          path: test-apk
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          target: google_apis
+          arch: x86_64
+          script: bash source/RemixPlayer_v0.64/tests/android-smoke.sh apk/app-debug.apk && bash source/RemixPlayer_v0.64/tests/android-playback.sh test-apk/app-debug-androidTest.apk && bash source/RemixPlayer_v0.64/tests/android-mixer-smoke.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Android-smoke-api-${{ matrix.api }}
+          path: smoke-output/
+          if-no-files-found: ignore
+
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          printf '%s  %s\n' "$SOURCE_SHA256" "$SOURCE_ZIP" | sha256sum -c -
+          unzip -q "$SOURCE_ZIP" -d source
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '17'}
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with: {gradle-version: '8.9'}
+      - run: gradle --no-daemon :app:lintDebug --stacktrace
+        working-directory: source/RemixPlayer_v0.64
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Lint-report
+          path: source/RemixPlayer_v0.64/app/build/reports/lint-results-debug.*
+          if-no-files-found: ignore
+  candidate:
+    name: Automated acceptance candidate (manual QA still required)
+    needs: [apk, host, native, smoke, lint]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: {name: RemixPlayer-v0.64-debug-UNVERIFIED, path: candidate}
+      - run: sha256sum candidate/app-debug.apk > candidate/apk.sha256
+      - uses: actions/upload-artifact@v4
+        with: {name: RemixPlayer-v0.64-automated-QA-candidate, path: candidate/, if-no-files-found: error}
