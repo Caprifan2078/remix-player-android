@@ -34,6 +34,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/004-accessibility-privacy.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/005-ui-qa.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/006-playback-regression.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/007-mixer-resume.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
           test -f "source/$PROJECT/app/build.gradle.kts"
       - uses: actions/setup-java@v4
@@ -106,6 +107,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/004-accessibility-privacy.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/005-ui-qa.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/006-playback-regression.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/007-mixer-resume.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/setup-java@v4
         with:
@@ -163,6 +165,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/004-accessibility-privacy.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/005-ui-qa.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/006-playback-regression.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/007-mixer-resume.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/download-artifact@v4
         with:
@@ -197,6 +200,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/004-accessibility-privacy.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/005-ui-qa.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/006-playback-regression.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/007-mixer-resume.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/download-artifact@v4
         with:
@@ -238,6 +242,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/004-accessibility-privacy.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/005-ui-qa.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/006-playback-regression.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/007-mixer-resume.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/setup-java@v4
         with: {distribution: temurin, java-version: '17'}
