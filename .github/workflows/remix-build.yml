@@ -1,20 +1,20 @@
 # Place at .github/workflows/remix-build.yml in a dedicated private repository.
-# Place RemixPlayer_v0.64_source.zip at the repository root, unchanged.
-name: Remix Player 0.64 - first APK
+# Place RemixPlayer_v0.66_source.zip at the repository root, unchanged.
+name: Remix Player 0.66 - first APK
 on:
   workflow_dispatch:
   push:
     paths:
-      - 'RemixPlayer_v0.64_source.zip'
+      - 'RemixPlayer_v0.66_source.zip'
 permissions:
   contents: read
 concurrency:
   group: remix-build-${{ github.ref }}
   cancel-in-progress: false
 env:
-  SOURCE_ZIP: RemixPlayer_v0.64_source.zip
-  SOURCE_SHA256: 042462f7655388f624e36cc1291e83fe63426c1c7a42fc1418ac5a3913387981
-  PROJECT: RemixPlayer_v0.64
+  SOURCE_ZIP: RemixPlayer_v0.66_source.zip
+  SOURCE_SHA256: 8ebc8cf15b4bc7a34a674bc7a927d69fd54026f2bbf6289cf2fe4ad8dedf4ba2
+  PROJECT: RemixPlayer_v0.66
 jobs:
   apk:
     name: Compile and package APK
@@ -38,14 +38,14 @@ jobs:
         with:
           gradle-version: '8.9'
       - name: Build native MP3 and Whisper
-        working-directory: source/RemixPlayer_v0.64
+        working-directory: source/RemixPlayer_v0.66
         run: |
           set -o pipefail
           mkdir -p "$GITHUB_WORKSPACE/diagnostics"
           bash scripts/build-mp3-android.sh 2>&1 | tee "$GITHUB_WORKSPACE/diagnostics/mp3.log"
           bash scripts/build-whisper-android.sh 2>&1 | tee "$GITHUB_WORKSPACE/diagnostics/whisper.log"
       - name: Compile application
-        working-directory: source/RemixPlayer_v0.64
+        working-directory: source/RemixPlayer_v0.66
         run: |
           set -o pipefail
           gradle --no-daemon :app:assembleDebug --stacktrace 2>&1 | tee "$GITHUB_WORKSPACE/diagnostics/assemble.log"
@@ -54,18 +54,18 @@ jobs:
       - name: Save APK before further checks
         uses: actions/upload-artifact@v4
         with:
-          name: RemixPlayer-v0.64-debug-UNVERIFIED
-          path: source/RemixPlayer_v0.64/app/build/outputs/apk/debug/app-debug.apk
+          name: RemixPlayer-v0.66-debug-UNVERIFIED
+          path: source/RemixPlayer_v0.66/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
       - name: Compile instrumentation tests
-        working-directory: source/RemixPlayer_v0.64
+        working-directory: source/RemixPlayer_v0.66
         run: |
           set -o pipefail
           gradle --no-daemon :app:assembleDebugAndroidTest --stacktrace 2>&1 | tee "$GITHUB_WORKSPACE/diagnostics/instrumentation-build.log"
       - uses: actions/upload-artifact@v4
         with:
-          name: RemixPlayer-v0.64-instrumentation
-          path: source/RemixPlayer_v0.64/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          name: RemixPlayer-v0.66-instrumentation
+          path: source/RemixPlayer_v0.66/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
@@ -96,7 +96,7 @@ jobs:
             echo "$RUNNER_TEMP/kotlin/kotlinc/bin" >> "$GITHUB_PATH"
           fi
       - name: Full regression
-        working-directory: source/RemixPlayer_v0.64
+        working-directory: source/RemixPlayer_v0.66
         env:
           JAVA_OPTS: -Xmx2g
         run: |
@@ -105,7 +105,7 @@ jobs:
           bash tests/run-core.sh 2>&1 | tee "$GITHUB_WORKSPACE/host-logs/core.log"
       - name: Native and syntax checks
         if: always()
-        working-directory: source/RemixPlayer_v0.64
+        working-directory: source/RemixPlayer_v0.66
         run: |
           set -o pipefail
           mkdir -p "$GITHUB_WORKSPACE/host-logs"
@@ -131,7 +131,7 @@ jobs:
           unzip -q "$SOURCE_ZIP" -d source
       - uses: actions/download-artifact@v4
         with:
-          name: RemixPlayer-v0.64-debug-UNVERIFIED
+          name: RemixPlayer-v0.66-debug-UNVERIFIED
           path: apk
       - run: |
           set -o pipefail
@@ -158,11 +158,11 @@ jobs:
           unzip -q "$SOURCE_ZIP" -d source
       - uses: actions/download-artifact@v4
         with:
-          name: RemixPlayer-v0.64-debug-UNVERIFIED
+          name: RemixPlayer-v0.66-debug-UNVERIFIED
           path: apk
       - uses: actions/download-artifact@v4
         with:
-          name: RemixPlayer-v0.64-instrumentation
+          name: RemixPlayer-v0.66-instrumentation
           path: test-apk
       - name: Enable KVM
         run: |
@@ -174,7 +174,7 @@ jobs:
           api-level: ${{ matrix.api }}
           target: google_apis
           arch: x86_64
-          script: bash source/RemixPlayer_v0.64/tests/android-smoke.sh apk/app-debug.apk && bash source/RemixPlayer_v0.64/tests/android-playback.sh test-apk/app-debug-androidTest.apk && bash source/RemixPlayer_v0.64/tests/android-mixer-smoke.sh
+          script: bash source/RemixPlayer_v0.66/tests/android-smoke.sh apk/app-debug.apk && bash source/RemixPlayer_v0.66/tests/android-playback.sh test-apk/app-debug-androidTest.apk && bash source/RemixPlayer_v0.66/tests/android-mixer-smoke.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -197,12 +197,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with: {gradle-version: '8.9'}
       - run: gradle --no-daemon :app:lintDebug --stacktrace
-        working-directory: source/RemixPlayer_v0.64
+        working-directory: source/RemixPlayer_v0.66
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: Lint-report
-          path: source/RemixPlayer_v0.64/app/build/reports/lint-results-debug.*
+          path: source/RemixPlayer_v0.66/app/build/reports/lint-results-debug.*
           if-no-files-found: ignore
   candidate:
     name: Automated acceptance candidate (manual QA still required)
@@ -210,7 +210,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
-        with: {name: RemixPlayer-v0.64-debug-UNVERIFIED, path: candidate}
+        with: {name: RemixPlayer-v0.66-debug-UNVERIFIED, path: candidate}
       - run: sha256sum candidate/app-debug.apk > candidate/apk.sha256
       - uses: actions/upload-artifact@v4
-        with: {name: RemixPlayer-v0.64-automated-QA-candidate, path: candidate/, if-no-files-found: error}
+        with: {name: RemixPlayer-v0.66-automated-QA-candidate, path: candidate/, if-no-files-found: error}
