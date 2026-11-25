@@ -29,6 +29,7 @@ jobs:
           printf '%s  %s\n' "$SOURCE_SHA256" "$SOURCE_ZIP" | sha256sum -c -
           unzip -q "$SOURCE_ZIP" -d source
           patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/001-media-controller-import.patch"
+          patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/002-mainactivity-media3-opt-in.patch"
           test -f "source/$PROJECT/app/build.gradle.kts"
       - uses: actions/setup-java@v4
         with:
@@ -95,6 +96,7 @@ jobs:
           printf '%s  %s\n' "$SOURCE_SHA256" "$SOURCE_ZIP" | sha256sum -c -
           unzip -q "$SOURCE_ZIP" -d source
           patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/001-media-controller-import.patch"
+          patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/002-mainactivity-media3-opt-in.patch"
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -142,6 +144,7 @@ jobs:
           printf '%s  %s\n' "$SOURCE_SHA256" "$SOURCE_ZIP" | sha256sum -c -
           unzip -q "$SOURCE_ZIP" -d source
           patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/001-media-controller-import.patch"
+          patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/002-mainactivity-media3-opt-in.patch"
       - uses: actions/download-artifact@v4
         with:
           name: RemixPlayer-v0.66-debug-UNVERIFIED
@@ -170,6 +173,7 @@ jobs:
           printf '%s  %s\n' "$SOURCE_SHA256" "$SOURCE_ZIP" | sha256sum -c -
           unzip -q "$SOURCE_ZIP" -d source
           patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/001-media-controller-import.patch"
+          patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/002-mainactivity-media3-opt-in.patch"
       - uses: actions/download-artifact@v4
         with:
           name: RemixPlayer-v0.66-debug-UNVERIFIED
@@ -205,6 +209,7 @@ jobs:
           printf '%s  %s\n' "$SOURCE_SHA256" "$SOURCE_ZIP" | sha256sum -c -
           unzip -q "$SOURCE_ZIP" -d source
           patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/001-media-controller-import.patch"
+          patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/002-mainactivity-media3-opt-in.patch"
       - uses: actions/setup-java@v4
         with: {distribution: temurin, java-version: '17'}
       - name: Install Android toolchain for lint
@@ -223,6 +228,21 @@ jobs:
         with: {gradle-version: '8.9'}
       - run: gradle --no-daemon :app:lintDebug --stacktrace
         working-directory: source/RemixPlayer_v0.66
+      - name: Print lint issue details
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os, xml.etree.ElementTree as ET
+          path = Path("source") / os.environ["PROJECT"] / "app/build/reports/lint-results-debug.xml"
+          if not path.exists():
+              print("No XML lint report generated")
+          else:
+              for issue in ET.parse(path).getroot().findall("issue"):
+                  loc = issue.find("location")
+                  where = "" if loc is None else f"{loc.get('file','')}:{loc.get('line','')}"
+                  print(f"{issue.get('severity')} {issue.get('id')} {where}: {issue.get('message')}")
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:

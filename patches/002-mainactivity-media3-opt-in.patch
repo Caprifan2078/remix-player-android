@@ -1,0 +1,7 @@
+--- a/app/src/main/java/app/remix/player/MainActivity.kt
++++ b/app/src/main/java/app/remix/player/MainActivity.kt
+@@ -25,3 +25,3 @@
+ private data class Track(val uri: String, val title: String, val artist: String, var group: String, var lyrics: String="", var favorite: Boolean=false, val tempoRatio:Double?=null, val album:String="",val folder:String="")
+-@UnstableApi
++@androidx.annotation.OptIn(UnstableApi::class)
+ class MainActivity : ComponentActivity() {
