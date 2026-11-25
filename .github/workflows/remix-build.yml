@@ -33,6 +33,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/003-runtime-qa.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/004-accessibility-privacy.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/005-ui-qa.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/006-playback-regression.py" "source/$PROJECT"
           test -f "source/$PROJECT/app/build.gradle.kts"
       - uses: actions/setup-java@v4
         with:
@@ -103,6 +104,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/003-runtime-qa.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/004-accessibility-privacy.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/005-ui-qa.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/006-playback-regression.py" "source/$PROJECT"
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -156,6 +158,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/003-runtime-qa.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/004-accessibility-privacy.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/005-ui-qa.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/006-playback-regression.py" "source/$PROJECT"
       - uses: actions/download-artifact@v4
         with:
           name: RemixPlayer-v0.66-debug-UNVERIFIED
@@ -188,6 +191,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/003-runtime-qa.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/004-accessibility-privacy.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/005-ui-qa.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/006-playback-regression.py" "source/$PROJECT"
       - uses: actions/download-artifact@v4
         with:
           name: RemixPlayer-v0.66-debug-UNVERIFIED
@@ -227,6 +231,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/003-runtime-qa.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/004-accessibility-privacy.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/005-ui-qa.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/006-playback-regression.py" "source/$PROJECT"
       - uses: actions/setup-java@v4
         with: {distribution: temurin, java-version: '17'}
       - name: Install Android toolchain for lint
