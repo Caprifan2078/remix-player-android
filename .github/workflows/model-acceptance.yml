@@ -123,13 +123,20 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+      - name: Check available AVD space before boot
+        run: |
+          mkdir -p "$HOME/.android/avd"
+          df -h "$HOME/.android/avd"
+          free -h
+          available=$(df -Pk "$HOME/.android/avd" | awk 'NR==2 {print $4}')
+          test "$available" -ge 6291456 || { echo 'Insufficient AVD disk capacity; abort before emulator boot'; exit 1; }
       - uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
           target: google_apis
           arch: x86_64
           ram-size: 4096M
-          disk-size: 8G
+          disk-size: 4G
           script: bash model-qa/run-real-models.sh
       - uses: actions/upload-artifact@v4
         if: always()
