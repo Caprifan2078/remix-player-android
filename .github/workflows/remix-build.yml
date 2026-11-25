@@ -120,7 +120,9 @@ jobs:
           "$RUNNER_TEMP/kotlin/kotlinc/bin/kotlinc" -version
           echo "$RUNNER_TEMP/kotlin/kotlinc/bin" >> "$GITHUB_PATH"
       - name: Static privacy and accessibility regression
-        run: python3 patches/quality-audit.py "source/$PROJECT"
+        run: |
+          python3 patches/quality-audit.py "source/$PROJECT"
+          python3 patches/check-test-identities.py --selftest
       - name: Full regression
         working-directory: source/RemixPlayer_v0.66
         env:

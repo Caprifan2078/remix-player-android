@@ -120,7 +120,8 @@ class StudioAcceptanceTest {
                     z.putNextEntry(java.util.zip.ZipEntry(name));z.write(data);z.closeEntry()
                 }
             }
-            val bad=File(dir,"bad");assertTrue(runCatching{BackupCore.read(ByteArrayInputStream(malicious.toByteArray()),bad)}.isFailure)
+            val bad=File(dir,"bad");val rejected=runCatching{BackupCore.read(ByteArrayInputStream(malicious.toByteArray()),bad)}.exceptionOrNull()
+            assertTrue("Expected path validation, not an unrelated exception",rejected is IllegalArgumentException && rejected.message=="Недопустимая запись архива")
             assertFalse(bad.exists());assertFalse(File(dir,"escape.wav").exists())
             println("PASS Android: portable audio backup restore, playable file and traversal rollback")
         }finally{dir.deleteRecursively()}
