@@ -31,6 +31,7 @@ jobs:
           patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/001-media-controller-import.patch"
           patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/002-mainactivity-media3-opt-in.patch"
           python3 "$GITHUB_WORKSPACE/patches/003-runtime-qa.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/004-accessibility-privacy.py" "source/$PROJECT"
           test -f "source/$PROJECT/app/build.gradle.kts"
       - uses: actions/setup-java@v4
         with:
@@ -99,6 +100,7 @@ jobs:
           patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/001-media-controller-import.patch"
           patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/002-mainactivity-media3-opt-in.patch"
           python3 "$GITHUB_WORKSPACE/patches/003-runtime-qa.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/004-accessibility-privacy.py" "source/$PROJECT"
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -111,6 +113,8 @@ jobs:
           unzip -q "$RUNNER_TEMP/kotlin.zip" -d "$RUNNER_TEMP/kotlin"
           "$RUNNER_TEMP/kotlin/kotlinc/bin/kotlinc" -version
           echo "$RUNNER_TEMP/kotlin/kotlinc/bin" >> "$GITHUB_PATH"
+      - name: Static privacy and accessibility regression
+        run: python3 patches/quality-audit.py "source/$PROJECT"
       - name: Full regression
         working-directory: source/RemixPlayer_v0.66
         env:
@@ -148,6 +152,7 @@ jobs:
           patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/001-media-controller-import.patch"
           patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/002-mainactivity-media3-opt-in.patch"
           python3 "$GITHUB_WORKSPACE/patches/003-runtime-qa.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/004-accessibility-privacy.py" "source/$PROJECT"
       - uses: actions/download-artifact@v4
         with:
           name: RemixPlayer-v0.66-debug-UNVERIFIED
@@ -178,6 +183,7 @@ jobs:
           patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/001-media-controller-import.patch"
           patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/002-mainactivity-media3-opt-in.patch"
           python3 "$GITHUB_WORKSPACE/patches/003-runtime-qa.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/004-accessibility-privacy.py" "source/$PROJECT"
       - uses: actions/download-artifact@v4
         with:
           name: RemixPlayer-v0.66-debug-UNVERIFIED
@@ -196,7 +202,7 @@ jobs:
           api-level: ${{ matrix.api }}
           target: google_apis
           arch: x86_64
-          script: bash source/RemixPlayer_v0.66/tests/android-all-smoke.sh apk/app-debug.apk test-apk/app-debug-androidTest.apk
+          script: bash patches/deep-emulator.sh source/RemixPlayer_v0.66 apk/app-debug.apk test-apk/app-debug-androidTest.apk
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -215,6 +221,7 @@ jobs:
           patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/001-media-controller-import.patch"
           patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/002-mainactivity-media3-opt-in.patch"
           python3 "$GITHUB_WORKSPACE/patches/003-runtime-qa.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/004-accessibility-privacy.py" "source/$PROJECT"
       - uses: actions/setup-java@v4
         with: {distribution: temurin, java-version: '17'}
       - name: Install Android toolchain for lint
