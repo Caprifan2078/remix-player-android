@@ -30,6 +30,7 @@ jobs:
           unzip -q "$SOURCE_ZIP" -d source
           patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/001-media-controller-import.patch"
           patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/002-mainactivity-media3-opt-in.patch"
+          python3 "$GITHUB_WORKSPACE/patches/003-runtime-qa.py" "source/$PROJECT"
           test -f "source/$PROJECT/app/build.gradle.kts"
       - uses: actions/setup-java@v4
         with:
@@ -97,6 +98,7 @@ jobs:
           unzip -q "$SOURCE_ZIP" -d source
           patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/001-media-controller-import.patch"
           patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/002-mainactivity-media3-opt-in.patch"
+          python3 "$GITHUB_WORKSPACE/patches/003-runtime-qa.py" "source/$PROJECT"
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -145,6 +147,7 @@ jobs:
           unzip -q "$SOURCE_ZIP" -d source
           patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/001-media-controller-import.patch"
           patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/002-mainactivity-media3-opt-in.patch"
+          python3 "$GITHUB_WORKSPACE/patches/003-runtime-qa.py" "source/$PROJECT"
       - uses: actions/download-artifact@v4
         with:
           name: RemixPlayer-v0.66-debug-UNVERIFIED
@@ -174,6 +177,7 @@ jobs:
           unzip -q "$SOURCE_ZIP" -d source
           patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/001-media-controller-import.patch"
           patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/002-mainactivity-media3-opt-in.patch"
+          python3 "$GITHUB_WORKSPACE/patches/003-runtime-qa.py" "source/$PROJECT"
       - uses: actions/download-artifact@v4
         with:
           name: RemixPlayer-v0.66-debug-UNVERIFIED
@@ -192,7 +196,7 @@ jobs:
           api-level: ${{ matrix.api }}
           target: google_apis
           arch: x86_64
-          script: bash source/RemixPlayer_v0.66/tests/android-smoke.sh apk/app-debug.apk && bash source/RemixPlayer_v0.66/tests/android-playback.sh test-apk/app-debug-androidTest.apk && bash source/RemixPlayer_v0.66/tests/android-mixer-smoke.sh
+          script: bash source/RemixPlayer_v0.66/tests/android-all-smoke.sh apk/app-debug.apk test-apk/app-debug-androidTest.apk
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -210,6 +214,7 @@ jobs:
           unzip -q "$SOURCE_ZIP" -d source
           patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/001-media-controller-import.patch"
           patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/002-mainactivity-media3-opt-in.patch"
+          python3 "$GITHUB_WORKSPACE/patches/003-runtime-qa.py" "source/$PROJECT"
       - uses: actions/setup-java@v4
         with: {distribution: temurin, java-version: '17'}
       - name: Install Android toolchain for lint
