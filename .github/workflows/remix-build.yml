@@ -7,6 +7,7 @@ on:
     paths:
       - 'RemixPlayer_v0.66_source.zip'
       - '.github/workflows/remix-build.yml'
+      - 'patches/**'
 permissions:
   contents: read
 concurrency:
@@ -27,6 +28,7 @@ jobs:
         run: |
           printf '%s  %s\n' "$SOURCE_SHA256" "$SOURCE_ZIP" | sha256sum -c -
           unzip -q "$SOURCE_ZIP" -d source
+          patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/001-media-controller-import.patch"
           test -f "source/$PROJECT/app/build.gradle.kts"
       - uses: actions/setup-java@v4
         with:
@@ -92,6 +94,7 @@ jobs:
       - run: |
           printf '%s  %s\n' "$SOURCE_SHA256" "$SOURCE_ZIP" | sha256sum -c -
           unzip -q "$SOURCE_ZIP" -d source
+          patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/001-media-controller-import.patch"
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -138,6 +141,7 @@ jobs:
       - run: |
           printf '%s  %s\n' "$SOURCE_SHA256" "$SOURCE_ZIP" | sha256sum -c -
           unzip -q "$SOURCE_ZIP" -d source
+          patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/001-media-controller-import.patch"
       - uses: actions/download-artifact@v4
         with:
           name: RemixPlayer-v0.66-debug-UNVERIFIED
@@ -165,6 +169,7 @@ jobs:
       - run: |
           printf '%s  %s\n' "$SOURCE_SHA256" "$SOURCE_ZIP" | sha256sum -c -
           unzip -q "$SOURCE_ZIP" -d source
+          patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/001-media-controller-import.patch"
       - uses: actions/download-artifact@v4
         with:
           name: RemixPlayer-v0.66-debug-UNVERIFIED
@@ -199,6 +204,7 @@ jobs:
       - run: |
           printf '%s  %s\n' "$SOURCE_SHA256" "$SOURCE_ZIP" | sha256sum -c -
           unzip -q "$SOURCE_ZIP" -d source
+          patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/001-media-controller-import.patch"
       - uses: actions/setup-java@v4
         with: {distribution: temurin, java-version: '17'}
       - name: Install Android toolchain for lint
