@@ -41,6 +41,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/010-karaoke-ui.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/011-lyrics-follow.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/012-whisper-window.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/013-transition-energy.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
           test -f "source/$PROJECT/app/build.gradle.kts"
@@ -121,6 +122,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/010-karaoke-ui.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/011-lyrics-follow.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/012-whisper-window.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/013-transition-energy.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/setup-java@v4
@@ -145,6 +147,8 @@ jobs:
         run: bash patches/run-lyrics-overlap.sh "source/$PROJECT"
       - name: Whisper boundary word timing regression
         run: bash patches/run-whisper-window.sh "source/$PROJECT"
+      - name: Measured offline transition energy regression
+        run: bash patches/run-transition-energy.sh "source/$PROJECT"
       - name: Full regression
         working-directory: source/RemixPlayer_v0.66
         env:
@@ -192,6 +196,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/010-karaoke-ui.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/011-lyrics-follow.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/012-whisper-window.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/013-transition-energy.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/download-artifact@v4
@@ -234,6 +239,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/010-karaoke-ui.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/011-lyrics-follow.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/012-whisper-window.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/013-transition-energy.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/download-artifact@v4
@@ -283,6 +289,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/010-karaoke-ui.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/011-lyrics-follow.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/012-whisper-window.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/013-transition-energy.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/setup-java@v4
