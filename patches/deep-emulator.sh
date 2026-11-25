@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -uo pipefail
 status=0
-bash "$1/tests/android-smoke.sh" "$2" || status=1
+bash patches/startup-smoke.sh "$2" || status=1
 bash "$1/tests/android-playback.sh" "$3" || status=1
 # Direct instrumentation now verifies real mixer buttons, service, position, pause and lyrics spans.
 # uiautomator dump waits for idle, and cannot capture a continuously updating playback screen.
