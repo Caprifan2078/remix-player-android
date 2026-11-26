@@ -47,7 +47,7 @@ rep('val libraryTools=bodyChildren().filter','val libraryTools=bodyChildren().fi
 rep('if(views.isEmpty())return','if(views.isEmpty())return\n        if(views.all{it.visibility==View.GONE}){views.forEach{v->(v.parent as? ViewGroup)?.removeView(v)};return}')
 
 # One primary lyric entry; keep the existing editable lookup available as the manual source.
-rep('val lookup=body.getChildAt(2);body.removeView(lookup);body.addView(lookup,1);','val lookup=body.getChildAt(2) as Button;body.removeView(lookup);body.addView(btn(if(lyricsBusy)"Поиск текста…" else "Найти текст"){lyricSearchChoices(t){lookup.performClick()}},1);')
+rep('val lookup=body.getChildAt(2);body.removeView(lookup);body.addView(lookup,1);','val lookup=body.getChildAt(2) as Button;body.removeView(lookup);body.addView(btn(if(lyricsBusy)"Поиск текста…" else "Найти текст"){lyricSearchChoices(t){lookup.performClick()}},1);body.getChildAt(2).visibility=View.GONE;')
 anchor='    private fun compactSection(key:String,title:String,views:List<View>,at:Int){'
 rep(anchor,'''    private fun lyricSearchChoices(t:Track,manual:()->Unit){
         if(stemBusy||lyricsBusy){toast("Дождитесь завершения обработки");return}
@@ -62,7 +62,8 @@ rep(anchor,'''    private fun lyricSearchChoices(t:Track,manual:()->Unit){
             sheetAction(panel,"Автоматически","Из файла и интернета · безопасное сохранение"){dialog.dismiss();scan(true,false)}
             sheetAction(panel,"Вся медиатека","Один запуск для всех песен"){dialog.dismiss();batchLyrics()}
             sheetAction(panel,"Другие источники","Метаданные, браузер, распознавание"){dialog.dismiss()
-                actionSheet("Источники текста",350){sources,content->
+                actionSheet("Источники текста",420){sources,content->
+                    sheetAction(content,"Импортировать текст","LRC или TXT"){sources.dismiss();lyricTarget=t.uri;lyricRevision=lyricRevision(t);lyricPicker.launch(arrayOf("*/*"))}
                     sheetAction(content,"Только из аудиофайла","Офлайн · встроенный текст"){sources.dismiss();scan(false,false)}
                     sheetAction(content,"Уточнить название и исполнителя","Онлайн-поиск с выбором результата"){sources.dismiss();manual()}
                     sheetAction(content,"Поиск в браузере","По названию и исполнителю"){openLyricBrowser(original.title+" "+original.artist)}
@@ -128,5 +129,6 @@ s=s[:a]+'''        for(j in 0 until modes.childCount){
         }.apply{contentDescription="Другие действия с композицией";background=PremiumChrome.ripple(Color.TRANSPARENT,dp(12).toFloat());setTextColor(PremiumChrome.TEXT)}
         modes.addView(overflow,LinearLayout.LayoutParams(dp(48),dp(48)))'''+s[b:]
 
+rep('body.addView(whisperButton,3)','body.addView(whisperButton,3);whisperButton.visibility=View.GONE')
 p.write_text(s)
 print("PASS: persistent default-off PRO controls; core player unchanged")
