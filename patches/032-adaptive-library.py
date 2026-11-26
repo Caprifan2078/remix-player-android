@@ -3,7 +3,7 @@ from pathlib import Path
 import sys
 src=Path(sys.argv[1])/'app/src/main/java/app/remix/player'
 p=src/'GenreMix.kt';p.write_text(p.read_text()+'\n'+(Path(__file__).parent/'ProducerAdaptation.kt').read_text().split('\n',1)[1])
-p=src/'GenreCheckpoint.kt';s=p.read_text();assert s.count('genre-render-v8')==1;p.write_text(s.replace('genre-render-v8','genre-render-v10'))
+p=src/'GenreCheckpoint.kt';s=p.read_text();assert s.count('genre-render-v8')==1;p.write_text(s.replace('genre-render-v8','genre-render-v11'))
 p=src/'MainActivity.kt';s=p.read_text()
 def rep(a,b):
  global s
@@ -14,6 +14,18 @@ rep('report.chords,report.energy,groove,controls,sections,update)','report.chord
 assert s.count('report.chords,report.energy,groove,controls,sections,update)')==2
 s=s.replace('report.chords,report.energy,groove,controls,sections,update)','report.chords,report.energy,groove,adapted,sections,update)')
 rep('30 шаблонов · умное сведение баса и разные тембры','40 направлений · адаптивная аранжировка')
+# Only hard-dance renders use the neural note estimate; ambiguous results keep the preset.
+rep('val files=GenreCheckpoint.render(raw,inputs,dir,job.plan,bpm,','''val pitch=if(styles.any{HardKick.profile(it.name)!=null}){
+                    status("Basic Pitch · анализ низких нот…")
+                    try{BasicPitchModel.estimate(this,raw)}catch(e:Exception){if(e is InterruptedException||Thread.currentThread().isInterrupted)throw e;null}
+                }else null
+                val tuned=styles.map{style->
+                    val profile=HardKick.profile(style.name)
+                    val hz=if(pitch!=null&&profile!=null)BasicPitchHint.frequencyNear(pitch,profile.hz)else null
+                    style.copy(kickHz=hz)
+                }
+                val renderPlan=job.plan.copy(styles=tuned)
+                val files=GenreCheckpoint.render(raw,inputs,dir,renderPlan,bpm,''')
 # Reuse the existing background job/cancel mechanism. No destructive tag writes or silent ASR downloads.
 a=s.index('    private data class BatchLyricsItem')
 b=s.index('    // Shared custom bottom sheet',a)
