@@ -48,4 +48,45 @@ object MoodDiscovery {
   }
   return out
  }
+
+ /** Controlled vocabulary, not an LLM. Unknown descriptions are never silently mapped. */
+ fun describe(raw:String):Profile? {
+  if(raw.length>160)return null
+  val tokens=Regex("[\\p{L}]+").findAll(raw.lowercase(java.util.Locale.ROOT).replace('ё','е')).map{it.value}.toList()
+  if(tokens.any{it in setOf("не","без","кроме","not","without","no")})return null
+  fun has(vararg stems:String)=tokens.any{t->stems.any{t.startsWith(it)}}
+  val choices=listOf(
+   has("груст","печаль","меланхол","sad") to 0,
+   has("спокой","расслаб","тих","calm","relax") to 1,
+   has("энерг","быстр","бодр","energy","fast") to 2,
+   has("трениров","спорт","gym","workout") to 3,
+   has("темн","мрач","dark") to 4,
+   has("сосредоточ","фокус","учеб","focus") to 5,
+   has("весел","радост","светл","happy") to 6,
+   has("атмосфер","dream","ambient") to 7
+  ).filter{it.first}.map{profiles[it.second]}
+  if(choices.size>1)return null
+  val bass=has("бас","bass")
+  if(choices.isEmpty()&&!bass)return null
+  val p=choices.firstOrNull()?:profiles[2].copy(title="Выраженный бас",detail="Акустический профиль с усиленным низом",energy=.55,activity=.5)
+  return if(bass)p.copy(low=.85)else p
+ }
+ /** Build a finite playlist from intermediate acoustic targets, skipping empty stages. */
+ fun journey(entries:List<Entry>,from:Profile,to:Profile,limit:Int=30):List<String>{
+  require(limit in 1..100)
+  val pool=entries.filter{it.id.isNotBlank()}.distinctBy{it.id}.toMutableList()
+  val out=mutableListOf<String>()
+  var lastArtist=""
+  fun lerp(a:Double,b:Double,t:Double)=a+(b-a)*t
+  for(i in 0 until limit){
+   val t=if(limit==1)0.5 else i.toDouble()/(limit-1)
+   val v=if(from.valence!=null&&to.valence!=null)lerp(from.valence,to.valence,t)else null
+   val p=Profile("","",lerp(from.energy,to.energy,t),lerp(from.activity,to.activity,t),lerp(from.brightness,to.brightness,t),lerp(from.low,to.low,t),v,lerp(from.dynamics,to.dynamics,t))
+   val candidates=pool.mapNotNull{e->score(e.features,p)?.let{e to it}}.sortedWith(compareByDescending<Pair<Entry,Double>>{it.second}.thenBy{it.first.id})
+   val best=candidates.firstOrNull()?:continue
+   val pick=candidates.firstOrNull{it.second>=best.second-.035&&it.first.artist.isNotBlank()&&!it.first.artist.trim().equals(lastArtist,true)}?:best
+   out.add(pick.first.id);lastArtist=pick.first.artist.trim();pool.remove(pick.first)
+  }
+  return out
+ }
 }
