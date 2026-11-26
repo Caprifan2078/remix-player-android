@@ -39,9 +39,12 @@ fun main(){
   specs.map{it.size}.distinct().size==specs.size,
   !WhisperModelSpec.matches(59707625L,"0".repeat(64)),
   !WhisperModelSpec.matches(190085488L,"ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb"),
-  WhisperModelSpec.maxBytes==487601967L)
+  WhisperModelSpec.maxBytes==1081140203L,
+  WhisperModelSpec.bySize(539212467L)?.id=="medium-q5_0",
+  WhisperModelSpec.bySize(574041195L)?.id=="large-v3-turbo-q5_0",
+  WhisperModelSpec.bySize(1081140203L)?.id=="large-v3-q5_0")
  q5Checks.forEachIndexed{i,pass->check(pass){"Q5 catalogue case ${i+1}"}}
- println("PASS: 13 compact multilingual Whisper catalogue checks")
+ println("PASS: 16 compact and extended multilingual Whisper catalogue checks")
  val ast=ModelCatalog.entries.single{it.kind==ModelCatalog.Kind.GENRE}
  check(ast.id=="ast-gtzan-fp32"&&ast.sizeMb==345&&ast.sha256=="71bbd4bd350fdee6c6940778a5a9c85471628cec91a505bad1d4f5cd6b3fb673")
  println("PASS: memory threshold boundaries, pinned full precision AST metadata, official Whisper redirect and unsafe host rejection")
