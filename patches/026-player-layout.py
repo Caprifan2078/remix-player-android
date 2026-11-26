@@ -39,7 +39,18 @@ rep('val token=++coverToken', '''installCoverSwipe(image,t.uri)
         val token=++coverToken''')
 rep('    private fun nowPlaying(){','''    @android.annotation.SuppressLint("ClickableViewAccessibility")
     private fun installCoverSwipe(image:ImageView,id:String){
-        image.contentDescription="Обложка · влево следующая песня, вправо предыдущая"
+        image.contentDescription="Обложка композиции"
+        image.tooltipText="Влево — следующая песня, вправо — предыдущая"
+        fun navigate(next:Boolean):Boolean{
+            if(current()?.uri!=id)return false
+            val p=controller?:return false
+            if(if(next)!p.hasNextMediaItem() else !p.hasPreviousMediaItem())return false
+            stopPreview()
+            if(next)p.seekToNextMediaItem() else p.seekToPreviousMediaItem()
+            return true
+        }
+        androidx.core.view.ViewCompat.addAccessibilityAction(image,"Следующая песня"){_,_->navigate(true)}
+        androidx.core.view.ViewCompat.addAccessibilityAction(image,"Предыдущая песня"){_,_->navigate(false)}
         var x=0f;var y=0f;var horizontal=false
         val slop=android.view.ViewConfiguration.get(this).scaledTouchSlop
         image.setOnTouchListener{v,e->
@@ -56,10 +67,7 @@ rep('    private fun nowPlaying(){','''    @android.annotation.SuppressLint("Cli
                     v.parent?.requestDisallowInterceptTouchEvent(false)
                     val d=CoverSwipe.direction(e.x-x,e.y-y,dp(56).toFloat())
                     if(horizontal&&d!=null&&current()?.uri==id){
-                        controller?.let{p->
-                            val can=if(d==CoverSwipe.Direction.NEXT)p.hasNextMediaItem() else p.hasPreviousMediaItem()
-                            if(can){stopPreview();if(d==CoverSwipe.Direction.NEXT)p.seekToNextMediaItem() else p.seekToPreviousMediaItem()}
-                        }
+                        navigate(d==CoverSwipe.Direction.NEXT)
                     }else if(!horizontal&&kotlin.math.abs(e.x-x)<=slop&&kotlin.math.abs(e.y-y)<=slop)v.performClick()
                     horizontal=false;true
                 }
