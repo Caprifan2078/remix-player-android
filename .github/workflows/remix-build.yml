@@ -4,6 +4,12 @@ name: Remix Player 0.66 - first APK
 on:
   workflow_dispatch:
   push:
+    branches: [main]
+    paths:
+      - 'RemixPlayer_v0.66_source.zip'
+      - '.github/workflows/remix-build.yml'
+      - 'patches/**'
+  pull_request:
     paths:
       - 'RemixPlayer_v0.66_source.zip'
       - '.github/workflows/remix-build.yml'
@@ -45,6 +51,11 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/014-stem-finite.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/015-download-cancel.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/016-whisper-input.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/017-overlap-stall.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/018-audio-output-safety.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/019-spatial-lyrics.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/020-genre-kick.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/021-search-ci-audit.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
           test -f "source/$PROJECT/app/build.gradle.kts"
@@ -129,6 +140,11 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/014-stem-finite.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/015-download-cancel.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/016-whisper-input.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/017-overlap-stall.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/018-audio-output-safety.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/019-spatial-lyrics.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/020-genre-kick.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/021-search-ci-audit.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/setup-java@v4
@@ -163,6 +179,8 @@ jobs:
         run: bash patches/run-download-regression.sh "source/$PROJECT"
       - name: Quiet-window Whisper input regression
         run: bash patches/run-whisper-input.sh "source/$PROJECT"
+      - name: Keyboard layout search regression
+        run: bash patches/run-search-layout.sh "source/$PROJECT"
       - name: Full regression
         working-directory: source/RemixPlayer_v0.66
         env:
@@ -214,6 +232,11 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/014-stem-finite.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/015-download-cancel.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/016-whisper-input.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/017-overlap-stall.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/018-audio-output-safety.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/019-spatial-lyrics.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/020-genre-kick.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/021-search-ci-audit.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/download-artifact@v4
@@ -260,6 +283,11 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/014-stem-finite.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/015-download-cancel.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/016-whisper-input.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/017-overlap-stall.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/018-audio-output-safety.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/019-spatial-lyrics.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/020-genre-kick.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/021-search-ci-audit.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/download-artifact@v4
@@ -313,6 +341,11 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/014-stem-finite.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/015-download-cancel.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/016-whisper-input.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/017-overlap-stall.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/018-audio-output-safety.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/019-spatial-lyrics.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/020-genre-kick.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/021-search-ci-audit.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/setup-java@v4

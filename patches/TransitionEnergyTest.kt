@@ -32,6 +32,14 @@ fun main(){
  val silent=File(dir,"silent.pcm").apply{writeBytes(ByteArray(n*4))}
  val out=File(dir,"silent-mix.wav");TransitionMix.render(silent,silent,out,2);check(out.readBytes().drop(44).all{it==0.toByte()})
  Thread.currentThread().interrupt();try{check(runCatching{TransitionMix.render(a,b,File(dir,"cancel.wav"),2)}.isFailure);check(!File(dir,"cancel.wav").exists())}finally{Thread.interrupted()}
+ val preserved=File(dir,"preserved.wav").apply{writeText("previous result")}
+ val before=preserved.readBytes()
+ check(runCatching{TransitionMix.render(a,b,preserved,2){if(it>=10)error("Injected render failure")}}.isFailure)
+ check(preserved.readBytes().contentEquals(before))
+ check(dir.listFiles()!!.none{it.name.startsWith(".transition-")})
+ val finalProgress=mutableListOf<Int>()
+ TransitionMix.render(a,b,preserved,2){finalProgress.add(it)}
+ check(finalProgress.last()==100&&preserved.length()==44+264600L*4)
  println("PASS: independent and identical signals, full-scale protection, opposite phase, stereo endpoints, source integrity, silence and cancellation")
  }finally{dir.deleteRecursively()}
 }

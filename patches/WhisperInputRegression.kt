@@ -16,5 +16,15 @@ fun main(){
  invalid[1]=Float.POSITIVE_INFINITY;check(runCatching{VocalConditioning.prepareWhisper(invalid,n)}.isFailure)
  invalid[1]=1.1f;check(runCatching{VocalConditioning.prepareWhisper(invalid,n)}.isFailure)
  Thread.currentThread().interrupt();val cancelled=try{runCatching{VocalConditioning.prepareWhisper(quiet,n)}}finally{Thread.interrupted()};check(cancelled.isFailure)
- println("PASS: quiet signal boost, normal/loud preservation, transient headroom, silence/noise floor, exact sample count, invalid values and cancellation")
+ val longN=25*16000
+ val sparse=FloatArray(longN)
+ for(i in 160000 until 166400)sparse[i]=(.004*sin(2*PI*233*i/16000)).toFloat()
+ check(rms(sparse)<.001)
+ val rescued=checkNotNull(VocalConditioning.prepareWhisper(sparse,longN)){"Sparse quiet phrase discarded"}
+ check(rescued.size==longN);check(rescued.indices.all{abs(rescued[it]-sparse[it]*4)<1e-7});check(rescued.all{it.isFinite()})
+ val clicks=FloatArray(longN);clicks[160000]=.08f;clicks[161280]=.08f
+ check(VocalConditioning.prepareWhisper(clicks,longN)==null)
+ val noise=FloatArray(longN){(.0008*sin(2*PI*233*it/16000)).toFloat()}
+ check(VocalConditioning.prepareWhisper(noise,longN)==null)
+ println("PASS: sparse quiet phrase and click rejection; quiet signal boost, normal/loud preservation, transient headroom, silence/noise floor, exact sample count, invalid values and cancellation")
 }
