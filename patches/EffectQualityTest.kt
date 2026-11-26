@@ -44,5 +44,17 @@ fun main(){
         }
     }
     println("PASS: $checks preset/rate combinations; 41 distinct DSP + speed/pitch signatures; finite, bounded, audible and exact bypass")
+    for(sr in listOf(8000,44100,48000)){
+        val d=Dsp(sr,2);val f=FloatArray(2);val out=FloatArray(2);val p=preset("Cathedral")
+        var left=0.0;var right=0.0
+        repeat(sr*2){i->
+            f[0]=if(i==0).5f else 0f;f[1]=0f
+            d.frame(f,out,p);check(out.all{it.isFinite()&&abs(it)<=1f})
+            if(i<sr/100)check(out[1]==0f){"Dry localization changed"}
+            else{left+=out[0]*out[0];right+=out[1]*out[1]}
+        }
+        check(right>1e-8&&right/left in .01.. .20){"Missing or excessive room crossfeed: $sr Hz, $right/$left"}
+        println("PASS: $sr Hz stereo room reflections and preserved dry localization")
+    }
     check(measurements.all{it.second}){"Quality regression: ${measurements.filterNot{it.second}.map{it.first}}"}
 }
