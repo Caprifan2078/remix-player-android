@@ -22,5 +22,10 @@ fun main(){
  check(abs(ratio(55.0,0f,true)-1)<1e-6)
  check(abs(ratio(55.0,1f,false)-1)<1e-6)
  val mix=HardMixSpace(48000);repeat(4800){mix.frame(.3f,-.3f,1f,true)};check(abs(mix.left)<.15f);repeat(48000){mix.frame(.3f,-.3f,0f,true)};check(abs(mix.left-.3f)<.001f)
- println("PASS: 14 hard kick and mix checks; bass ratio=$bass, high ratio=$highs")
+ check(names.all{HardKick.mixDrumGain(it)==.54f})
+ check(HardKick.mixDrumGain("House")==.38f&&HardKick.sidechainDecay("House")==.065)
+ check(names.all{HardKick.sidechainDecay(it) in .065.. .135})
+ check(HardKick.sidechainDecay("Hardstyle")>HardKick.sidechainDecay("Uptempo Hardcore"))
+ val previous=exp(-.12/.065);val current=exp(-.12/HardKick.sidechainDecay("Hardstyle"));check(current>previous*2)
+ println("PASS: 19 hard kick and mix checks; bass ratio=$bass, high ratio=$highs; hardstyle duck envelope at 120ms $previous -> $current")
 }
