@@ -43,6 +43,23 @@ private class EffectRoom(rate:Int,channels:Int,p:Preset){
     }
 }
 
+/** First-order antiderivative antialiasing for the heavy tanh waveshaper.
+ * Integrates over the interval between samples; stable for nearly equal samples. */
+private class SmoothDrive(channels:Int){
+    private val last=DoubleArray(channels)
+    private val integral=DoubleArray(channels)
+    private val initialized=BooleanArray(channels)
+    fun reset(){initialized.fill(false)}
+    fun sample(c:Int,x:Float,k:Float,norm:Float):Float{
+        val z=x.toDouble()*k
+        val a=abs(z);val f=a+ln1p(exp(-2*a))
+        val previous=last[c];val delta=z-previous
+        val y=if(!initialized[c])tanh(z)else if(abs(delta)<1e-5)tanh((z+previous)*.5)else (f-integral[c])/delta
+        last[c]=z;integral[c]=f;initialized[c]=true
+        return (y/norm).toFloat()
+    }
+}
+
 /** Shared realtime/export DSP. Artistic filters retain their character; bass, room and drive adapt separately. */
 class Dsp(private val rate:Int,private val channels:Int){
     init{require(rate in 8000..384000&&channels>0)}
@@ -51,6 +68,7 @@ class Dsp(private val rate:Int,private val channels:Int){
     private val low1=FloatArray(channels);private val low2=FloatArray(channels)
     private val guard=LinkedPeakGuard(rate);private val adaptiveDepth=AdaptiveEffectEnvelope(rate);private val orbit=StereoOrbit(rate)
     private var previous:Preset?=null;private var room:EffectRoom?=null
+    private val smoothDrive=SmoothDrive(channels);private var antiAlias=false
     private var bassAlpha=0f;private var highAlpha=0f;private var lowAlpha=0f;private var colorMix=0f
     private var driveK=1f;private var driveNorm=1f;private var driveMix=1f;private var phase=0.0;private var phaseStep=0.0;private var processed=false;private var bandpass=false
     private fun alpha(hz:Double)=(1-exp(-2*PI*hz.coerceIn(1.0,rate*.45)/rate)).toFloat()
@@ -71,6 +89,7 @@ class Dsp(private val rate:Int,private val channels:Int){
         }
         lowAlpha=alpha(color.first);highAlpha=alpha(color.second);bandpass=color.second>0; colorMix=color.third
         driveK=1+p.drive*6
+        antiAlias=p.name in setOf("Overdrive","Distorted","Extreme Distortion");smoothDrive.reset()
         driveMix=when(p.name){
             "Sped Up","Nightcore"->.30f
             "Lo-Fi Filter"->.40f
@@ -100,7 +119,7 @@ class Dsp(private val rate:Int,private val channels:Int){
                 if(bandpass){high1[c]+=highAlpha*(v-high1[c]);v-=high1[c];high2[c]+=highAlpha*(v-high2[c]);v-=high2[c]}
                 low1[c]+=lowAlpha*(v-low1[c]);low2[c]+=lowAlpha*(low1[c]-low2[c]);y+=(low2[c]-y)*colorMix
             }
-            if(p.drive>0){val wet=tanh(y*driveK)/driveNorm;y+=(wet-y)*depth*driveMix}
+            if(p.drive>0){val wet=if(antiAlias)smoothDrive.sample(c,y,driveK,driveNorm)else tanh(y*driveK)/driveNorm;y+=(wet-y)*depth*driveMix}
             room?.let{val amount=p.room*depth;val wet=it.sample(c,y);y=y*(1-.12f*amount)+wet*amount*.72f}
             out[c]=y
         }
