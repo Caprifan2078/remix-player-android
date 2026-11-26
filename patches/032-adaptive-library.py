@@ -90,7 +90,8 @@ s=s[:a]+'''    private data class ScanItem(val uri:String,val title:String,val a
         }
     }
     // Prefer already separated vocals. Do not start an expensive separation job implicitly.
-    private fun scanRecognize(uri:Uri,id:String,reference:String?=null):String{
+    private fun scanRecognize(uri:Uri,id:String,reference:String?=null,timedBaseline:String?=null):String{
+        fun reliable(match:KnownLyricAlignment.Result?)=match?.wordLevel==true&&(timedBaseline==null||KnownLyricAlignment.acceptsTimingUpgrade(timedBaseline,match))
         val stem=try{getSharedPreferences("stem_cache",MODE_PRIVATE).getString(id,null)?.let{StemEngine.load(this,it)}}catch(e:Exception){
             if(e is InterruptedException||Thread.currentThread().isInterrupted)throw e
             null
@@ -106,7 +107,7 @@ s=s[:a]+'''    private data class ScanItem(val uri:String,val title:String,val a
             if(heard.isNotBlank()){
                 if(reference==null)return heard
                 val match=KnownLyricAlignment.align(heard,reference)
-                if(match?.wordLevel==true)return heard
+                if(reliable(match))return heard
                 if(match!=null)fallback=heard
             }
         }
@@ -119,7 +120,7 @@ s=s[:a]+'''    private data class ScanItem(val uri:String,val title:String,val a
         check(!Thread.currentThread().isInterrupted)
         if(reference!=null&&fallback!=null){
             val match=KnownLyricAlignment.align(original,reference)
-            if(match?.wordLevel!=true)return fallback
+            if(!reliable(match))return fallback
         }
         return original
     }
@@ -141,11 +142,17 @@ s=s[:a]+'''    private data class ScanItem(val uri:String,val title:String,val a
                         }else status=when{raw.isNullOrBlank()->"Нет совпадения";Lrc.parse(raw).isEmpty()->"Только слова";raw==t.before->"Пропущено";else->"Текст найден"}
                     }
                     val reference=raw?:t.before
-                    if(align&&reference.isNotBlank()&&Lrc.parse(reference).isEmpty()){
-                        val known=LyricDocument.plain(reference)
-                        val heard=scanRecognize(uri,t.uri,known)
-                        val result=KnownLyricAlignment.align(heard,known)
-                        if(result!=null){raw=result.lrc;status="Синхронизировано"}else if(raw==null)status="Нет уверенной синхронизации"
+                    if(align&&reference.isNotBlank()){
+                        val untimed=Lrc.parse(reference).isEmpty()
+                        val upgrade=!untimed&&KnownLyricAlignment.canUpgradeTiming(reference)
+                        if(untimed||upgrade){
+                            val known=LyricDocument.plain(reference)
+                            val heard=scanRecognize(uri,t.uri,known,if(upgrade)reference else null)
+                            val result=KnownLyricAlignment.align(heard,known)
+                            if(result!=null&&(untimed||KnownLyricAlignment.acceptsTimingUpgrade(reference,result))){
+                                raw=result.lrc;status=if(result.wordLevel)"Синхронизировано по словам" else "Синхронизировано"
+                            }else if(raw==null){status=if(upgrade)"Построчные метки сохранены" else "Нет уверенной синхронизации"}
+                        }
                     }
                 }catch(e:Exception){if(Thread.currentThread().isInterrupted||e is InterruptedException)throw e;status="Ошибка"}
                 val update=ScanUpdate(t,raw,report,status,draft)
