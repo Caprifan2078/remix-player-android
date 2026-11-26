@@ -1,0 +1,146 @@
+name: Remix Player - real pretrained model acceptance
+on:
+  workflow_dispatch:
+  push:
+    branches: ['qa/real-model-acceptance']
+    paths: ['model-qa/**', '.github/workflows/model-acceptance.yml']
+permissions:
+  contents: read
+concurrency:
+  group: remix-real-models
+  cancel-in-progress: false
+env:
+  SOURCE_ZIP: RemixPlayer_v0.66_source.zip
+  SOURCE_SHA256: 8ebc8cf15b4bc7a34a674bc7a927d69fd54026f2bbf6289cf2fe4ad8dedf4ba2
+  PROJECT: RemixPlayer_v0.66
+jobs:
+  apk:
+    name: Compile and package APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify and extract original source
+        run: |
+          printf '%s  %s\n' "$SOURCE_SHA256" "$SOURCE_ZIP" | sha256sum -c -
+          unzip -q "$SOURCE_ZIP" -d source
+          patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/001-media-controller-import.patch"
+          patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/002-mainactivity-media3-opt-in.patch"
+          python3 "$GITHUB_WORKSPACE/patches/003-runtime-qa.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/004-accessibility-privacy.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/005-ui-qa.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/006-playback-regression.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/007-mixer-resume.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/008-mixer-compact.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/009-studio-sound.py" "source/$PROJECT"
+          patch --batch --forward -d "source/$PROJECT" -p1 < "$GITHUB_WORKSPACE/patches/010-lyrics-overlap.patch"
+          python3 "$GITHUB_WORKSPACE/patches/010-karaoke-ui.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/011-lyrics-follow.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/012-whisper-window.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/013-transition-energy.py" "source/$PROJECT"
+          cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
+          cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
+          cp "$GITHUB_WORKSPACE/model-qa/RealModelAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/RealModelAcceptanceTest.kt"
+          test -f "source/$PROJECT/app/build.gradle.kts"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Android toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          manager="$sdk/cmdline-tools/latest/bin/sdkmanager"
+          if [[ ! -x "$manager" ]]; then
+            manager="$(find "$sdk/cmdline-tools" -path '*/bin/sdkmanager' -type f | sort -V | tail -1)"
+          fi
+          test -x "$manager"
+          "$manager" --version
+          "$manager" --sdk_root="$sdk" 'platforms;android-35' 'build-tools;35.0.0' 'ndk;28.2.13676358'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Build native MP3 and Whisper
+        working-directory: source/RemixPlayer_v0.66
+        run: |
+          set -o pipefail
+          mkdir -p "$GITHUB_WORKSPACE/diagnostics"
+          bash scripts/build-mp3-android.sh 2>&1 | tee "$GITHUB_WORKSPACE/diagnostics/mp3.log"
+          bash scripts/build-whisper-android.sh 2>&1 | tee "$GITHUB_WORKSPACE/diagnostics/whisper.log"
+      - name: Compile application
+        working-directory: source/RemixPlayer_v0.66
+        run: |
+          set -o pipefail
+          gradle --no-daemon :app:assembleDebug --stacktrace 2>&1 | tee "$GITHUB_WORKSPACE/diagnostics/assemble.log"
+          test -s app/build/outputs/apk/debug/app-debug.apk
+          sha256sum app/build/outputs/apk/debug/app-debug.apk | tee "$GITHUB_WORKSPACE/diagnostics/apk.sha256"
+      - name: Save APK before further checks
+        uses: actions/upload-artifact@v4
+        with:
+          name: RemixPlayer-v0.66-debug-UNVERIFIED
+          path: source/RemixPlayer_v0.66/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+      - name: Compile instrumentation tests
+        working-directory: source/RemixPlayer_v0.66
+        run: |
+          set -o pipefail
+          gradle --no-daemon :app:assembleDebugAndroidTest --stacktrace 2>&1 | tee "$GITHUB_WORKSPACE/diagnostics/instrumentation-build.log"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RemixPlayer-v0.66-instrumentation
+          path: source/RemixPlayer_v0.66/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: APK-build-diagnostics
+          path: diagnostics/
+          if-no-files-found: ignore
+  real-models:
+    name: Real pretrained models on Android 15
+    needs: apk
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: {name: RemixPlayer-v0.66-debug-UNVERIFIED, path: apk}
+      - uses: actions/download-artifact@v4
+        with: {name: RemixPlayer-v0.66-instrumentation, path: test-apk}
+      - name: Prepare pinned Whisper weights and synthetic speech fixture
+        run: |
+          set -euo pipefail
+          mkdir -p model-fixtures
+          sudo apt-get update
+          sudo apt-get install -y espeak-ng
+          espeak-ng -v en-us -s 135 -w model-fixtures/qa-whisper.wav 'The music is playing. Listen to the song today. This is a test.'
+          curl --fail --location --retry 2 --max-time 240 --proto '=https' --proto-redir '=https' --max-filesize 80000000 -o model-fixtures/qa-whisper-tiny.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
+          printf '%s  %s\n' be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21 model-fixtures/qa-whisper-tiny.bin | sha256sum -c -
+          test "$(stat -c %s model-fixtures/qa-whisper-tiny.bin)" = 77691713
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Check available AVD space before boot
+        run: |
+          mkdir -p "$HOME/.android/avd"
+          df -h "$HOME/.android/avd"
+          free -h
+          available=$(df -Pk "$HOME/.android/avd" | awk 'NR==2 {print $4}')
+          test "$available" -ge 6291456 || { echo 'Insufficient AVD disk capacity; abort before emulator boot'; exit 1; }
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          ram-size: 4096M
+          disk-size: 4G
+          script: bash model-qa/run-real-models.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Real-model-results
+          path: model-results/
+          if-no-files-found: warn
