@@ -12,4 +12,13 @@ fun main(){
  val x=LyricsMatch.rank(listOf(wrong,remix,unrelated,plain,correct,correct),"Believer (Official Video).mp3","Imagine Dragons",205)
  check(x.first()==correct);check(x.size==5);check(plain in x);check(x.indexOf(wrong)>x.indexOf(correct));check(LyricsMatch.titleVariant("Song (Live)")=="Song (Live)");check(LyricsMatch.titleVariant("Song (Slowed + Reverb).mp3")=="Song")
  check(LyricsMatch.normalize("Élan — 123")=="élan 123");println("PASS: title cleanup, version preservation, artist/duration ranking, plain lyrics and deduplication")
+ check(LyricsSearchPlan.metadataTitles("Bad filename","Real song")==listOf("Bad filename","Real song"))
+ check(LyricsSearchPlan.metadataTitles("Real song"," real SONG ")==listOf("Real song"))
+ check(LyricsSearchPlan.metadataTitles("","Real song")==listOf("Real song"))
+ check(LyricsSearchPlan.transcriptHint(listOf("la la la","one two three four five six seven eight nine ten eleven twelve")).split(' ').size==10)
+ check(LyricsSearchPlan.transcriptHint(listOf("a b","???")).isEmpty())
+ check(LyricsSearchPlan.browserUrl("  ")==null)
+ val browser=java.net.URI(LyricsSearchPlan.browserUrl("слова & more #test")!!)
+ check(browser.host=="www.google.com"&&java.net.URLDecoder.decode(browser.rawQuery,"UTF-8")=="q=слова & more #test lyrics")
+ println("PASS: 7 fallback metadata and browser query cases")
 }
