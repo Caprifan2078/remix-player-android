@@ -5,7 +5,7 @@ bash patches/startup-smoke.sh "$2" || status=1
 bash "$1/tests/android-playback.sh" "$3" || status=1
 # Direct instrumentation now verifies real mixer buttons, service, position, pause and lyrics spans.
 # uiautomator dump waits for idle, and cannot capture a continuously updating playback screen.
-for name in mixer-resumed mixer-paused karaoke-word karaoke-seek; do
+for name in mixer-resumed mixer-paused karaoke-word karaoke-seek compact-library compact-versions compact-studio; do
     adb exec-out run-as app.remix.player cat "files/qa-$name.png" > "smoke-output/$name.png" || status=1
     python3 -c 'import sys; assert open(sys.argv[1],"rb").read(8)==b"\x89PNG\r\n\x1a\n"' "smoke-output/$name.png" || status=1
 done
