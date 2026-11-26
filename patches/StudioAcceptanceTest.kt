@@ -232,4 +232,63 @@ class StudioAcceptanceTest {
         println("PASS Android: real pinned Basic Pitch ONNX inference and finite note probabilities")
     }
 
+    @androidx.media3.common.util.UnstableApi
+    @Test fun crossfadeDoesNotReplayIncomingIntroAfterDelayedTick(){
+        val dir=folder()
+        val inst=InstrumentationRegistry.getInstrumentation()
+        var ownedPlayer:androidx.media3.exoplayer.ExoPlayer?=null
+        var ownedOverlap:LiveOverlap?=null
+        lateinit var player:androidx.media3.exoplayer.ExoPlayer
+        lateinit var overlap:LiveOverlap
+        fun onMain(block:()->Unit){inst.runOnMainSync(block)}
+        fun await(message:String,timeout:Long=15000L,condition:()->Boolean){
+            val end=android.os.SystemClock.elapsedRealtime()+timeout
+            var ok=false
+            while(!ok&&android.os.SystemClock.elapsedRealtime()<end){
+                onMain{ok=condition()}
+                if(!ok)android.os.SystemClock.sleep(30)
+            }
+            assertTrue(message,ok)
+        }
+        try{
+            val a=File(dir,"first.wav");val b=File(dir,"next.wav");val pcm=File(dir,"source.pcm")
+            raw(pcm,44100*12,440.0);wav(pcm,a)
+            raw(pcm,44100*12,660.0);wav(pcm,b)
+            fun item(f:File,id:String)=androidx.media3.common.MediaItem.Builder().setMediaId(id).setUri(FileProvider.getUriForFile(c,"app.remix.player.files",f)).build()
+            onMain{
+                player=androidx.media3.exoplayer.ExoPlayer.Builder(c).build();ownedPlayer=player
+                overlap=LiveOverlap(c,player);ownedOverlap=overlap
+                player.setMediaItems(listOf(item(a,"qa-first"),item(b,"qa-next")))
+                player.seekTo(0,6500L);player.prepare();player.play()
+            }
+            await("First track never became ready"){player.isPlaying&&player.currentMediaItemIndex==0}
+            await("Incoming track never became audible"){
+                overlap.tick(4000L,true)
+                player.currentMediaItemIndex==0&&player.volume<.70f&&player.currentPosition>8000L
+            }
+            // No coordinator ticks until Media3 auto-advances, reproducing a busy main clock.
+            await("Automatic transition did not occur",10000L){player.currentMediaItemIndex==1}
+            onMain{assertEquals("The stale intro must stay muted on automatic advance",0f,player.volume,.001f)}
+            await("Primary did not continue from the already heard intro",10000L){
+                overlap.tick(4000L,true)
+                player.currentMediaItemIndex==1&&player.isPlaying&&player.currentPosition>=2000L&&player.volume>.99f
+            }
+            var previous=0L
+            onMain{previous=player.currentPosition}
+            repeat(10){
+                android.os.SystemClock.sleep(80)
+                onMain{
+                    overlap.tick(4000L,true)
+                    assertEquals(1,player.currentMediaItemIndex)
+                    assertTrue("Incoming position moved backwards",player.currentPosition>=previous-80)
+                    previous=player.currentPosition
+                }
+            }
+            println("PASS Android: real automatic crossfade transition preserves already heard incoming intro")
+        }finally{
+            onMain{ownedOverlap?.close();ownedPlayer?.release()}
+            dir.deleteRecursively()
+        }
+    }
+
 }
