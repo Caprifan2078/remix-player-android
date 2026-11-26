@@ -74,9 +74,11 @@ helper='''    private fun moodPrefs()=getSharedPreferences("mood_discovery_v1",M
             }
             panel.addView(label("Под настроение",13,muted,true))
             MoodDiscovery.profiles.forEach{profile->
-                val ids=MoodDiscovery.rank(indexed,profile)
-                sheetAction(panel,profile.title,(if(ids.size==100)"До 100 песен" else ids.size.toString()+" песен")+" · "+profile.detail){
-                    dialog.dismiss();moodMixPreview(profile.title,profile.detail,ids)
+                sheetAction(panel,profile.title,profile.detail){
+                    if(indexed.isEmpty()){toast("Сначала просканируйте медиатеку");return@sheetAction}
+                    if(stemBusy){toast("Дождитесь завершения обработки");return@sheetAction}
+                    dialog.dismiss()
+                    stemWork("Подбор музыки…",{MoodDiscovery.rank(indexed,profile)}){ids->moodMixPreview(profile.title,profile.detail,ids)}
                 }
             }
             panel.addView(label("Подборка по акустическим признакам, а не по словам песни или настроению слушателя. Оценки приблизительны.",12,muted))
@@ -90,9 +92,9 @@ helper='''    private fun moodPrefs()=getSharedPreferences("mood_discovery_v1",M
             panel.addView(btn("Найти"){
                 val p=MoodDiscovery.describe(query.text.toString())
                 if(p==null){toast("Укажите одно настроение или бас");return@btn}
-                val ids=MoodDiscovery.rank(indexed,p)
-                if(ids.isEmpty()){toast("Нет подходящих песен");return@btn}
-                dialog.dismiss();moodMixPreview("Поиск · "+p.title,"Акустический подбор по ключевым словам",ids)
+                if(stemBusy){toast("Дождитесь завершения обработки");return@btn}
+                dialog.dismiss()
+                stemWork("Поиск музыки…",{MoodDiscovery.rank(indexed,p)}){ids->moodMixPreview("Поиск · "+p.title,"Акустический подбор по ключевым словам",ids)}
             })
         }
     }
