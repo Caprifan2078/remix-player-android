@@ -43,5 +43,11 @@ fun main(){
  check(ru.wordLevel&&LyricDocument.plain(ru.lrc)==russianRef)
  check(Lrc.parse(ru.lrc).map{WordLyrics.parse(it).words.map{w->w.ms}}==listOf(listOf(2000L,3200L),listOf(7000L,8500L)))
  check(KnownLyricAlignment.align(russian+"\n[00:15.000]<00:15.000>Елка <00:16.000>горит","Ёлка горит")==null)
- println("PASS: 27 known lyric alignment cases, including Russian spelling and measured word preservation")
+ val timed="[00:02.100]Ёлка горит\n[00:07.200]Всё поют"
+ check(KnownLyricAlignment.canUpgradeTiming(timed))
+ check(KnownLyricAlignment.acceptsTimingUpgrade(timed,ru))
+ check(!KnownLyricAlignment.canUpgradeTiming(ru.lrc))
+ check(!KnownLyricAlignment.acceptsTimingUpgrade(timed.replace("00:02.100","00:00.000"),ru))
+ check(!KnownLyricAlignment.acceptsTimingUpgrade(timed,KnownLyricAlignment.Result(timed,false)))
+ println("PASS: 32 known lyric alignment cases, including conservative timed-to-word upgrades")
 }
