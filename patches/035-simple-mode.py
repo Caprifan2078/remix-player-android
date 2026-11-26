@@ -138,6 +138,7 @@ anchor='    private fun scanDraftReview(){'
 rep(anchor,r'''    private fun pasteAndSync(t:Track,initial:String=""){
         if(stemBusy||lyricsBusy){toast("Дождитесь завершения обработки");return}
         val source=libraryIndex.get(t.group)?:t
+        val revision=lyricRevision(source)
         actionSheet("Вставить текст песни",460){dialog,panel->
             panel.addView(label("Вставьте правильные слова. Whisper сам попробует определить время строк и слов на оригинальной записи.",14,muted))
             val editor=EditText(this).apply{
@@ -156,7 +157,9 @@ rep(anchor,r'''    private fun pasteAndSync(t:Track,initial:String=""){
             sheetAction(panel,"Синхронизировать и проверить","Метки только из распознавания вокала"){
                 val clean=BrowserLyricImport.candidate(editor.text.toString())
                 if(clean==null){toast("Введите слова песни, а не ссылку");return@sheetAction}
-                dialog.dismiss();syncPastedLyrics(source,clean)
+                val live=libraryIndex.get(source.uri)
+                if(live==null||lyricRevision(live)!=revision){toast("Песня или текст изменились");dialog.dismiss();return@sheetAction}
+                dialog.dismiss();syncPastedLyrics(live,clean)
             }
         }
     }
@@ -233,8 +236,7 @@ rep(anchor,r'''    private fun pasteAndSync(t:Track,initial:String=""){
         val info=label("Поиск текста · выберите результат",14,muted)
         panel.addView(info)
         val web=android.webkit.WebView(this)
-        val height=(resources.displayMetrics.heightPixels-dp(240)).coerceIn(dp(180),dp(500))
-        panel.addView(web,LinearLayout.LayoutParams(-1,height))
+        panel.addView(web,LinearLayout.LayoutParams(-1,0,1f))
         var candidate:String?=null
         var generation=0
         var disposed=false
@@ -282,14 +284,14 @@ rep(anchor,r'''    private fun pasteAndSync(t:Track,initial:String=""){
             override fun onPageStarted(view:android.webkit.WebView,url:String?,favicon:android.graphics.Bitmap?){
                 generation++;candidate=null;importButton.isEnabled=false;info.text="Загрузка страницы…"
             }
-            override fun onPageFinished(view:android.webkit.WebView,url:String?){extract()}
+            override fun onPageFinished(view:android.webkit.WebView,url:String?){if(url==view.url)extract()}
         }
         dialog.setContentView(panel)
         dialog.setOnDismissListener{
             disposed=true;web.stopLoading();(web.parent as? ViewGroup)?.removeView(web);web.destroy()
         }
         dialog.show()
-        dialog.window?.setLayout(-1,-2)
+        dialog.window?.setLayout(-1,-1)
         web.loadUrl(url)
     }
     private fun recognizeAndReview(t:Track){
@@ -312,14 +314,18 @@ rep(anchor,r'''    private fun pasteAndSync(t:Track,initial:String=""){
         val heard=LyricDocument.plain(raw)
         val phrase=TranscriptMatch.query(heard)
         fun accept(candidate:String,verify:Boolean){
+            if(verify){
+                val target=libraryIndex.get(id)
+                if(target==null||lyricRevision(target)!=revision){toast("Песня или текст изменились");return}
+                syncPastedLyrics(target,candidate,raw);return
+            }
             val clean=runCatching{LyricDocument.decode(candidate.toByteArray(Charsets.UTF_8))}.getOrElse{toast(it.message?:"Некорректный текст");return}
             val text=LyricDocument.plain(clean)
             if(text.isBlank()){toast("Нет текста");return}
-            // Only use measured timestamps from this recording, never silently copy another remix's timeline.
-            val aligned=if(verify)KnownLyricAlignment.align(raw,text) else null
-            val prepared=if(verify)aligned?.lrc?:text else clean
+            // A raw draft is kept with its measured timing, pending explicit confirmation.
+            val prepared=clean
             if(prepared.toByteArray(Charsets.UTF_8).size>LyricDocument.MAX_BYTES){toast("Текст слишком большой");return}
-            reviewTranscript(if(verify)"Текст · сверка с вокалом" else "Whisper · черновик",prepared){accepted->
+            reviewTranscript("Whisper · черновик",prepared){accepted->
                 val target=libraryIndex.get(id)
                 if(target==null||lyricRevision(target)!=revision){toast("Песня или текст изменились");return@reviewTranscript}
                 val before=target.lyrics;target.lyrics=accepted
