@@ -15,5 +15,12 @@ fun main(){
  low.reset();check(low.bass==1f&&low.drive==1f&&low.room==1f)
  repeat(100){low.frame(floatArrayOf(Float.NaN,Float.POSITIVE_INFINITY))}
  check(low.bass.isFinite()&&low.drive.isFinite())
- println("PASS: 7 source spectrum effect adaptation checks")
+ val attack=SourceEffectBalance(48000,2)
+ repeat(48000){attack.frame(floatArrayOf(.03f,-.03f))}
+ repeat(2400){attack.frame(floatArrayOf(.8f,-.8f))}
+ check(attack.transient<.8f&&attack.transient>=.5f)
+ repeat(96000){attack.frame(floatArrayOf(.03f,-.03f))}
+ check(attack.transient>.98f)
+ attack.reset();check(attack.transient==1f)
+ println("PASS: 10 source spectrum and transient effect adaptation checks")
 }
