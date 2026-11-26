@@ -7,7 +7,7 @@ class DjBassExchange(rate:Int=44100){
  private val a=DoubleArray(2);private val b=DoubleArray(2)
  fun lowGain(t:Double,incoming:Boolean):Double{
   val x=t.coerceIn(0.0,1.0)
-  val v=if(incoming)((x-.42)/.46).coerceIn(0.0,1.0) else ((.58-x)/.46).coerceIn(0.0,1.0)
+  val v=if(incoming)((x-.25)/.50).coerceIn(0.0,1.0) else ((.75-x)/.50).coerceIn(0.0,1.0)
   return v*v*(3-2*v)
  }
  fun sample(ch:Int,l:Double,r:Double,t:Double,ga:Double,gb:Double,norm:Double):Double{

@@ -11,11 +11,13 @@ edit('AudioCore.kt','Preset("Sped Up",1.25f)','Preset("Sped Up",1.25f,bass=.12f,
 edit('AudioCore.kt','Preset("Nightcore",1.25f,1.25f)','Preset("Nightcore",1.25f,1.25f,bass=.16f,room=.09f,drive=.035f)')
 edit('AudioCore.kt','Preset("Slowed + Reverb",.85f,.9f,room=.35f)','Preset("Slowed + Reverb",.85f,.9f,bass=.13f,room=.35f,muffled=.06f)')
 edit('GenreCheckpoint.kt','genre-render-v6','genre-render-v7')
-edit('TransitionMix.kt','overlap:Long,progress:(Int)->Unit={}):Long {','overlap:Long,progress:(Int)->Unit={},bassExchange:Boolean=false):Long {')
+edit('TransitionMix.kt','    fun renderFrames(first:File,second:File,out:File,overlap:Long,progress:(Int)->Unit={}):Long {','''    fun renderFrames(first:File,second:File,out:File,overlap:Long,progress:(Int)->Unit={}):Long = renderInternal(first,second,out,overlap,false,progress)
+    fun renderSmartFrames(first:File,second:File,out:File,overlap:Long,progress:(Int)->Unit={}):Long = renderInternal(first,second,out,overlap,true,progress)
+    private fun renderInternal(first:File,second:File,out:File,overlap:Long,bassExchange:Boolean,progress:(Int)->Unit):Long {''')
 edit('TransitionMix.kt','copy(x,a-overlap);repeatFrames(overlap)','val exchange=if(bassExchange)DjBassExchange()else null;copy(x,a-overlap);repeatFrames(overlap)')
 edit('TransitionMix.kt','repeat(2){val l=StemCore.readShort(x)/32768.0;val r=StemCore.readShort(y)/32768.0;StemCore.writeShort(w,StemCore.pcm(((l*gainA+r*gainB)/norm).toFloat()))}','repeat(2){ch->val l=StemCore.readShort(x)/32768.0;val r=StemCore.readShort(y)/32768.0;val mixed=exchange?.sample(ch,l,r,t,gainA,gainB,norm)?:((l*gainA+r*gainB)/norm);StemCore.writeShort(w,StemCore.pcm(mixed.toFloat()))}')
-edit('DjTransition.kt','TransitionMix.renderFrames(first,prepared,out,n){progress("Сведение: $it%")}','TransitionMix.renderFrames(first,prepared,out,n,{progress("Сведение: $it%")},bassExchange=true)')
-edit('DjTransition.kt','return Result(TransitionMix.renderFrames','notes.add("Обмен басом между песнями");return Result(TransitionMix.renderFrames')
+edit('DjTransition.kt','TransitionMix.renderFrames(first,prepared,out,n){progress("Сведение: $it%")}','TransitionMix.renderSmartFrames(first,prepared,out,n){progress("Сведение: $it%")}')
+edit('DjTransition.kt','return Result(TransitionMix.renderSmartFrames','notes.add("Обмен басом между песнями");return Result(TransitionMix.renderSmartFrames')
 p=src/'MainActivity.kt';s=p.read_text()
 def rep(a,b):
  global s
