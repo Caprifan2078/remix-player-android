@@ -65,6 +65,8 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/027-premium-sheets.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/"{EmbeddedLyrics,LyricClock,TrackLyricSource}.kt "source/$PROJECT/app/src/main/java/app/remix/player/"
           python3 "$GITHUB_WORKSPACE/patches/028-lyrics-timing.py" "source/$PROJECT"
+          cp "$GITHUB_WORKSPACE/patches/KnownLyricAlignment.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
+          python3 "$GITHUB_WORKSPACE/patches/029-retry-align.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
           test -f "source/$PROJECT/app/build.gradle.kts"
@@ -169,6 +171,8 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/027-premium-sheets.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/"{EmbeddedLyrics,LyricClock,TrackLyricSource}.kt "source/$PROJECT/app/src/main/java/app/remix/player/"
           python3 "$GITHUB_WORKSPACE/patches/028-lyrics-timing.py" "source/$PROJECT"
+          cp "$GITHUB_WORKSPACE/patches/KnownLyricAlignment.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
+          python3 "$GITHUB_WORKSPACE/patches/029-retry-align.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/setup-java@v4
@@ -219,6 +223,8 @@ jobs:
         run: bash patches/run-quick-effects-search.sh "source/$PROJECT"
       - name: Embedded lyrics and timing calibration
         run: bash patches/run-embedded-clock.sh "source/$PROJECT"
+      - name: Known lyric alignment safety
+        run: bash patches/run-known-lyric-alignment.sh "source/$PROJECT"
       - name: Full regression
         working-directory: source/RemixPlayer_v0.66
         env:
@@ -290,6 +296,8 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/027-premium-sheets.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/"{EmbeddedLyrics,LyricClock,TrackLyricSource}.kt "source/$PROJECT/app/src/main/java/app/remix/player/"
           python3 "$GITHUB_WORKSPACE/patches/028-lyrics-timing.py" "source/$PROJECT"
+          cp "$GITHUB_WORKSPACE/patches/KnownLyricAlignment.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
+          python3 "$GITHUB_WORKSPACE/patches/029-retry-align.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/download-artifact@v4
@@ -356,6 +364,8 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/027-premium-sheets.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/"{EmbeddedLyrics,LyricClock,TrackLyricSource}.kt "source/$PROJECT/app/src/main/java/app/remix/player/"
           python3 "$GITHUB_WORKSPACE/patches/028-lyrics-timing.py" "source/$PROJECT"
+          cp "$GITHUB_WORKSPACE/patches/KnownLyricAlignment.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
+          python3 "$GITHUB_WORKSPACE/patches/029-retry-align.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/download-artifact@v4
@@ -429,6 +439,8 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/027-premium-sheets.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/"{EmbeddedLyrics,LyricClock,TrackLyricSource}.kt "source/$PROJECT/app/src/main/java/app/remix/player/"
           python3 "$GITHUB_WORKSPACE/patches/028-lyrics-timing.py" "source/$PROJECT"
+          cp "$GITHUB_WORKSPACE/patches/KnownLyricAlignment.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
+          python3 "$GITHUB_WORKSPACE/patches/029-retry-align.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/setup-java@v4
