@@ -76,7 +76,7 @@ assert eqsource.count('fun eqRenderTests(){')==1
 eqsource=eqsource.replace('fun eqRenderTests(){','fun eqRenderTests(){eqHeadroomQualityTests();')
 eqtest.write_text(eqsource+'\n'+(Path(__file__).parent/'EqHeadroomQualityTest.kt').read_text().split('\n',2)[2])
 # Do not reuse a render checkpoint from an older DSP algorithm.
-edit('EffectCheckpoint.kt','dsp-peak-guard-v60','dsp-quality-v6')
+edit('EffectCheckpoint.kt','dsp-peak-guard-v60','dsp-quality-v7')
 edit('GenreCheckpoint.kt','genre-render-v7','genre-render-v8')
 edit('TransitionMix.kt','    fun renderFrames(first:File,second:File,out:File,overlap:Long,progress:(Int)->Unit={}):Long {','''    fun renderFrames(first:File,second:File,out:File,overlap:Long,progress:(Int)->Unit={}):Long = renderInternal(first,second,out,overlap,false,progress)
     fun renderSmartFrames(first:File,second:File,out:File,overlap:Long,progress:(Int)->Unit={}):Long = renderInternal(first,second,out,overlap,true,progress)
