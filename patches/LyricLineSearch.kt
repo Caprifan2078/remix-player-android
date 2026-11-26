@@ -6,7 +6,12 @@ object LyricLineSearch {
     const val MAX_RESULTS=80
     private val marks=Regex("\\p{M}+")
     private val separators=Regex("[^\\p{L}\\p{N}]+")
-    fun normalize(s:String):String=Normalizer.normalize(s.lowercase(Locale.ROOT).replace('ё','е'),Normalizer.Form.NFD).replace(marks,"").replace(separators," ").trim()
+    private val latinMarks=Regex("(?<=\\p{IsLatin})\\p{M}+")
+    fun normalize(s:String):String {
+        val decomposed=Normalizer.normalize(s.lowercase(Locale.ROOT),Normalizer.Form.NFD)
+        val composed=Normalizer.normalize(decomposed.replace(latinMarks,""),Normalizer.Form.NFC)
+        return composed.replace('ё','е').replace(marks,"").replace(separators," ").trim()
+    }
     data class PairLine(val original:Line,val translation:String)
     fun pair(lines:List<Line>,raw:String):List<PairLine>?{
         if(raw.length>64000)return null
