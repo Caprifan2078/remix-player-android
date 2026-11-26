@@ -40,7 +40,7 @@ test=Path(sys.argv[1])/'tests/WhisperModel62Test.kt'
 t=test.read_text()
 old='check(models.map{it.id}==listOf("tiny","base","small"))'
 assert t.count(old)==1
-t=t.replace(old,'check(models.map{it.id}==listOf("tiny","base-q5_1","base","small-q5_1","small"))')
+t=t.replace(old,'check(models.map{it.id}==listOf("tiny","base-q5_1","base","small-q5_1","small","medium-q5_0","large-v3-turbo-q5_0","large-v3-q5_0"))')
 old='check(models.zipWithNext().all{(a,b)->a.size<b.size&&a.minFreeRam<b.minFreeRam})'
 assert t.count(old)==1
 t=t.replace(old,'check(models.map{it.size}.distinct().size==models.size&&models.zipWithNext().all{(a,b)->a.minFreeRam<=b.minFreeRam})')
@@ -89,9 +89,9 @@ s=s[:a]+'''    private fun whisperModelDialog(){
         if(!WhisperLocal.available){toast("Whisper не включён в сборку");return}
         val active=WhisperLocal.installed(this)?.title?:"не установлена"
         val models=WhisperModelSpec.models
-        android.app.AlertDialog.Builder(this).setTitle("Распознавание вокала · Whisper").setItems(models.map{it.title+when(it.id){"tiny"->" · быстрая";"base-q5_1"->" · компактная, баланс";"base"->" · полная Base";"small-q5_1"->" · рекомендуемая для точности";else->" · полная Small, тяжёлая"}}.toTypedArray()){_,i->
+        android.app.AlertDialog.Builder(this).setTitle("Распознавание вокала · Whisper").setItems(models.map{it.title+" · "+it.description}.toTypedArray()){_,i->
             val spec=models[i]
-            android.app.AlertDialog.Builder(this).setTitle(spec.title).setMessage("Текущая модель: $active.\\nЗагрузка из официального источника, проверка размера, SHA-256 и запуска модели. Музыка не отправляется. Точность на пении не гарантирована.").setNegativeButton("Отмена",null).setPositiveButton("Скачать"){_,_->stemWork("Загрузка Whisper…",{WhisperLocal.download(this,spec){updateWork("Whisper: $it%")}}){id->toast("Whisper $id установлен");render()}}.show()
+            android.app.AlertDialog.Builder(this).setTitle(spec.title).setMessage("Текущая модель: $active.\\n${spec.description}\\nПорог свободной ОЗУ: ${spec.minFreeRam/1048576} МиБ (ориентир, не измеренный пик).\\nЗагрузка с проверкой размера, SHA-256 и запуска. Аудио остаётся на устройстве. Точность на пении не гарантирована.").setNegativeButton("Отмена",null).setPositiveButton("Скачать"){_,_->stemWork("Загрузка Whisper…",{WhisperLocal.download(this,spec){updateWork("Whisper: $it%")}}){id->toast("Whisper $id установлен");render()}}.show()
         }.setNeutralButton("Импорт файла"){_,_->whisperPicker.launch(arrayOf("*/*"))}.setNegativeButton("Закрыть",null).show()
     }
 '''+s[b:]
