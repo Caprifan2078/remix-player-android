@@ -87,7 +87,7 @@ edit('LiveOverlap.kt','''            if(!queueMatches()||now-handoffAt>1800||p.p
             if(aligned){
                 if(!previewPlaying){abort(false);return false}
                 if(blendSince==0L)blendSince=now
-                val blend=((now-blendSince)/120f).coerceIn(0f,1f);p.volume=1f-blend;main.volume=blend
+                val blend=audiblePosition.primaryGain(now-blendSince);p.volume=1f-blend;main.volume=blend
                 if(now-blendSince>=120){abort(false);return false}
             }else{
                 blendSince=0L;main.volume=0f;p.volume=if(previewPlaying)1f else 0f
@@ -95,17 +95,18 @@ edit('LiveOverlap.kt','''            if(!queueMatches()||now-handoffAt>1800||p.p
                 val target=audiblePosition.target(if(previewPlaying)p.currentPosition else 0L,p.duration)
                 if(now-handoffAt>=3000){
                     // Recovery is two-phase: never expose the stale primary decoder.
-                    if(!recoveringHandoff){
+                    val recoveryAction=audiblePosition.recovery(now-handoffAt,now-lastCorrectionAt,recoveringHandoff,main.currentPosition,main.currentMediaItemIndex==to)
+                    if(recoveryAction==OverlapHandoff.Recovery.START){
                         recoveringHandoff=true
                         observeIncoming()
                         val recovery=audiblePosition.target(if(previewPlaying)p.currentPosition else 0L,p.duration)
                         p.volume=0f;p.pause()
                         debug("handoff recovery position="+recovery)
                         seekIncoming(recovery);lastCorrectionAt=now
-                    }else if(now-lastCorrectionAt>=1000&&main.currentPosition<audiblePosition.audibleUntil-80){
+                    }else if(recoveryAction==OverlapHandoff.Recovery.RETRY){
                         lastCorrectionAt=now;seekIncoming(audiblePosition.target(0L,p.duration))
                     }
-                    if(now-handoffAt>=12000){
+                    if(recoveryAction==OverlapHandoff.Recovery.PAUSE){
                         // A failed decoder must not be allowed to replay an audible intro.
                         seekIncoming(audiblePosition.target(0L,p.duration))
                         main.pause()
