@@ -78,14 +78,26 @@ object MoodDiscovery {
   val out=mutableListOf<String>()
   var lastArtist=""
   fun lerp(a:Double,b:Double,t:Double)=a+(b-a)*t
-  for(i in 0 until limit){
-   val t=if(limit==1)0.5 else i.toDouble()/(limit-1)
-   val v=if(from.valence!=null&&to.valence!=null)lerp(from.valence,to.valence,t)else null
+  val count=minOf(limit,pool.size)
+  for(i in 0 until count){
+   check(!Thread.currentThread().isInterrupted){"Cancelled"}
+   val t=if(count==1)0.5 else i.toDouble()/(count-1)
+   val v=when{
+    t==0.0->from.valence
+    t==1.0->to.valence
+    from.valence!=null&&to.valence!=null->lerp(from.valence,to.valence,t)
+    else->null
+   }
    val p=Profile("","",lerp(from.energy,to.energy,t),lerp(from.activity,to.activity,t),lerp(from.brightness,to.brightness,t),lerp(from.low,to.low,t),v,lerp(from.dynamics,to.dynamics,t))
-   val candidates=pool.mapNotNull{e->score(e.features,p)?.let{e to it}}.sortedWith(compareByDescending<Pair<Entry,Double>>{it.second}.thenBy{it.first.id})
-   val best=candidates.firstOrNull()?:continue
-   val pick=candidates.firstOrNull{it.second>=best.second-.035&&it.first.artist.isNotBlank()&&!it.first.artist.trim().equals(lastArtist,true)}?:best
-   out.add(pick.first.id);lastArtist=pick.first.artist.trim();pool.remove(pick.first)
+   var best:Entry?=null;var bestScore=-1.0
+   var other:Entry?=null;var otherScore=-1.0
+   for(e in pool){
+    val value=score(e.features,p)?:continue
+    if(value>bestScore||(value==bestScore&&e.id<(best?.id?:""))){best=e;bestScore=value}
+    if(e.artist.isNotBlank()&&!e.artist.trim().equals(lastArtist,true)&&(value>otherScore||(value==otherScore&&e.id<(other?.id?:"")))){other=e;otherScore=value}
+   }
+   val pick=(if(otherScore>=bestScore-.035)other else best)?:best?:continue
+   out.add(pick.id);lastArtist=pick.artist.trim();pool.remove(pick)
   }
   return out
  }
