@@ -23,6 +23,13 @@ import java.util.concurrent.Future
 object AutoLyrics {
     private const val JOB_ID=66126
     private const val PREF="auto_lyrics_v1"
+    fun translateEnabled(c:Context)=c.getSharedPreferences(PREF,Context.MODE_PRIVATE).getBoolean("translate",false)
+    fun setTranslate(c:Context,value:Boolean)=c.getSharedPreferences(PREF,Context.MODE_PRIVATE).edit().putBoolean("translate",value).commit()
+    fun needsTranslation(c:Context,id:String,raw:String):Boolean{
+        val key=AutoTranslationPolicy.key(id,raw)
+        return AutoTranslationPolicy.pending(translateEnabled(c),raw,c.getSharedPreferences("translations",Context.MODE_PRIVATE).contains(key),c.getSharedPreferences(PREF,Context.MODE_PRIVATE).contains("tr_"+key))
+    }
+    fun markTranslation(c:Context,key:String)=c.getSharedPreferences(PREF,Context.MODE_PRIVATE).edit().putBoolean("tr_"+key,true).commit()
     fun enabled(c:Context)=c.getSharedPreferences(PREF,Context.MODE_PRIVATE).getBoolean("enabled",false)
     fun setEnabled(c:Context,enabled:Boolean):Boolean{
         if(!c.getSharedPreferences(PREF,Context.MODE_PRIVATE).edit().putBoolean("enabled",enabled).commit())return false
@@ -93,13 +100,14 @@ class AutoLyricsJob:JobService(){
             val id=row.optString("uri");if(id.isBlank()||row.optString("group",id)!=id||Uri.parse(id).scheme!="content")continue
             val oldTitle=row.optString("title");val oldArtist=row.optString("artist");val old=row.optString("lyrics")
             val rev=AutoLyrics.revision(id,oldTitle,oldArtist,old)
-            if(AutoLyrics.completed(this,id,rev,modelReady))continue
+            val lyricsDone=AutoLyrics.completed(this,id,rev,modelReady)
+            if(lyricsDone&&!AutoLyrics.needsTranslation(this,id,old))continue
             val existing=AutoLyrics.file(this,id)
             if(AutoLyrics.read(existing)?.optString("revision")==rev)continue
             val uri=Uri.parse(id)
             var identity=TrackIdentityFix.Identity(oldTitle,oldArtist)
-            var raw:String?=null;var draft:String?=null;var outcome="done"
-            try{
+            var raw:String?=null;var draft:String?=null;var outcome=if(lyricsDone&&!modelReady)"waiting" else "done"
+            if(!lyricsDone)try{
                 val info=TrackLyricSource.metadata(this,uri,oldTitle,oldArtist,null)
                 identity=TrackIdentityFix.fromTags(identity,info.tagTitle,info.tagArtist)
                 raw=try{TrackLyricSource.automatic(this,uri,identity.title,identity.artist,old,true)}catch(e:Exception){
@@ -148,8 +156,26 @@ class AutoLyricsJob:JobService(){
                 outcome="error"
             }
             checkRunning()
+            val finalRaw=raw?:old
+            var translation:List<String>?=null
+            var translationKey:String?=null
+            if(AutoLyrics.needsTranslation(this,id,finalRaw)){
+                val lines=LocalLyricLanguage.lines(finalRaw)
+                try{
+                    val lang=LocalLyricLanguage.detect(lines)
+                    if(lang!=null&&lang!="ru"){
+                        val result=LyricTranslation.translate(lines,lang,"ru",true)
+                        if(AutoTranslationPolicy.valid(lines,result))translation=result
+                    }
+                    translationKey=AutoTranslationPolicy.key(id,finalRaw)
+                }catch(e:Exception){
+                    if(e is InterruptedException||Thread.currentThread().isInterrupted)throw InterruptedException()
+                    // Retain the original and retry transient download/translation errors on a later job.
+                }
+            }
+            checkRunning()
             if(!AutoLyrics.write(this,id,JSONObject().put("uri",id).put("revision",rev).put("title",identity.title).put("artist",identity.artist)
-                .put("raw",raw?:JSONObject.NULL).put("draft",draft?:JSONObject.NULL).put("outcome",outcome)))return
+                .put("raw",raw?:JSONObject.NULL).put("draft",draft?:JSONObject.NULL).put("outcome",outcome).put("translationKey",translationKey?:JSONObject.NULL).put("translation",translation?.let{JSONArray(it)}?:JSONObject.NULL)))return
             Thread.sleep(1100)
         }
     }
