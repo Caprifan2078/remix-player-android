@@ -62,6 +62,76 @@ class StudioAcceptanceTest {
             println("PASS Android: 44 effect exports + independent MediaCodec WAV decode")
         }finally{dir.deleteRecursively()}
     }
+    @androidx.media3.common.util.UnstableApi
+    @Test fun realCrossfadeContinuesIncomingAndCancelsOnSeek(){
+        val dir=folder()
+        val inst=InstrumentationRegistry.getInstrumentation()
+        val pcm=File(dir,"crossfade.pcm")
+        val first=File(dir,"a.wav");val second=File(dir,"b.wav")
+        var player:androidx.media3.exoplayer.ExoPlayer?=null
+        var coordinator:LiveOverlap?=null
+        try{
+            raw(pcm,44100*14,440.0);wav(pcm,first)
+            raw(pcm,44100*14,660.0);wav(pcm,second)
+            val uriA=FileProvider.getUriForFile(c,"app.remix.player.files",first)
+            val uriB=FileProvider.getUriForFile(c,"app.remix.player.files",second)
+            inst.runOnMainSync{
+                val p=androidx.media3.exoplayer.ExoPlayer.Builder(c).build();player=p
+                p.setAudioAttributes(androidx.media3.common.AudioAttributes.Builder().setUsage(androidx.media3.common.C.USAGE_MEDIA).setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MUSIC).build(),false)
+                p.setMediaItems(listOf(
+                    androidx.media3.common.MediaItem.Builder().setUri(uriA).setMediaId("crossfade-a").build(),
+                    androidx.media3.common.MediaItem.Builder().setUri(uriB).setMediaId("crossfade-b").build()
+                ),0,5500)
+                coordinator=LiveOverlap(c,p)
+                p.prepare();p.play()
+            }
+            var firstAudible=-1L;var lastAudible=-1L;var mixed=false;var done=false
+            val deadline=android.os.SystemClock.elapsedRealtime()+26000
+            while(!done&&android.os.SystemClock.elapsedRealtime()<deadline){
+                inst.runOnMainSync{
+                    val p=player!!
+                    val owned=coordinator!!.tick(3000,true)
+                    if(p.currentMediaItemIndex==0&&owned&&p.volume<.9f)mixed=true
+                    if(p.currentMediaItemIndex==1&&p.isPlaying&&p.volume>.2f){
+                        val position=p.currentPosition
+                        if(firstAudible<0)firstAudible=position
+                        if(lastAudible>=0)assertTrue("Incoming restarted after audible handoff: $lastAudible -> $position",position+200>=lastAudible)
+                        lastAudible=position
+                        done=!owned&&p.volume>.98f&&position>firstAudible+350
+                    }
+                    assertNull(p.playerError)
+                }
+                android.os.SystemClock.sleep(25)
+            }
+            assertTrue("No audible overlap before transition",mixed)
+            assertTrue("Incoming intro replayed: first audible position $firstAudible",firstAudible>=1000)
+            assertTrue("Handoff never completed",done)
+            println("PASS Android crossfade: incoming first audible position=$firstAudible ms, no sampled backward restart")
+            inst.runOnMainSync{
+                val p=player!!;coordinator!!.close()
+                p.seekTo(0,8500);coordinator=LiveOverlap(c,p);p.play()
+            }
+            var cancelled=false
+            val cancelDeadline=android.os.SystemClock.elapsedRealtime()+12000
+            while(!cancelled&&android.os.SystemClock.elapsedRealtime()<cancelDeadline){
+                inst.runOnMainSync{
+                    val p=player!!;val owned=coordinator!!.tick(3000,true)
+                    if(owned&&p.currentMediaItemIndex==0&&p.volume<.9f){
+                        p.seekTo(0,3000)
+                        coordinator!!.tick(3000,true)
+                        assertTrue("Volume remained attenuated after manual seek",p.volume>.98f)
+                        assertEquals(0,p.currentMediaItemIndex)
+                        cancelled=true
+                    }
+                }
+                android.os.SystemClock.sleep(25)
+            }
+            assertTrue("Never entered overlap for manual seek test",cancelled)
+        }finally{
+            inst.runOnMainSync{coordinator?.close();player?.release()}
+            dir.deleteRecursively()
+        }
+    }
     @Test fun thirtyGenresDistinctDecodableAndNonSilent(){
         val dir=folder()
         try{
