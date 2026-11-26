@@ -17,3 +17,5 @@ kotlinc patches/SourceEffectBalance.kt patches/SourceEffectBalanceTest.kt -inclu
 java -jar "$tmp/SourceEffectBalance.jar"
 kotlinc patches/TrackIdentityFix.kt patches/TrackIdentityFixTest.kt -include-runtime -d "$tmp/TrackIdentityFix.jar"
 java -jar "$tmp/TrackIdentityFix.jar"
+kotlinc patches/AutoTranslationPolicy.kt patches/AutoTranslationPolicyTest.kt -include-runtime -d "$tmp/auto-translation.jar"
+java -jar "$tmp/auto-translation.jar"
