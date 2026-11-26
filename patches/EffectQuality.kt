@@ -127,8 +127,8 @@ class Dsp(private val rate:Int,private val channels:Int){
         val depth=adaptiveDepth.frame(input)
         if(tuneSource)spectrum.frame(input)
         val bassDepth=depth*(if(tuneSource)spectrum.bass else 1f)
-        val driveDepth=depth*(if(tuneSource)spectrum.drive else 1f)
-        val roomDepth=depth*(if(tuneSource)spectrum.room else 1f)
+        val driveDepth=depth*(if(tuneSource)spectrum.drive*spectrum.transient else 1f)
+        val roomDepth=depth*(if(tuneSource)spectrum.room*(.5f+.5f*spectrum.transient) else 1f)
         for(c in 0 until channels){
             val x=if(input[c].isFinite())input[c].coerceIn(-1f,1f)else 0f
             var y=x
