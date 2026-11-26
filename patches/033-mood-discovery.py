@@ -78,19 +78,52 @@ helper='''    private fun moodPrefs()=getSharedPreferences("mood_discovery_v1",M
             })
         }
     }
+    private fun launchMoodJourney(indexed:List<MoodDiscovery.Entry>,from:MoodDiscovery.Profile,to:MoodDiscovery.Profile,limit:Int){
+        if(stemBusy){toast("Дождитесь завершения обработки");return}
+        val title=from.title+" → "+to.title
+        stemWork("Составление подборки…",{MoodDiscovery.journey(indexed,from,to,limit)}){ids->moodMixPreview(title,"Постепенная смена акустического профиля",ids)}
+    }
     private fun moodJourneyDialog(indexed:List<MoodDiscovery.Entry>){
         val profiles=MoodDiscovery.profiles
-        actionSheet("Смена настроения",420){dialog,panel->
+        actionSheet("Смена настроения",480){dialog,panel->
             panel.addView(label("Порядок песен подбирается по энергии, ритму и другим акустическим признакам. Это не изменение самих аудиофайлов.",13,muted))
             listOf(1 to 2,2 to 1,0 to 6,5 to 3).forEach{(a,b)->
                 val from=profiles[a];val to=profiles[b]
-                val title=from.title+" → "+to.title
-                sheetAction(panel,title,"До 30 песен без повторов"){
+                sheetAction(panel,from.title+" → "+to.title,"До 30 песен без повторов"){
                     if(stemBusy){toast("Дождитесь завершения обработки");return@sheetAction}
-                    dialog.dismiss()
-                    stemWork("Составление подборки…",{MoodDiscovery.journey(indexed,from,to)}){ids->moodMixPreview(title,"Постепенная смена акустического профиля",ids)}
+                    dialog.dismiss();launchMoodJourney(indexed,from,to,30)
                 }
             }
+            sheetAction(panel,"Свой маршрут","Выбрать начальное и конечное настроение, длину подборки"){
+                dialog.dismiss();customMoodJourney(indexed)
+            }
+        }
+    }
+    private fun customMoodJourney(indexed:List<MoodDiscovery.Entry>){
+        val profiles=MoodDiscovery.profiles
+        actionSheet("Свой маршрут",390){dialog,panel->
+            fun choice(title:String,values:List<String>,initial:Int):android.widget.Spinner{
+                panel.addView(label(title,13,muted,true))
+                val spinner=android.widget.Spinner(this)
+                val adapter=android.widget.ArrayAdapter(this,android.R.layout.simple_spinner_item,values)
+                adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+                spinner.adapter=adapter;spinner.setSelection(initial)
+                spinner.contentDescription=title
+                panel.addView(spinner,LinearLayout.LayoutParams(-1,dp(48)))
+                return spinner
+            }
+            val names=profiles.map{it.title}
+            val from=choice("Начальное настроение",names,1)
+            val to=choice("Конечное настроение",names,2)
+            val sizes=listOf(10,20,30,50,100)
+            val length=choice("Максимум песен",sizes.map{it.toString()},2)
+            panel.addView(btn("Создать подборку"){
+                if(stemBusy){toast("Дождитесь завершения обработки");return@btn}
+                val a=profiles.getOrNull(from.selectedItemPosition)?:return@btn
+                val b=profiles.getOrNull(to.selectedItemPosition)?:return@btn
+                val count=sizes.getOrNull(length.selectedItemPosition)?:30
+                dialog.dismiss();launchMoodJourney(indexed,a,b,count)
+            })
         }
     }
     private fun startMoodScan(songs:List<Track>,known:Set<String>,rescan:Boolean){
