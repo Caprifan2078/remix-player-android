@@ -74,6 +74,57 @@ replace('Presets.all.forEach{p->card((if(p==Presets.active)"✓  " else "")+p.na
             }.setNegativeButton("Закрыть",null).show()
         })''')
 
+# The library should open with search and music, not a dashboard of tools.
+replace('    private fun library(){', '''    private var libraryToolsExpanded=false
+    private fun library(){''')
+replace('body.addView(btn("Инструменты библиотеки…"){android.app.AlertDialog.Builder(this).setTitle("Инструменты библиотеки")',
+'''val advanced=column()
+        advanced.addView(btn("Инструменты библиотеки…"){android.app.AlertDialog.Builder(this).setTitle("Инструменты библиотеки")''')
+replace('body.addView(btn(if(scanBusy)"Сканирование…" else "Найти музыку на телефоне"){requestScan()});val search=EditText(this)',
+'''val scan=btn(if(scanBusy)"Сканирование…" else "Найти музыку на телефоне"){requestScan()}
+        val search=EditText(this)''')
+replace('body.addView(search);val filter=btn', '''body.addView(search)
+        if(tracks.isEmpty()||scanBusy)body.addView(scan)else advanced.addView(scan)
+        val filter=btn''')
+replace('body.addView(filter);val tools=row();tools.addView(btn(selectedPlaylist?:"Плейлисты"){playlistFilter()},weight());tools.addView(btn(listOf(if(selectedPlaylist==null)"По добавлению" else "Порядок плейлиста","По названию","По исполнителю")[sortMode]){sortMode=(sortMode+1)%3;shownSongs=100;render()},weight());body.addView(tools);val extras=row();',
+'''val primary=row();primary.addView(filter,weight());primary.addView(btn(selectedPlaylist?:"Плейлисты"){playlistFilter()},weight());body.addView(primary)
+        advanced.addView(btn("Сортировка: "+listOf(if(selectedPlaylist==null)"По добавлению" else "Порядок плейлиста","По названию","По исполнителю")[sortMode]){sortMode=(sortMode+1)%3;shownSongs=100;render()})
+        val extras=row();''')
+replace('body.addView(extras);body.addView(btn(category?:listOf("Каталог: все песни","Каталог: альбомы","Каталог: папки","Каталог: исполнители")[categoryMode]){chooseCategory()});body.addView(btn(if(randomVersions)',
+'''advanced.addView(extras);advanced.addView(btn(category?:listOf("Каталог: все песни","Каталог: альбомы","Каталог: папки","Каталог: исполнители")[categoryMode]){chooseCategory()});advanced.addView(btn(if(randomVersions)''')
+replace('val list=column();body.addView(btn("Добавить найденные песни в плейлист…"){bulkPlaylistDialog()});body.addView(btn("Добавить найденные песни в очередь…"){bulkQueueDialog()});body.addView(list)',
+'''val list=column()
+        advanced.addView(btn("Добавить найденные песни в плейлист…"){bulkPlaylistDialog()})
+        advanced.addView(btn("Добавить найденные песни в очередь…"){bulkQueueDialog()})
+        val details=mutableListOf<String>()
+        if(categoryMode!=0)details.add(category?:listOf("Все песни","Альбомы","Папки","Исполнители")[categoryMode])
+        if(sortMode!=0)details.add(listOf("По добавлению","По названию","По исполнителю")[sortMode])
+        if(randomVersions)details.add("Случайные версии")
+        if(details.isNotEmpty())body.addView(label(details.joinToString(" · "),13,muted))
+        val toggle=btn(if(libraryToolsExpanded)"Скрыть инструменты" else "Фильтры и инструменты…"){}
+        toggle.setOnClickListener{
+            libraryToolsExpanded=!libraryToolsExpanded
+            advanced.visibility=if(libraryToolsExpanded)View.VISIBLE else View.GONE
+            toggle.text=if(libraryToolsExpanded)"Скрыть инструменты" else "Фильтры и инструменты…"
+        }
+        body.addView(toggle);advanced.visibility=if(libraryToolsExpanded)View.VISIBLE else View.GONE;body.addView(advanced);body.addView(list)''')
+
+# Untimed or missing lyrics: retain import and online lookup as primary actions,
+# but group the editing/model setup buttons just like the synchronized view.
+replace('activeLyrics=Lrc.parse(raw);if(activeLyrics.isEmpty()){body.addView(label(',
+'''activeLyrics=Lrc.parse(raw);if(activeLyrics.isEmpty()){
+        val extra=column()
+        while(body.childCount>3){val view=body.getChildAt(3);body.removeViewAt(3);extra.addView(view)}
+        val toggle=btn(if(lyricToolsExpanded)"Скрыть инструменты текста" else "Инструменты текста…"){}
+        fun updateTools(){
+            val expanded=lyricToolsExpanded||stemBusy
+            extra.visibility=if(expanded)View.VISIBLE else View.GONE
+            toggle.text=if(expanded)"Скрыть инструменты текста" else "Инструменты текста…"
+        }
+        toggle.setOnClickListener{if(!stemBusy){lyricToolsExpanded=!lyricToolsExpanded;updateTools()}}
+        body.addView(toggle);body.addView(extra);updateTools()
+        body.addView(label(''')
+
 # Fail closed if any legacy top-level duplicate survives.
 versions=s[s.index("    private fun versions(){"):s.index("    private val customPresets=")]
 for duplicate in ('btn("Экспорт WAV в папку…")','btn("Экспорт FLAC без потерь…")','btn("Экспорт MP3…")','btn("Открыть студию эффектов")','listOf("Текст","Микшер","Студия","Очередь")'):
