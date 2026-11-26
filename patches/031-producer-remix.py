@@ -101,7 +101,16 @@ rep('GenreEngine.styles.forEach{style->card(style.name,"Цель: ${style.target
 rep('val styles=GenreEngine.styles;val selected=BooleanArray(styles.size)','val styles=ProducerStyles.all;val selected=BooleanArray(styles.size)')
 rep('.setNeutralButton("Все 30"){_,_->confirmBatch(source,styles)}','.setNeutralButton("30 основных"){_,_->confirmBatch(source,GenreEngine.styles)}')
 rep('if(chosen.isEmpty())toast("Выберите хотя бы один жанр") else confirmBatch(source,chosen)','if(chosen.isEmpty())toast("Выберите хотя бы один жанр") else if(chosen.size>30)toast("Не более 30 версий за пакет") else confirmBatch(source,chosen)')
-rep('panel.addView(label("Быстрые режимы",12,muted,true))','''sheetAction(panel,"Hardstyle и жанровые ремиксы","Создать новую версию с новыми ударными и басом"){dialog.dismiss();screen="Жанры";render()}
+rep('panel.addView(label("Быстрые режимы",12,muted,true))','''sheetAction(panel,"Hardstyle и жанровые ремиксы","Создать отдельную версию песни · не моментальный эффект"){
+                dialog.dismiss()
+                val playing=current()
+                if(playing==null){toast("Сначала включите песню");return@sheetAction}
+                val source=libraryIndex.get(playing.group)?:playing
+                actionSheet("Жанровый ремикс",300){genres,choices->
+                    sheetAction(choices,"Hardstyle · 150 BPM","Новый кик, бас, аранжировка"){genres.dismiss();generateGenres(source,listOf(ProducerStyles.all.single{it.name=="Hardstyle"}))}
+                    sheetAction(choices,"Другие жанры","40 направлений и настройки"){genres.dismiss();screen="Жанры";render()}
+                }
+            }
             panel.addView(label("Моментальные эффекты",12,muted,true))
             panel.addView(label("Интенсивность меняется по громкости песни; скорость и тон остаются выбранными.",12,muted))''')
 rep('popular.size*61+65','popular.size*61+175')
