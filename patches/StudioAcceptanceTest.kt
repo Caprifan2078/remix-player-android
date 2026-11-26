@@ -161,7 +161,17 @@ class StudioAcceptanceTest {
             assertEquals(44+result.frames*4,out.length())
             assertTrue(result.overlap in 210000L..231000L)
             val decoded=File(dir,"decoded.pcm");assertEquals(result.frames,decode(out,decoded))
-            assertArrayEquals(out.readBytes().copyOfRange(44,out.length().toInt()),decoded.readBytes())
+            assertEquals("Decoded length",out.length()-44,decoded.length())
+            // Compare every byte, without allocating three copies of the song in a 16 MiB heap.
+            java.io.DataInputStream(out.inputStream().buffered()).use{expected->
+                java.io.DataInputStream(decoded.inputStream().buffered()).use{actual->
+                    expected.readFully(ByteArray(44))
+                    val x=ByteArray(16384);val y=ByteArray(16384)
+                    var remaining=decoded.length();var offset=0L
+                    while(remaining>0){val n=minOf(x.size.toLong(),remaining).toInt();expected.readFully(x,0,n);actual.readFully(y,0,n);for(i in 0 until n)if(x[i]!=y[i])fail("PCM mismatch at byte "+(offset+i));remaining-=n;offset+=n}
+                    assertEquals(-1,expected.read());assertEquals(-1,actual.read())
+                }
+            }
             assertEquals(beforeA,hash(a));assertEquals(beforeB,hash(b));assertTrue(dir.listFiles()!!.none{it.name.startsWith("dj-fit-")})
             println("PASS Android: measured BPM matching, rendered smart transition and independently decoded WAV")
         }finally{dir.deleteRecursively()}
