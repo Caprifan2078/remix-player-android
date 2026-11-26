@@ -70,7 +70,7 @@ rep(anchor,'''    private fun lyricSearchChoices(t:Track,manual:()->Unit){
                     sheetAction(content,"По вокалу · Whisper","Локальное распознавание или синхронизация"){
                         sources.dismiss()
                         val raw=rawLyrics(t)
-                        if(raw.isBlank())recognizeWhisper(t)else alignKnownLyrics(t,raw)
+                        if(raw.isBlank())recognizeAndReview(t)else alignKnownLyrics(t,raw)
                     }
                 }
             }
@@ -130,5 +130,87 @@ s=s[:a]+'''        for(j in 0 until modes.childCount){
         modes.addView(overflow,LinearLayout.LayoutParams(dp(48),dp(48)))'''+s[b:]
 
 rep('body.addView(whisperButton,3)','body.addView(whisperButton,3);whisperButton.visibility=View.GONE')
+# A transcript is a draft; compare against candidates before the user accepts it.
+(Path(sys.argv[1])/'app/src/main/java/app/remix/player/TranscriptMatch.kt').write_bytes((Path(__file__).parent/'TranscriptMatch.kt').read_bytes())
+anchor='    private fun scanDraftReview(){'
+rep(anchor,r'''    private fun recognizeAndReview(t:Track){
+        if(stemBusy||lyricsBusy)return
+        val original=libraryIndex.get(t.group)?:t
+        val id=original.uri;val revision=lyricRevision(original)
+        val draft=scanDraftFile(id)
+        val cached=runCatching{require(draft.length() in 1..262144);draft.readText()}.getOrNull()
+        if(!cached.isNullOrBlank()){transcriptChoices(original,cached,revision);return}
+        if(!WhisperLocal.available||WhisperLocal.installed(this)==null){whisperModelDialog();return}
+        stemWork("Whisper · распознавание вокала…",{scanRecognize(Uri.parse(id),id)}){raw->
+            val target=libraryIndex.get(id)
+            if(target==null||lyricRevision(target)!=revision){toast("Песня или текст изменились");return@stemWork}
+            if(!saveScanDraft(id,raw))toast("Не удалось записать черновик на диск")
+            transcriptChoices(target,raw,revision)
+        }
+    }
+    private fun transcriptChoices(source:Track,raw:String,revision:String){
+        val id=source.uri
+        val heard=LyricDocument.plain(raw)
+        val phrase=TranscriptMatch.query(heard)
+        fun accept(candidate:String,verify:Boolean){
+            val text=LyricDocument.plain(candidate)
+            if(text.isBlank()){toast("Нет текста");return}
+            // Only use measured timestamps from this recording, never silently copy another remix's timeline.
+            val aligned=if(verify)KnownLyricAlignment.align(raw,text) else null
+            val prepared=if(verify)aligned?.lrc?:text else candidate
+            if(prepared.toByteArray(Charsets.UTF_8).size>LyricDocument.MAX_BYTES){toast("Текст слишком большой");return}
+            reviewTranscript(if(verify)"Текст · сверка с вокалом" else "Whisper · черновик",prepared){accepted->
+                val target=libraryIndex.get(id)
+                if(target==null||lyricRevision(target)!=revision){toast("Песня или текст изменились");return@reviewTranscript}
+                val before=target.lyrics;target.lyrics=accepted
+                if(saveLibrary(true)){scanDraftFile(id).delete();render();toast("Текст сохранён для офлайн-просмотра")}
+                else{target.lyrics=before;reindex();toast("Не удалось сохранить текст")}
+            }
+        }
+        actionSheet("Распознанный текст",460){dialog,panel->
+            panel.addView(label(heard.take(700),14,PremiumChrome.TEXT))
+            sheetAction(panel,"Найти оригинал","Интернет в фоне · сверка с распознанными словами"){
+                dialog.dismiss()
+                if(stemBusy||lyricsBusy)return@sheetAction
+                val title=source.title;val artist=source.artist
+                stemWork("Ищем оригинальный текст…",{
+                    val (found,_)=TrackLyricSource.search(this,Uri.parse(id),title,artist,null)
+                    found.mapNotNull{item->
+                        val text=LyricDocument.plain(item.plain?:item.synced?:return@mapNotNull null)
+                        val score=TranscriptMatch.score(heard,text)
+                        if(score.plausible)Triple(item,text,score)else null
+                    }.sortedWith(compareByDescending<Triple<LyricsMatch.Candidate,String,TranscriptMatch.Score>>{it.third.fraction}.thenByDescending{it.third.matching}).take(5)
+                }){matches->
+                    val target=libraryIndex.get(id)
+                    if(target==null||lyricRevision(target)!=revision){toast("Песня или текст изменились");return@stemWork}
+                    actionSheet("Варианты оригинала",440){results,content->
+                        if(matches.isEmpty())content.addView(label("Надёжных совпадений в каталоге нет. Черновик сохранён.",14,muted))
+                        matches.forEach{(item,text,score)->
+                            sheetAction(content,item.title+" · "+item.artist,"Совпало фраз: "+score.matching+" / "+score.total){results.dismiss();accept(text,true)}
+                        }
+                        sheetAction(content,"Поиск по фразе в браузере","Вернитесь сюда и импортируйте скопированный текст"){results.dismiss();openLyricBrowser(title+" "+artist+" "+phrase);transcriptChoices(source,raw,revision)}
+                        sheetAction(content,"Назад к черновику"){results.dismiss();transcriptChoices(source,raw,revision)}
+                    }
+                }
+            }
+            sheetAction(panel,"Поиск по фразе в браузере","Запрос уже заполнен · без ручного ввода"){openLyricBrowser(source.title+" "+source.artist+" "+phrase)}
+            sheetAction(panel,"Вставить текст из браузера","Скопируйте слова песни, затем нажмите здесь"){
+                val clipboard=getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                val value=clipboard.primaryClip?.takeIf{it.itemCount>0}?.getItemAt(0)?.text?.toString().orEmpty()
+                if(value.isBlank()||value.toByteArray(Charsets.UTF_8).size>LyricDocument.MAX_BYTES){toast("Скопируйте текст песни, не ссылку");return@sheetAction}
+                if(value.trim().startsWith("https://")||value.trim().startsWith("http://")){toast("Нужны слова песни, а не ссылка");return@sheetAction}
+                val score=TranscriptMatch.score(heard,LyricDocument.plain(value))
+                if(!score.plausible){
+                    android.app.AlertDialog.Builder(this).setTitle("Слабое совпадение").setMessage("Скопированный текст мало похож на распознанный вокал. Проверьте, что это та же песня.").setNegativeButton("Отмена",null).setPositiveButton("Проверить вручную"){_,_->dialog.dismiss();accept(value,true)}.show()
+                }else{dialog.dismiss();accept(value,true)}
+            }
+            sheetAction(panel,"Проверить черновик Whisper","Оставить локально распознанные слова"){dialog.dismiss();accept(raw,false)}
+        }
+    }
+'''+anchor)
+a=s.index('                reviewTranscript("Whisper",raw){accepted->',s.index('    private fun scanDraftReview(){'))
+b=s.index('            }}',a)
+s=s[:a]+'''                transcriptChoices(t,raw,lyricRevision(t))
+'''+s[b:]
 p.write_text(s)
 print("PASS: persistent default-off PRO controls; core player unchanged")
