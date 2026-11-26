@@ -60,6 +60,12 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/023-model-cdn.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/WhisperDownload.kt" "$GITHUB_WORKSPACE/patches/ModelMemoryBudget.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
           python3 "$GITHUB_WORKSPACE/patches/024-model-recovery.py" "source/$PROJECT"
+          cp "$GITHUB_WORKSPACE/patches/DjTransition.kt" "$GITHUB_WORKSPACE/patches/RemixAdvisor.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
+          python3 "$GITHUB_WORKSPACE/patches/025-smart-dj.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/026-advisor-ui.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/027-mix-quality.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/028-live-recovery.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/029-radio-similarity.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
           test -f "source/$PROJECT/app/build.gradle.kts"
@@ -113,14 +119,14 @@ jobs:
           path: source/RemixPlayer_v0.66/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
           if-no-files-found: error
       - name: Compile real-model test instrumentation separately
-        if: ${{ github.event_name == 'pull_request' && github.head_ref == 'qa/smart-mix-model-recovery-20261126' }}
+        if: ${{ github.event_name == 'pull_request' && (github.head_ref == 'qa/smart-mix-model-recovery-20261126' || github.head_ref == 'qa/dj-ranking-20261126') }}
         run: |
           set -euo pipefail
           cp model-qa/RealModelAcceptanceTest.kt model-qa/DirectWhisperDownloadTest.kt "source/$PROJECT/app/src/androidTest/java/app/remix/player/"
           cd "source/$PROJECT"
           gradle --no-daemon :app:assembleDebugAndroidTest --stacktrace
       - uses: actions/upload-artifact@v4
-        if: ${{ github.event_name == 'pull_request' && github.head_ref == 'qa/smart-mix-model-recovery-20261126' }}
+        if: ${{ github.event_name == 'pull_request' && (github.head_ref == 'qa/smart-mix-model-recovery-20261126' || github.head_ref == 'qa/dj-ranking-20261126') }}
         with:
           name: Real-model-instrumentation
           path: source/RemixPlayer_v0.66/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
@@ -166,6 +172,12 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/023-model-cdn.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/WhisperDownload.kt" "$GITHUB_WORKSPACE/patches/ModelMemoryBudget.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
           python3 "$GITHUB_WORKSPACE/patches/024-model-recovery.py" "source/$PROJECT"
+          cp "$GITHUB_WORKSPACE/patches/DjTransition.kt" "$GITHUB_WORKSPACE/patches/RemixAdvisor.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
+          python3 "$GITHUB_WORKSPACE/patches/025-smart-dj.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/026-advisor-ui.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/027-mix-quality.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/028-live-recovery.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/029-radio-similarity.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/setup-java@v4
@@ -206,6 +218,10 @@ jobs:
         run: bash patches/run-smart-mix.sh "source/$PROJECT"
       - name: Model recovery and catalogue regression
         run: bash patches/run-model-recovery.sh "source/$PROJECT"
+      - name: Offline DJ and recommendation quality regression
+        run: bash patches/run-smart-dj.sh "source/$PROJECT"
+      - name: Real model log validator regression
+        run: python3 model-qa/test_verify_model_log.py
       - name: Full regression
         working-directory: source/RemixPlayer_v0.66
         env:
@@ -266,6 +282,12 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/023-model-cdn.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/WhisperDownload.kt" "$GITHUB_WORKSPACE/patches/ModelMemoryBudget.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
           python3 "$GITHUB_WORKSPACE/patches/024-model-recovery.py" "source/$PROJECT"
+          cp "$GITHUB_WORKSPACE/patches/DjTransition.kt" "$GITHUB_WORKSPACE/patches/RemixAdvisor.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
+          python3 "$GITHUB_WORKSPACE/patches/025-smart-dj.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/026-advisor-ui.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/027-mix-quality.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/028-live-recovery.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/029-radio-similarity.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/download-artifact@v4
@@ -321,6 +343,12 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/023-model-cdn.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/WhisperDownload.kt" "$GITHUB_WORKSPACE/patches/ModelMemoryBudget.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
           python3 "$GITHUB_WORKSPACE/patches/024-model-recovery.py" "source/$PROJECT"
+          cp "$GITHUB_WORKSPACE/patches/DjTransition.kt" "$GITHUB_WORKSPACE/patches/RemixAdvisor.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
+          python3 "$GITHUB_WORKSPACE/patches/025-smart-dj.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/026-advisor-ui.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/027-mix-quality.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/028-live-recovery.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/029-radio-similarity.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/download-artifact@v4
@@ -383,6 +411,12 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/023-model-cdn.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/WhisperDownload.kt" "$GITHUB_WORKSPACE/patches/ModelMemoryBudget.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
           python3 "$GITHUB_WORKSPACE/patches/024-model-recovery.py" "source/$PROJECT"
+          cp "$GITHUB_WORKSPACE/patches/DjTransition.kt" "$GITHUB_WORKSPACE/patches/RemixAdvisor.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
+          python3 "$GITHUB_WORKSPACE/patches/025-smart-dj.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/026-advisor-ui.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/027-mix-quality.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/028-live-recovery.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/029-radio-similarity.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/setup-java@v4
@@ -426,7 +460,8 @@ jobs:
           if-no-files-found: ignore
   candidate:
     name: Automated acceptance candidate (manual QA still required)
-    needs: [apk, host, native, smoke, lint]
+    needs: [apk, host, native, smoke, lint, real-models]
+    if: ${{ always() && needs.apk.result == 'success' && needs.host.result == 'success' && needs.native.result == 'success' && needs.smoke.result == 'success' && needs.lint.result == 'success' && (needs.real-models.result == 'success' || (needs.real-models.result == 'skipped' && !(github.event_name == 'pull_request' && (github.head_ref == 'qa/smart-mix-model-recovery-20261126' || github.head_ref == 'qa/dj-ranking-20261126')))) }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/download-artifact@v4
@@ -437,7 +472,7 @@ jobs:
 
   real-models:
     name: Real models on Android 15 (8 GiB emulator)
-    if: ${{ github.event_name == 'pull_request' && github.head_ref == 'qa/smart-mix-model-recovery-20261126' }}
+    if: ${{ github.event_name == 'pull_request' && (github.head_ref == 'qa/smart-mix-model-recovery-20261126' || github.head_ref == 'qa/dj-ranking-20261126') }}
     needs: apk
     runs-on: ubuntu-24.04
     timeout-minutes: 85
