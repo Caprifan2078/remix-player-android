@@ -46,5 +46,18 @@ fun main(){
  val picks=LocalDiscovery.favorites(largeLikes,likeIds,limit=100)
  check(picks.size==100&&picks.distinct().size==100&&picks.none{it in likeIds})
  check(runCatching{LocalDiscovery.favorites(favorites,liked,limit=0)}.isFailure)
- println("PASS: 35 local discovery, favorites and queue checks")
+ fun cancelled(block:()->Any?):Boolean {
+  Thread.currentThread().interrupt()
+  return try{runCatching{block()}.isFailure}finally{Thread.interrupted()}
+ }
+ val cases=listOf(
+  cancelled{LocalDiscovery.rank(seed,emptyList(),LocalDiscovery.Mode.SIMILAR)},
+  cancelled{LocalDiscovery.rank(seed,rows,LocalDiscovery.Mode.SIMILAR,excluded=rows.map{it.id}.toSet())},
+  cancelled{LocalDiscovery.favorites(favorites,emptySet())},
+  cancelled{LocalDiscovery.favorites(favorites,liked)},
+  cancelled{LocalDiscovery.rank(seed,rows,LocalDiscovery.Mode.SIMILAR)}
+ )
+ println("Cancellation: "+cases.count{it}+"/"+cases.size)
+ check(cases.all{it})
+ println("PASS: 40 local discovery, favorites, queue and cancellation checks")
 }
