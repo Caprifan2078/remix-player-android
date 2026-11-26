@@ -102,8 +102,22 @@ edit('GenreEngine.kt','sourceDrumScale:Float,controls:GenreMix):Float','sourceDr
 edit('GenreEngine.kt','samples[1]/32768f*style.bass*controls.source','samples[1]/32768f*style.bass*controls.source*sourceBassScale')
 edit('GenreEngine.kt','val kickSpace=KickSpace();out.outputStream()','val kickSpace=KickSpace();val hardStyle=HardKick.profile(style.name)!=null;out.outputStream()')
 edit('GenreEngine.kt','sum(samples,beat*(.75f+.25f*duck),style,newBass*duck,levels.sourceDrums,controls),sum(right,beat*(.75f+.25f*duck),style,newBass*duck,levels.sourceDrums,controls)','sum(samples,beat*(.75f+.25f*duck),style,newBass*duck,levels.sourceDrums,controls,if(hardStyle)kickGain else 1f),sum(right,beat*(.75f+.25f*duck),style,newBass*duck,levels.sourceDrums,controls,if(hardStyle)kickGain else 1f)')
+# Bundle the exact small upstream ONNX graph and its original license; no network or audio upload.
+import base64,hashlib
+pitch_dir=Path(__file__).parent/'basic-pitch'
+weights=base64.b64decode((pitch_dir/'nmp.onnx.b64').read_text().strip(),validate=True)
+assert len(weights)==230444 and hashlib.sha256(weights).hexdigest()=='2c3c1d144bfa61ad236e92e169c13535c880469a12a047d4e73451f2c059a0ec'
+assets=Path(sys.argv[1])/'app/src/main/assets/basic-pitch'
+assets.mkdir(parents=True,exist_ok=True)
+(assets/'nmp.onnx').write_bytes(weights)
+for filename in ('LICENSE','NOTICE'):
+    (assets/filename).write_bytes((pitch_dir/filename).read_bytes())
+for filename in ('BasicPitchHint.kt','BasicPitchModel.kt'):
+    (src/filename).write_bytes((Path(__file__).parent/filename).read_bytes())
+edit('GenreEngine.kt','val oldDrums:Float,val bass:Float)','val oldDrums:Float,val bass:Float,val kickHz:Double?=null)')
+edit('GenreCheckpoint.kt','o.writeFloat(s.oldDrums);o.writeFloat(s.bass)','o.writeFloat(s.oldDrums);o.writeFloat(s.bass);o.writeBoolean(s.kickHz!=null);s.kickHz?.let{o.writeDouble(it)}')
 # The hard-dance kick is rendered per genre, not the same oscillator with a different label.
-edit('GenreEngine.kt','private val kicks=DoubleArray(ceil(.36*rate).toInt())','private val kicks=HardKick.curve(style.name,rate)?:DoubleArray(ceil(.36*rate).toInt())')
+edit('GenreEngine.kt','private val kicks=DoubleArray(ceil(.36*rate).toInt())','private val kicks=HardKick.curve(style.name,rate,style.kickHz)?:DoubleArray(ceil(.36*rate).toInt())')
 p=src/'GenreEngine.kt'
 p.write_text(p.read_text()+'\n'+(Path(__file__).parent/'ProducerStyles.kt').read_text().split('\n',1)[1]+'\n'+(Path(__file__).parent/'HardKick.kt').read_text().split('\n',2)[2])
 p=src/'TransitionMix.kt'
