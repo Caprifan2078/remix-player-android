@@ -38,7 +38,7 @@ helper='''    private val expandedSections=mutableSetOf<String>()
             android.app.AlertDialog.Builder(this).setTitle(groups.keys.elementAt(i)).setItems(entries.map{(if(it==Presets.active)"✓ " else "")+EffectMenu.title(it.name)}.toTypedArray()){_,j->applyPreset(entries[j]);render()}.setNegativeButton("Назад"){_,_->effectPicker()}.show()
         }.setNegativeButton("Закрыть",null).show()
     }
-    private fun reviewTranscript(engine:String,raw:String,commit:()->Unit){
+    private fun reviewTranscript(engine:String,raw:String,commit:(String)->Unit){
         val lines=Lrc.parse(raw).map{WordLyrics.parse(it).text}.filter{it.isNotBlank()}
         if(lines.isEmpty()){toast("Не удалось распознать текст");return}
         actionSheet("Проверка распознавания",490){dialog,panel->
@@ -46,9 +46,33 @@ helper='''    private val expandedSections=mutableSetOf<String>()
             val query=EditText(this).apply{setText(LyricsSearchPlan.transcriptHint(lines));hint="Несколько услышанных слов";setTextColor(PremiumChrome.TEXT);setHintTextColor(muted);setSingleLine(true);filters=arrayOf(android.text.InputFilter.LengthFilter(180))}
             panel.addView(query,LinearLayout.LayoutParams(-1,dp(50)))
             sheetAction(panel,"Найти слова в браузере","Будет отправлен только выбранный фрагмент"){openLyricBrowser(query.text.toString())}
-            sheetAction(panel,"Сохранить черновик","Слова могут содержать ошибки"){dialog.dismiss();commit();render()}
+            sheetAction(panel,"Вставить проверенный текст","Использовать уже полученные временные метки"){dialog.dismiss();reviewReference(engine,raw,commit)}
+            sheetAction(panel,"Сохранить черновик","Слова могут содержать ошибки"){dialog.dismiss();commit(raw);render()}
             sheetAction(panel,"Не сохранять"){dialog.dismiss()}
             panel.addView(label(lines.take(18).joinToString("\\n")+if(lines.size>18)"\\n…"else "",16,PremiumChrome.TEXT))
+        }
+    }
+    private fun reviewReference(engine:String,raw:String,commit:(String)->Unit,initial:String=""){
+        actionSheet("Правильный текст",490){dialog,panel->
+            panel.addView(label("Вставьте слова в исходном порядке. Повторно запускать Whisper не нужно.",14,muted))
+            val editor=EditText(this).apply{setText(initial);hint="Вставьте текст песни";setTextColor(PremiumChrome.TEXT);setHintTextColor(muted);gravity=Gravity.TOP;minLines=5;maxLines=10;filters=arrayOf(android.text.InputFilter.LengthFilter(LyricDocument.MAX_CHARS))}
+            panel.addView(editor,LinearLayout.LayoutParams(-1,dp(220)))
+            sheetAction(panel,"Сопоставить и проверить","Слова сохраняются, время берётся из распознавания"){
+                if(stemBusy){toast("Дождитесь завершения обработки");return@sheetAction}
+                val reference=editor.text.toString()
+                if(reference.isBlank()){toast("Вставьте текст песни");return@sheetAction}
+                dialog.dismiss()
+                stemWork("Сопоставление текста…",{KnownLyricAlignment.align(raw,reference)}){result->
+                    if(result==null){toast("Надёжной синхронизации недостаточно");reviewReference(engine,raw,commit,reference)}
+                    else actionSheet("Проверьте синхронизацию",350){confirm,content->
+                        content.addView(label(if(result.wordLevel)"Найдены метки слов" else "Найдены метки строк, без выдуманного времени слов",14,muted))
+                        content.addView(label(LyricDocument.plain(result.lrc).lineSequence().take(6).joinToString("\\n"),16,PremiumChrome.TEXT))
+                        sheetAction(content,"Сохранить правильный текст"){confirm.dismiss();commit(result.lrc);render()}
+                        sheetAction(content,"Исправить слова"){confirm.dismiss();reviewReference(engine,raw,commit,reference)}
+                    }
+                }
+            }
+            sheetAction(panel,"Назад к черновику"){dialog.dismiss();reviewTranscript(engine,raw,commit)}
         }
     }
     private fun openLyricBrowser(query:String){
@@ -102,9 +126,9 @@ replace('if(activeLyrics.isEmpty()){body.addView(label(','if(activeLyrics.isEmpt
 # Existing lyrics retain their original karaoke view and advanced tools.
 replace('private fun showModelCatalog(){if(stemBusy)return;val items=ModelCatalog.entries;','private fun showModelCatalog(kind:ModelCatalog.Kind?=null){if(stemBusy)return;val items=ModelCatalog.entries.filter{kind==null||it.kind==kind};')
 # Review recognizer output BEFORE mutating tracks, preserving the original concurrency checks.
-replace('){raw->if(tracks.contains(original)&&original.lyrics==originalBefore){original.lyrics=raw;','){raw->reviewTranscript("Vosk",raw){if(tracks.contains(original)&&original.lyrics==originalBefore){original.lyrics=raw;')
+replace('){raw->if(tracks.contains(original)&&original.lyrics==originalBefore){original.lyrics=raw;','){raw->reviewTranscript("Vosk",raw){raw->if(tracks.contains(original)&&original.lyrics==originalBefore){original.lyrics=raw;')
 replace('else toast("Исходный текст или песня изменились. Черновик не сохранён.")}}.show()}','else toast("Исходный текст или песня изменились. Черновик не сохранён.")}}}.show()}')
-replace('){raw->if(tracks.contains(original)&&original.lyrics==before){original.lyrics=raw;','){raw->reviewTranscript("Whisper",raw){if(tracks.contains(original)&&original.lyrics==before){original.lyrics=raw;')
+replace('){raw->if(tracks.contains(original)&&original.lyrics==before){original.lyrics=raw;','){raw->reviewTranscript("Whisper",raw){raw->if(tracks.contains(original)&&original.lyrics==before){original.lyrics=raw;')
 replace('else toast("Текст или песня изменились; черновик не сохранён")}}.show()}.show()}','else toast("Текст или песня изменились; черновик не сохранён")}}}.show()}.show()}')
 replace('Новый черновик заменит текущий текст, если он не изменился во время обработки.','Сначала покажем черновик. Сохранять его необязательно.')
 # Versions, settings and download service options: move secondary actions into collapsible groups.
