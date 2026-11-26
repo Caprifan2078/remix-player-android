@@ -7,7 +7,7 @@ def replace(old,new):
     global s
     assert s.count(old)==1,("Expected exactly one match",old[:100])
     s=s.replace(old,new)
-replace('private var lyricToolsExpanded=false','private var lyricToolsExpanded=false\n    private var lyricFollow=true\n    private var lyricInkAnimation:android.animation.ValueAnimator?=null')
+replace('private var lyricToolsExpanded=false','private var lyricToolsExpanded=false\n    private var lyricFollow=true\n    private var lyricInkAnimation:android.animation.ValueAnimator?=null\n    class LyricInk(var color:Int):android.text.style.CharacterStyle(),android.text.style.UpdateAppearance{\n        override fun updateDrawState(paint:android.text.TextPaint){paint.color=color}\n    }')
 replace('val scroll=ScrollView(this);lyricScroll=scroll;','''val follow=btn(if(lyricFollow)"Автопрокрутка: вкл." else "Автопрокрутка: выкл."){}
         follow.setOnClickListener{lyricFollow=!lyricFollow;follow.text=if(lyricFollow)"Автопрокрутка: вкл." else "Автопрокрутка: выкл.";if(lyricFollow){lyricViews.getOrNull(lastLine)?.let{v->lyricScroll?.smoothScrollTo(0,(v.top-dp(110)).coerceAtLeast(0))}}}
         body.addView(follow)
@@ -17,10 +17,7 @@ replace('if(w>=0){val word=line.words[w];span.setSpan(android.text.style.Foregro
                 for(k in 0 until w){val done=line.words[k];span.setSpan(android.text.style.ForegroundColorSpan(Color.WHITE),done.start,done.end,android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)}
                 // Fixed text geometry: no underline or size changes as words advance.
                 val view=lyricViews[i]
-                val ink=object:android.text.style.CharacterStyle(),android.text.style.UpdateAppearance{
-                    var color=accent
-                    override fun updateDrawState(paint:android.text.TextPaint){paint.color=color}
-                }
+                val ink=LyricInk(accent)
                 span.setSpan(ink,h.activeStart,h.activeEnd,android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                 val evaluator=android.animation.ArgbEvaluator()
                 lyricInkAnimation=android.animation.ValueAnimator.ofFloat(0f,1f).apply{
