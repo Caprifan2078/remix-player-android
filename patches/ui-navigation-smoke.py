@@ -6,8 +6,18 @@ pkg="app.remix.player"
 def adb(*args):
     return subprocess.check_output(["adb",*args],timeout=45)
 def tree():
-    adb("shell","uiautomator","dump","/sdcard/remix-nav.xml")
-    return adb("exec-out","cat","/sdcard/remix-nav.xml")
+    remote="/sdcard/remix-nav.xml"
+    adb("shell","rm","-f",remote)
+    reply=adb("shell","uiautomator","dump",remote)
+    if b"ERROR" in reply or b"dumped to" not in reply:
+        raise RuntimeError("Fresh navigation hierarchy unavailable: "+reply.decode(errors="replace"))
+    raw=adb("exec-out","cat",remote)
+    nodes=list(ET.fromstring(raw).iter("node"))
+    if any(n.get("package")=="android" and n.get("resource-id")=="android:id/alertTitle" for n in nodes):
+        raise RuntimeError("System dialog blocks navigation")
+    if not any(n.get("package")==pkg for n in nodes):
+        raise RuntimeError("Navigation hierarchy does not belong to app")
+    return raw
 def tap(label):
     nodes=list(ET.fromstring(tree()).iter("node"))
     matches=[n for n in nodes if n.get("package")==pkg and n.get("clickable")=="true" and n.get("text")==label]
@@ -24,7 +34,9 @@ def capture(name,heading):
         if time.monotonic()>=end:raise AssertionError(f"{name}: missing heading {heading}")
         time.sleep(.5)
     (out/(name+".xml")).write_bytes(raw)
-    (out/(name+".png")).write_bytes(adb("exec-out","screencap","-p"))
+    png=adb("exec-out","screencap","-p")
+    assert png.startswith(bytes.fromhex("89504e470d0a1a0a")), "Invalid screen capture: "+name
+    (out/(name+".png")).write_bytes(png)
     assert adb("shell","pidof",pkg).strip(),name
     print("PASS UI navigation:",name,flush=True)
 adb("shell","am","force-stop",pkg)

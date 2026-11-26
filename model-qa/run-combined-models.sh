@@ -28,15 +28,12 @@ done
 # Run direct download last; the preceding test cleans up the active model.
 log="model-results/direct-whisper.txt"
 timeout 720 adb shell am instrument -w -r -e class "app.remix.player.DirectWhisperDownloadTest#downloadActivateAndTranscribeOnDevice" app.remix.player.test/androidx.test.runner.AndroidJUnitRunner | tee "$log" || status=1
-python3 - "$log" <<'PY' || status=1
+python3 - "$log" downloadActivateAndTranscribeOnDevice <<'PY' || status=1
 import pathlib,re,sys
 s=pathlib.Path(sys.argv[1]).read_text()
-assert re.findall(r'^INSTRUMENTATION_STATUS: test=(.*)
-,s,re.M)==['downloadActivateAndTranscribeOnDevice']*2
-assert re.findall(r'^INSTRUMENTATION_STATUS_CODE: (-?\d+)
-,s,re.M)==['1','0']
-assert re.findall(r'\bOK \(1 test\)',s)==['OK (1 test)']
-assert re.findall(r'^INSTRUMENTATION_CODE: (-?\d+)
-,s,re.M)==['-1']
+assert re.findall(r'^INSTRUMENTATION_STATUS: test=(.*)$',s,re.M)==[sys.argv[2],sys.argv[2]],'Wrong test identity'
+assert re.findall(r'^INSTRUMENTATION_STATUS_CODE: (-?\d+)$',s,re.M)==['1','0'],'Unsuccessful test'
+assert re.findall(r'\bOK \(1 test\)',s)==['OK (1 test)'],'Missing success'
+assert re.findall(r'^INSTRUMENTATION_CODE: (-?\d+)$',s,re.M)==['-1'],'Bad terminal result'
 PY
 exit "$status"
