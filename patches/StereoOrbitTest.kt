@@ -6,4 +6,13 @@ fun main(){
  check(high.second/high.first>3);check(mirror.first/mirror.second>3);check(abs(high.first-mirror.second)<1e-6);check(abs(bass.first-bass.second)<.04)
  val orbit=StereoOrbit(48000);val x=floatArrayOf(.3f,-.3f);orbit.apply(x,0f);check(x[0]>.1f&&x[1]<-.1f)
  repeat(100){orbit.apply(x,.8f)};orbit.reset();x.fill(0f);orbit.apply(x,1f);check(x.all{it==0f});x[0]=Float.NaN;x[1]=Float.POSITIVE_INFINITY;orbit.apply(x,Float.NaN);check(x.all{it==0f});println("PASS: seven spatial audio checks; high-frequency channel ratio=${high.second/high.first}; bass difference=${abs(bass.first-bass.second)}")
+ val e=AdaptiveEffectEnvelope(48000);val input=FloatArray(2)
+ fun settle(v:Float,n:Int):Float{input.fill(v);var result=0f;repeat(n){result=e.frame(input)};return result}
+ val quiet=settle(.08f,48000*5);val loud=settle(.20f,24000)
+ check(quiet>.97f&&loud<.79f){"Insensitive to locally loud passages"}
+ check(settle(.05f,48000*3)>.97f)
+ e.reset();check(settle(.05f,48000)>.97f)
+ check(settle(.8f,48000)<.57f)
+ println("PASS: four relative dynamics and recovery checks")
+
 }
