@@ -32,6 +32,12 @@ p=src/'AudioCore.kt';audio=p.read_text()
 a=audio.index('class Dsp(');b=audio.index('data class Lyric(',a)
 quality=(Path(__file__).parent/'EffectQuality.kt').read_text().split('\n',4)[4]
 p.write_text(audio[:a]+quality+'\n'+audio[b:])
+# Live-only effect switching: retain export DSP and its exact original path.
+(src/'LiveEffectSwitch.kt').write_bytes((Path(__file__).parent/'LiveEffectSwitch.kt').read_bytes())
+edit('PlaybackService.kt','private var dsp: Dsp? = null','private var dsp: LiveEffectSwitch? = null')
+edit('PlaybackService.kt','dsp=Dsp(inputAudioFormat.sampleRate,a.size)','dsp=LiveEffectSwitch(inputAudioFormat.sampleRate,a.size)')
+edit('PlaybackService.kt','if(lastPreset!==p){lastPreset=p;dsp=if(a.isNotEmpty())Dsp(inputAudioFormat.sampleRate,a.size) else null}','if(lastPreset!==p)lastPreset=p')
+edit('PlaybackService.kt','(p==Presets.all.first() && levels.all{it==0f}) || d==null','(p==Presets.all.first() && levels.all{it==0f} && d?.canBypass(p)==true) || d==null')
 # Do not reuse a render checkpoint from an older DSP algorithm.
 edit('EffectCheckpoint.kt','dsp-peak-guard-v60','dsp-quality-v3')
 edit('GenreCheckpoint.kt','genre-render-v7','genre-render-v8')
