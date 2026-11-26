@@ -2,6 +2,19 @@ package app.remix.player
 /** Preserve reference text. Never publish a partial, ambiguous or fabricated mapping. */
 object KnownLyricAlignment {
  data class Result(val lrc:String,val wordLevel:Boolean)
+ private fun timedLines(raw:String):List<LyricTimingUpgrade.Line>{
+  val lines=Lrc.parse(raw)
+  return lines.map{line->val p=WordLyrics.parse(line);LyricTimingUpgrade.Line(line.ms,p.text,p.words.map{it.ms})}
+ }
+ /** Already valid word-level or mixed texts are not automatically replaced. */
+ fun canUpgradeTiming(raw:String):Boolean{
+  if(raw.length>LyricDocument.MAX_CHARS)return false
+  val lines=timedLines(raw)
+  return LyricTimingUpgrade.eligible(lines)&&LyricDocument.plain(raw)==lines.joinToString("\n"){it.text.trim()}
+ }
+ fun acceptsTimingUpgrade(raw:String,result:Result):Boolean=
+  result.wordLevel&&canUpgradeTiming(raw)&&LyricTimingUpgrade.accept(timedLines(raw),timedLines(result.lrc))
+
  fun align(heard:String,reference:String):Result? {
   if(heard.isBlank()||reference.isBlank())return null
   val words=try{LyricAlign.align(heard,reference)}catch(e:IllegalArgumentException){null}
