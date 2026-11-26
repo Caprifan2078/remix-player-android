@@ -185,7 +185,7 @@ s=s[:a]+'''    private data class ScanItem(val uri:String,val title:String,val a
                         }else status=when{raw.isNullOrBlank()->"Нет совпадения";Lrc.parse(raw).isEmpty()->"Только слова";raw==t.before->"Пропущено";else->"Текст найден"}
                     }
                     val reference=raw?:t.before
-                    if(align&&reference.isNotBlank()){
+                    if(align&&reference.isNotBlank()&&status!="Подтверждено по вокалу"){
                         val untimed=Lrc.parse(reference).isEmpty()
                         val upgrade=!untimed&&KnownLyricAlignment.canUpgradeTiming(reference)
                         if(untimed||upgrade){
@@ -209,8 +209,8 @@ s=s[:a]+'''    private data class ScanItem(val uri:String,val title:String,val a
                                 val text=update.raw
                                 if(text!=null&&text!=target.lyrics){
                                     val previous=target.lyrics;target.lyrics=text
-                                    if(saveLibrary(true)){saved++;if(smart&&Lrc.parse(text).isNotEmpty())scanDraftFile(target.uri).delete()} else{target.lyrics=previous;reindex();errors++;if(smart)recordLyricAttempt(target,"error");return@runOnUiThread}
-                                }else if(update.draft!=null){if(saveScanDraft(target.uri,update.draft))drafts++ else{errors++;if(smart)recordLyricAttempt(target,"error");return@runOnUiThread}}
+                                    if(saveLibrary(true)){saved++;if(smart&&Lrc.parse(text).isNotEmpty())scanDraftFile(target.uri).delete()} else{target.lyrics=previous;reindex();errors++;if(smart)recordLyricAttempt(target,"error");completed++;return@runOnUiThread}
+                                }else if(update.draft!=null){if(saveScanDraft(target.uri,update.draft))drafts++ else{errors++;if(smart)recordLyricAttempt(target,"error");completed++;return@runOnUiThread}}
                                 else if(update.status=="Ошибка")errors++
                                 else if(update.status!="Пропущено")unresolved++
                                 if(smart)recordLyricAttempt(target,if(update.status=="Ошибка")"error" else "done")
