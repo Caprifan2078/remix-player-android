@@ -16,7 +16,7 @@ object ProducerStyles {
  )
  val all get()=GenreEngine.styles+extra.map{it.style}
  fun family(s:GenreEngine.Style)=extra.firstOrNull{it.style.name==s.name}?.family?:s.name
- private val names=listOf("Hardstyle","Euphoric Hardstyle","Rawstyle","Xtra Raw","Jumpstyle","Hardtekk","Uptempo Hardcore","Hard Techno","Brazilian Phonk","Montagem","Montagem Hard","Mandelão","Automotivo","Drift Phonk","Jersey Club","Drum & Bass")
+ private val names=listOf("Hardstyle","Jumpstyle","Hardtekk","Euphoric Hardstyle","Rawstyle","Xtra Raw","Uptempo Hardcore","Hard Techno","Brazilian Phonk","Montagem","Montagem Hard","Mandelão","Automotivo","Drift Phonk","Jersey Club","Drum & Bass")
  fun featured()=names.map{n->all.single{it.name==n}}
  fun more()=all.filterNot{it.name in names}
  fun describe(s:GenreEngine.Style)=extra.firstOrNull{it.style.name==s.name}?.description?:when(s.name){

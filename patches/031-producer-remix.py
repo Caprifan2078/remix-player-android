@@ -10,7 +10,7 @@ edit('LeadSynth.kt','private val color=when(style.name){','private val color=whe
 edit('AudioCore.kt','Preset("Sped Up",1.25f)','Preset("Sped Up",1.25f,bass=.12f,room=.075f,drive=.025f)')
 edit('AudioCore.kt','Preset("Nightcore",1.25f,1.25f)','Preset("Nightcore",1.25f,1.25f,bass=.16f,room=.09f,drive=.035f)')
 edit('AudioCore.kt','Preset("Slowed + Reverb",.85f,.9f,room=.35f)','Preset("Slowed + Reverb",.85f,.9f,bass=.13f,room=.35f,muffled=.06f)')
-edit('GenreCheckpoint.kt','genre-render-v6','genre-render-v7')
+edit('GenreCheckpoint.kt','genre-render-v7','genre-render-v8')
 edit('TransitionMix.kt','    fun renderFrames(first:File,second:File,out:File,overlap:Long,progress:(Int)->Unit={}):Long {','''    fun renderFrames(first:File,second:File,out:File,overlap:Long,progress:(Int)->Unit={}):Long = renderInternal(first,second,out,overlap,false,progress)
     fun renderSmartFrames(first:File,second:File,out:File,overlap:Long,progress:(Int)->Unit={}):Long = renderInternal(first,second,out,overlap,true,progress)
     private fun renderInternal(first:File,second:File,out:File,overlap:Long,bassExchange:Boolean,progress:(Int)->Unit):Long {''')
