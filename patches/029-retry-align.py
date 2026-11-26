@@ -2,6 +2,7 @@
 from pathlib import Path
 import sys
 root=Path(sys.argv[1]);src=root/'app/src/main/java/app/remix/player'
+(src/'GroupedLyricMatch.kt').write_bytes((Path(__file__).parent/'GroupedLyricMatch.kt').read_bytes())
 def edit(path,a,b):
  s=path.read_text();assert s.count(a)==1,(path.name,a[:100],s.count(a));path.write_text(s.replace(a,b))
 p=src/'LiveOverlap.kt'
