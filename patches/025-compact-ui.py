@@ -56,26 +56,28 @@ replace('run{body.addView(btn("Экспорт WAV в папку…"){exportWav(t
 
 # Custom effects can grow to 100 entries: do not build a long card list.
 replace('customPresets.forEach{p->card(p.name,"Свой пресет · применить / изменить / удалить"){customPresetMenu(p)}}',
-'''if(customPresets.isNotEmpty())body.addView(btn("Мои эффекты · \${customPresets.size}"){
+'''if(customPresets.isNotEmpty())body.addView(btn("Мои эффекты · ${customPresets.size}"){
             val items=customPresets.toList()
             android.app.AlertDialog.Builder(this).setTitle("Мои эффекты").setItems(items.map{it.name}.toTypedArray()){_,i->
                 if(customPresets.contains(items[i]))customPresetMenu(items[i])else toast("Эффект изменился")
             }.setNegativeButton("Закрыть",null).show()
-        })'''.replace('\\$','$'))
+        })''')
 
 # Keep six quick effects plus the active effect, with all other presets one tap away.
-replace('Presets.all.forEach{p->card((if(p==Presets.active)"✓  " else "")+p.name,"Темп \${p.speed}× · тон \${p.pitch}×"){applyPreset(p);render()}}'.replace('\\$','$'),
+replace('Presets.all.forEach{p->card((if(p==Presets.active)"✓  " else "")+p.name,"Темп ${p.speed}× · тон ${p.pitch}×"){applyPreset(p);render()}}',
 '''val quickPresets=(Presets.all.take(6)+listOf(Presets.active)).distinct()
-        quickPresets.forEach{p->card((if(p==Presets.active)"✓  " else "")+p.name,"Темп \${p.speed}× · тон \${p.pitch}×"){applyPreset(p);render()}}
-        body.addView(btn("Все эффекты · \${Presets.all.size}"){
+        quickPresets.forEach{p->card((if(p==Presets.active)"✓  " else "")+p.name,"Темп ${p.speed}× · тон ${p.pitch}×"){applyPreset(p);render()}}
+        body.addView(btn("Все эффекты · ${Presets.all.size}"){
             val items=Presets.all.toList()
             android.app.AlertDialog.Builder(this).setTitle("Все эффекты").setItems(items.map{(if(it==Presets.active)"✓  " else "")+it.name}.toTypedArray()){_,i->
                 if(current()?.uri!=t.uri)toast("Композиция изменилась")else{applyPreset(items[i]);render()}
             }.setNegativeButton("Закрыть",null).show()
-        })'''.replace('\\$','$'))
+        })''')
 
 # Fail closed if any legacy top-level duplicate survives.
+versions=s[s.index("    private fun versions(){"):s.index("    private val customPresets=")]
 for duplicate in ('btn("Экспорт WAV в папку…")','btn("Экспорт FLAC без потерь…")','btn("Экспорт MP3…")','btn("Открыть студию эффектов")','listOf("Текст","Микшер","Студия","Очередь")'):
-    assert duplicate not in s, duplicate
+    assert duplicate not in versions, duplicate
+assert 'listOf("Текст","Микшер","Студия","Очередь")' not in s
 p.write_text(s)
 print("PASS: compact player, version actions and bounded studio preset list (source assertions only)")
