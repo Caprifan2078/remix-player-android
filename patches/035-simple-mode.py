@@ -298,16 +298,16 @@ rep(anchor,r'''    private fun pasteAndSync(t:Track,initial:String=""){
         val id=original.uri;val revision=lyricRevision(original)
         val draft=scanDraftFile(id)
         val cached=runCatching{require(draft.length() in 1..262144);draft.readText()}.getOrNull()
-        if(!cached.isNullOrBlank()){transcriptChoices(original,cached,revision);return}
+        if(!cached.isNullOrBlank()){transcriptChoices(original,cached,revision,true);return}
         if(!WhisperLocal.available||WhisperLocal.installed(this)==null){whisperModelDialog();return}
         stemWork("Whisper · распознавание вокала…",{scanRecognize(Uri.parse(id),id)}){raw->
             val target=libraryIndex.get(id)
             if(target==null||lyricRevision(target)!=revision){toast("Песня или текст изменились");return@stemWork}
             if(!saveScanDraft(id,raw))toast("Не удалось записать черновик на диск")
-            transcriptChoices(target,raw,revision)
+            transcriptChoices(target,raw,revision,true)
         }
     }
-    private fun transcriptChoices(source:Track,raw:String,revision:String){
+    private fun transcriptChoices(source:Track,raw:String,revision:String,autoSearch:Boolean=false){
         val id=source.uri
         val heard=LyricDocument.plain(raw)
         val phrase=TranscriptMatch.query(heard)
@@ -327,14 +327,14 @@ rep(anchor,r'''    private fun pasteAndSync(t:Track,initial:String=""){
                 else{target.lyrics=before;reindex();toast("Не удалось сохранить текст")}
             }
         }
-        actionSheet("Распознанный текст",460){dialog,panel->
-            panel.addView(label(heard.take(700),14,PremiumChrome.TEXT))
-            sheetAction(panel,"Найти оригинал","Интернет в фоне · сверка с распознанными словами"){
-                dialog.dismiss()
-                if(stemBusy||lyricsBusy)return@sheetAction
+        fun findOriginal(){
+                if(stemBusy||lyricsBusy)return
                 val title=source.title;val artist=source.artist
                 stemWork("Ищем оригинальный текст…",{
-                    val (found,_)=TrackLyricSource.search(this,Uri.parse(id),title,artist,null)
+                    val found=try{TrackLyricSource.search(this,Uri.parse(id),title,artist,null).first}catch(e:Exception){
+                        if(e is InterruptedException||Thread.currentThread().isInterrupted)throw e
+                        emptyList()
+                    }
                     found.mapNotNull{item->
                         val text=LyricDocument.plain(item.plain?:item.synced?:return@mapNotNull null)
                         val score=TranscriptMatch.score(heard,text)
@@ -344,7 +344,7 @@ rep(anchor,r'''    private fun pasteAndSync(t:Track,initial:String=""){
                     val target=libraryIndex.get(id)
                     if(target==null||lyricRevision(target)!=revision){toast("Песня или текст изменились");return@stemWork}
                     actionSheet("Варианты оригинала",440){results,content->
-                        if(matches.isEmpty())content.addView(label("Надёжных совпадений в каталоге нет. Черновик сохранён.",14,muted))
+                        if(matches.isEmpty())content.addView(label("Каталог недоступен или надёжных совпадений нет. Черновик сохранён.",14,muted))
                         matches.forEach{(item,text,score)->
                             sheetAction(content,item.title+" · "+item.artist,"Совпало фраз: "+score.matching+" / "+score.total){results.dismiss();actionSheet("Сравнить тексты",460){compare,preview->
                                 preview.addView(label("Распознано Whisper",14,muted,true));preview.addView(label(heard.take(420),15,PremiumChrome.TEXT))
@@ -357,7 +357,11 @@ rep(anchor,r'''    private fun pasteAndSync(t:Track,initial:String=""){
                         sheetAction(content,"Назад к черновику"){results.dismiss();transcriptChoices(source,raw,revision)}
                     }
                 }
-            }
+        }
+        if(autoSearch&&!stemBusy&&!lyricsBusy){findOriginal();return}
+        actionSheet("Распознанный текст",460){dialog,panel->
+            panel.addView(label(heard.take(700),14,PremiumChrome.TEXT))
+            sheetAction(panel,"Найти оригинал","Интернет в фоне · сверка с распознанными словами"){dialog.dismiss();findOriginal()}
             sheetAction(panel,"Поиск по фразе в браузере","Найденные слова можно импортировать автоматически"){dialog.dismiss();lyricWebSearch(source,phrase,raw)}
             sheetAction(panel,"Вставить текст из браузера","Скопируйте слова песни, затем нажмите здесь"){
                 val clipboard=getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
