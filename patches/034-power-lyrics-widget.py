@@ -19,6 +19,7 @@ replace(p,'Preset("Fast Stereo Orbit",1.2f,1.05f,pan=.95f,room=.15f))','''Preset
         Preset("Slowed + Bass",.80f,.80f,bass=.50f))''')
 p=root/'tests/CoreTest.kt'
 replace(p,'check(Presets.all.size==41)','check(Presets.all.size==44)')
+replace(p,'check(Presets.all.map{it.name}.distinct().size==41)','check(Presets.all.map{it.name}.distinct().size==44)')
 replace(p,'41 presets','44 presets')
 p=src/'PlaybackService.kt'
 replace(p,'dsp=Dsp(inputAudioFormat.sampleRate,a.size);lastPreset=null','dsp=null;lastPreset=null')

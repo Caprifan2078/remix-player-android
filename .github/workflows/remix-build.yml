@@ -71,6 +71,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/032-eq-pcm-quality.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/033-two-genres.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/034-power-lyrics-widget.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/035-studio-widget.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
           test -f "source/$PROJECT/app/build.gradle.kts"
@@ -188,6 +189,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/032-eq-pcm-quality.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/033-two-genres.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/034-power-lyrics-widget.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/035-studio-widget.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/setup-java@v4
@@ -305,6 +307,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/032-eq-pcm-quality.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/033-two-genres.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/034-power-lyrics-widget.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/035-studio-widget.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/download-artifact@v4
@@ -371,6 +374,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/032-eq-pcm-quality.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/033-two-genres.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/034-power-lyrics-widget.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/035-studio-widget.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/download-artifact@v4
@@ -444,6 +448,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/032-eq-pcm-quality.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/033-two-genres.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/034-power-lyrics-widget.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/035-studio-widget.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/setup-java@v4
