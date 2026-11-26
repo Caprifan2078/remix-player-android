@@ -18,10 +18,9 @@ object LyricsLookup {
             return JSONArray(text)
         }finally{c.disconnect()}
     }
-    fun search(title:String,artist:String,durationSeconds:Long?):List<LyricsMatch.Candidate>{
+    fun search(title:String,artist:String,durationSeconds:Long?,expanded:Boolean=true):List<LyricsMatch.Candidate>{
         val t=title.trim().take(300);val a=artist.trim().take(200);require(t.isNotEmpty())
-        val clean=LyricsMatch.titleVariant(t)
-        val queries=listOf("track_name="+enc(t)+(if(a.isNotBlank())"&artist_name="+enc(a)else""),"q="+enc("$t $a".trim()),"track_name="+enc(clean),"q="+enc(clean)).distinct()
+        val queries=LyricsSearchPlan.queries(t,a,expanded)
         val items=mutableListOf<LyricsMatch.Candidate>();var success=false;var failure:Exception?=null
         for(q in queries){if(Thread.currentThread().isInterrupted)throw InterruptedException()
             try{
@@ -33,8 +32,8 @@ object LyricsLookup {
                     items.add(LyricsMatch.Candidate(id,o.optString("trackName").take(300),o.optString("artistName").take(200),o.optLong("duration",-1).takeIf{it>0},synced,value("plainLyrics")))
                 }
                 // Avoid unnecessary network requests when a strict metadata query has a strong match.
-                if(items.any{LyricsMatch.normalize(it.title)==LyricsMatch.normalize(t)&&LyricsMatch.normalize(it.artist)==LyricsMatch.normalize(a)&&a.isNotBlank()&&it.synced!=null})break
-            }catch(e:Exception){failure=e}
+                if(items.any{LyricsSearchPlan.exact(t,a,durationSeconds,it)})break
+            }catch(e:Exception){if(e is InterruptedException||Thread.currentThread().isInterrupted)throw InterruptedException();failure=e}
         }
         if(!success)throw (failure?:IllegalStateException("Нет ответа от LRCLIB"))
         return LyricsMatch.rank(items,t,a,durationSeconds).take(10)
