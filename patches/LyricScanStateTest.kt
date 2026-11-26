@@ -1,0 +1,25 @@
+package app.remix.player
+fun main(){
+ val s=LyricScanState
+ check(s.classify(true,true,true,true,"error")==LyricScanState.State.WORDS)
+ check(s.classify(true,true,false,false,"error")==LyricScanState.State.LINES)
+ check(s.classify(true,false,false,true,"error")==LyricScanState.State.PLAIN)
+ check(s.classify(false,false,false,true,"error")==LyricScanState.State.REVIEW)
+ check(s.classify(false,false,false,false,"error")==LyricScanState.State.ERROR)
+ check(s.classify(false,false,false,false,"done")==LyricScanState.State.MISSING)
+ check(s.classify(false,false,false,false,null)==LyricScanState.State.NEW)
+ check(s.pending(LyricScanState.State.NEW,false,false))
+ check(!s.pending(LyricScanState.State.MISSING,true,false))
+ check(s.pending(LyricScanState.State.MISSING,true,true))
+ check(!s.pending(LyricScanState.State.WORDS,false,true))
+ check(s.pending(LyricScanState.State.LINES,false,false))
+ check(s.needsReview(LyricScanState.State.PLAIN)&&!s.needsReview(LyricScanState.State.WORDS))
+ val a=LyricScanState.Match("a",8,10,"[00:02]a")
+ check(s.choose(listOf(a))==a.aligned)
+ check(s.choose(listOf(a,a))==a.aligned)
+ check(s.choose(listOf(a,a.copy(text="b")))==null)
+ check(s.choose(listOf(a.copy(matched=4)))==null)
+ check(s.choose(listOf(a.copy(matched=5,total=10)))==null)
+ check(s.choose(listOf(a.copy(aligned=null)))==null)
+ println("PASS: 19 scan state, resume, retry and conservative match checks")
+}
