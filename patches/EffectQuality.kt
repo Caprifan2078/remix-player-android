@@ -76,20 +76,20 @@ private class SmoothDrive(channels:Int){
 /** Shared realtime/export DSP. Artistic filters retain their character; bass, room and drive adapt separately. */
 class Dsp(private val rate:Int,private val channels:Int){
     init{require(rate in 8000..384000&&channels>0)}
-    private val bass1=FloatArray(channels);private val bass2=FloatArray(channels)
+    private val bassBand=BassBand(rate,channels)
     private val high1=FloatArray(channels);private val high2=FloatArray(channels)
     private val low1=FloatArray(channels);private val low2=FloatArray(channels)
     private val guard=LinkedPeakGuard(rate);private val adaptiveDepth=AdaptiveEffectEnvelope(rate);private val orbit=StereoOrbit(rate)
     private var previous:Preset?=null;private var room:EffectRoom?=null
     private val smoothDrive=SmoothDrive(channels);private var antiAlias=false
-    private var bassAlpha=0f;private var highAlpha=0f;private var lowAlpha=0f;private var colorMix=0f
+    private var highAlpha=0f;private var lowAlpha=0f;private var colorMix=0f
     private var driveK=1f;private var driveNorm=1f;private var driveMix=1f;private var phase=0.0;private var phaseStep=0.0;private var processed=false;private var bandpass=false
     private fun alpha(hz:Double)=(1-exp(-2*PI*hz.coerceIn(1.0,rate*.45)/rate)).toFloat()
     private fun configure(p:Preset){
         previous=p
-        bass1.fill(0f);bass2.fill(0f);high1.fill(0f);high2.fill(0f);low1.fill(0f);low2.fill(0f)
+        high1.fill(0f);high2.fill(0f);low1.fill(0f);low2.fill(0f)
         guard.reset();adaptiveDepth.reset();orbit.reset();phase=0.0
-        bassAlpha=alpha(when(p.name){"Sub Bass"->78.0;"Deep Bass"->115.0;"Soft Bass"->145.0;else->165.0})
+        bassBand.reset(when(p.name){"Sub Bass"->78.0;"Deep Bass"->115.0;"Soft Bass"->145.0;else->165.0})
         val color=when(p.name){
             "Underwater"->Triple(750.0,0.0,.98f)
             "Next Room"->Triple(1100.0,0.0,.97f)
@@ -126,7 +126,7 @@ class Dsp(private val rate:Int,private val channels:Int){
         for(c in 0 until channels){
             val x=if(input[c].isFinite())input[c].coerceIn(-1f,1f)else 0f
             var y=x
-            if(p.bass>0){bass1[c]+=bassAlpha*(x-bass1[c]);bass2[c]+=bassAlpha*(bass1[c]-bass2[c]);y+=p.bass*depth*bass2[c]}
+            if(p.bass>0)y+=p.bass*depth*bassBand.sample(c,x)
             if(colorMix>0){
                 var v=y
                 if(bandpass){high1[c]+=highAlpha*(v-high1[c]);v-=high1[c];high2[c]+=highAlpha*(v-high2[c]);v-=high2[c]}
