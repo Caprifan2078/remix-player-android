@@ -3,7 +3,7 @@ from pathlib import Path
 import sys
 src=Path(sys.argv[1])/'app/src/main/java/app/remix/player'
 p=src/'GenreMix.kt';p.write_text(p.read_text()+'\n'+(Path(__file__).parent/'ProducerAdaptation.kt').read_text().split('\n',1)[1])
-p=src/'GenreCheckpoint.kt';s=p.read_text();assert s.count('genre-render-v8')==1;p.write_text(s.replace('genre-render-v8','genre-render-v9'))
+p=src/'GenreCheckpoint.kt';s=p.read_text();assert s.count('genre-render-v8')==1;p.write_text(s.replace('genre-render-v8','genre-render-v10'))
 p=src/'MainActivity.kt';s=p.read_text()
 def rep(a,b):
  global s
