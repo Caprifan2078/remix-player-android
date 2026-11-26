@@ -34,6 +34,17 @@ old='require(entry.kind==ModelCatalog.Kind.SEPARATOR&&entry.sha256!=null);val tm
 assert s.count(old)==1
 s=s.replace(old,'require(entry.kind==ModelCatalog.Kind.SEPARATOR&&entry.sha256!=null);checkModelMemory(context,entry.sizeMb.toLong()*1024*1024);val tmp=')
 p.write_text(s)
+# Install the extended multilingual artifact catalogue before compiling either app or host tests.
+(src/'WhisperModelSpec.kt').write_bytes((Path(__file__).parent/'WhisperModelSpec.kt').read_bytes())
+test=Path(sys.argv[1])/'tests/WhisperModel62Test.kt'
+t=test.read_text()
+old='check(models.map{it.id}==listOf("tiny","base","small"))'
+assert t.count(old)==1
+t=t.replace(old,'check(models.map{it.id}==listOf("tiny","base-q5_1","base","small-q5_1","small"))')
+old='check(models.zipWithNext().all{(a,b)->a.size<b.size&&a.minFreeRam<b.minFreeRam})'
+assert t.count(old)==1
+t=t.replace(old,'check(models.map{it.size}.distinct().size==models.size&&models.zipWithNext().all{(a,b)->a.minFreeRam<=b.minFreeRam})')
+test.write_text(t)
 # Direct Whisper download, sharing the same checked activation as local import.
 p=src/'WhisperLocal.kt';s=p.read_text()
 a=s.index('            val spec=WhisperModelSpec.bySize(tmp.length())')
@@ -42,7 +53,7 @@ s=s[:a]+'''            return activate(c,tmp)
         }finally{tmp.delete()}
     }
     private fun activate(c:Context,tmp:File):String{
-        val spec=WhisperModelSpec.bySize(tmp.length())?:error("Неподдерживаемый размер: выберите ggml-tiny, base или small")
+        val spec=WhisperModelSpec.bySize(tmp.length())?:error("Неподдерживаемый файл: выберите модель Whisper из каталога")
         require(VerifiedDownload.matches(tmp,spec.sha)){"SHA-256 не совпадает"};checkMemory(c,spec)
         val h=open(tmp.absolutePath);check(h!=0L){"Не удалось загрузить Whisper"};close(h);check(!Thread.currentThread().isInterrupted)
         java.nio.file.Files.move(tmp.toPath(),model(c).toPath(),java.nio.file.StandardCopyOption.ATOMIC_MOVE,java.nio.file.StandardCopyOption.REPLACE_EXISTING)
@@ -64,7 +75,7 @@ s=s[:a]+'''    private fun whisperModelDialog(){
         if(!WhisperLocal.available){toast("Whisper не включён в сборку");return}
         val active=WhisperLocal.installed(this)?.title?:"не установлена"
         val models=WhisperModelSpec.models
-        android.app.AlertDialog.Builder(this).setTitle("Распознавание вокала · Whisper").setItems(models.map{it.title+when(it.id){"tiny"->" · быстрая";"base"->" · баланс";else->" · более точная, тяжёлая"}}.toTypedArray()){_,i->
+        android.app.AlertDialog.Builder(this).setTitle("Распознавание вокала · Whisper").setItems(models.map{it.title+when(it.id){"tiny"->" · быстрая";"base-q5_1"->" · компактная, баланс";"base"->" · полная Base";"small-q5_1"->" · рекомендуемая для точности";else->" · полная Small, тяжёлая"}}.toTypedArray()){_,i->
             val spec=models[i]
             android.app.AlertDialog.Builder(this).setTitle(spec.title).setMessage("Текущая модель: $active.\\nЗагрузка из официального источника, проверка размера, SHA-256 и запуска модели. Музыка не отправляется. Точность на пении не гарантирована.").setNegativeButton("Отмена",null).setPositiveButton("Скачать"){_,_->stemWork("Загрузка Whisper…",{WhisperLocal.download(this,spec){updateWork("Whisper: $it%")}}){id->toast("Whisper $id установлен");render()}}.show()
         }.setNeutralButton("Импорт файла"){_,_->whisperPicker.launch(arrayOf("*/*"))}.setNegativeButton("Закрыть",null).show()
