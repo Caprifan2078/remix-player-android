@@ -52,6 +52,9 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/020-advisor-ui.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/EffectMenu.kt" "source/$PROJECT/app/src/main/java/app/remix/player/EffectMenu.kt"
           python3 "$GITHUB_WORKSPACE/patches/021-compact-player.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/017-model-cdn.py" "source/$PROJECT"
+          cp "$GITHUB_WORKSPACE/patches/WhisperDownload.kt" "$GITHUB_WORKSPACE/patches/ModelMemoryBudget.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
+          python3 "$GITHUB_WORKSPACE/patches/022-model-recovery.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
           test -f "source/$PROJECT/app/build.gradle.kts"
@@ -143,6 +146,9 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/020-advisor-ui.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/EffectMenu.kt" "source/$PROJECT/app/src/main/java/app/remix/player/EffectMenu.kt"
           python3 "$GITHUB_WORKSPACE/patches/021-compact-player.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/017-model-cdn.py" "source/$PROJECT"
+          cp "$GITHUB_WORKSPACE/patches/WhisperDownload.kt" "$GITHUB_WORKSPACE/patches/ModelMemoryBudget.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
+          python3 "$GITHUB_WORKSPACE/patches/022-model-recovery.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/setup-java@v4
@@ -183,6 +189,8 @@ jobs:
         run: bash patches/run-advisor.sh "source/$PROJECT"
       - name: Effect menu coverage
         run: bash patches/run-effect-menu.sh "source/$PROJECT"
+      - name: Model recovery policy regression
+        run: bash patches/run-model-recovery.sh "source/$PROJECT"
       - name: Full regression
         working-directory: source/RemixPlayer_v0.66
         env:
@@ -241,6 +249,9 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/020-advisor-ui.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/EffectMenu.kt" "source/$PROJECT/app/src/main/java/app/remix/player/EffectMenu.kt"
           python3 "$GITHUB_WORKSPACE/patches/021-compact-player.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/017-model-cdn.py" "source/$PROJECT"
+          cp "$GITHUB_WORKSPACE/patches/WhisperDownload.kt" "$GITHUB_WORKSPACE/patches/ModelMemoryBudget.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
+          python3 "$GITHUB_WORKSPACE/patches/022-model-recovery.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/download-artifact@v4
@@ -294,6 +305,9 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/020-advisor-ui.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/EffectMenu.kt" "source/$PROJECT/app/src/main/java/app/remix/player/EffectMenu.kt"
           python3 "$GITHUB_WORKSPACE/patches/021-compact-player.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/017-model-cdn.py" "source/$PROJECT"
+          cp "$GITHUB_WORKSPACE/patches/WhisperDownload.kt" "$GITHUB_WORKSPACE/patches/ModelMemoryBudget.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
+          python3 "$GITHUB_WORKSPACE/patches/022-model-recovery.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/download-artifact@v4
@@ -354,6 +368,9 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/020-advisor-ui.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/EffectMenu.kt" "source/$PROJECT/app/src/main/java/app/remix/player/EffectMenu.kt"
           python3 "$GITHUB_WORKSPACE/patches/021-compact-player.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/017-model-cdn.py" "source/$PROJECT"
+          cp "$GITHUB_WORKSPACE/patches/WhisperDownload.kt" "$GITHUB_WORKSPACE/patches/ModelMemoryBudget.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
+          python3 "$GITHUB_WORKSPACE/patches/022-model-recovery.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/setup-java@v4
