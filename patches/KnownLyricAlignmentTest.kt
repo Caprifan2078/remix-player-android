@@ -31,5 +31,11 @@ fun main(){
  val stopped=try{runCatching{noisy(heard,ref)}.isFailure}finally{Thread.interrupted()}
  check(stopped)
  check(noisy("[00:02.000]"+"word ".repeat(66),"word ".repeat(66))==null)
- println("PASS: 21 known lyric alignment cases, including noisy phrase recovery")
+ val split="[00:02.000]Снова светит\n[00:04.000]яркая луна\n[00:08.000]Иду домой"
+ val splitRef="Снова светит яркая луна\nИду домой"
+ val grouped=KnownLyricAlignment.alignGroupedPhrases(split,splitRef)!!
+ check(!grouped.wordLevel&&LyricDocument.plain(grouped.lrc)==splitRef)
+ check(Lrc.parse(grouped.lrc).map{it.ms}==listOf(2000L,8000L))
+ check(KnownLyricAlignment.align(split,splitRef)?.lrc==grouped.lrc)
+ println("PASS: 24 known lyric alignment cases, including split and noisy phrase recovery")
 }
