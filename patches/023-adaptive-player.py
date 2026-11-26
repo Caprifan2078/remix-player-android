@@ -36,6 +36,80 @@ edit('LiveOverlap.kt','if(preview==null&&duration-pos<=requested+5000&&duration-
 edit('LiveOverlap.kt','OverlapCore.window(duration,p.duration,requested)','OverlapCore.window(duration,p.duration,adaptive?.duration?:requested)')
 edit('LiveOverlap.kt','fadeWindow=actual;started=true','fadeWindow=actual;fadePlan=adaptive;started=true')
 edit('LiveOverlap.kt','val g=OverlapCore.gains(audible,w.duration);','val g=fadePlan?.let{AdaptiveOverlap.gains(audible,w.duration,it)}?:OverlapCore.gains(audible,w.duration);')
+# Preserve the audible incoming position across automatic transition, decoder stalls and late handoff.
+(src/'OverlapHandoff.kt').write_bytes((Path(__file__).parent/'OverlapHandoff.kt').read_bytes())
+edit('LiveOverlap.kt','    private var preview:ExoPlayer?=null','''    private var preview:ExoPlayer?=null
+    private val audiblePosition=OverlapHandoff()
+    private var lastCorrectionAt=0L
+    private fun observeIncoming(){
+        val p=preview?:return
+        if(started||handing)audiblePosition.observe(p.currentPosition,p.duration,p.volume)
+    }
+    private fun seekIncoming(target:Long){
+        handoffTarget=target;internalSeek=true
+        try{main.seekTo(to,target)}finally{internalSeek=false}
+    }''')
+edit('LiveOverlap.kt','if(reason==Player.DISCONTINUITY_REASON_AUTO_TRANSITION&&started&&newPosition.mediaItemIndex==to){autoPending=true;return}','if(reason==Player.DISCONTINUITY_REASON_AUTO_TRANSITION&&started&&newPosition.mediaItemIndex==to&&queueMatches()){observeIncoming();main.volume=0f;autoPending=true;return}')
+edit('LiveOverlap.kt','fadeWindow=null;fadePlan=null;startedAt=0L','fadeWindow=null;fadePlan=null;audiblePosition.reset();lastCorrectionAt=0L;startedAt=0L')
+edit('LiveOverlap.kt','''        if(!queueMatches()||p.playbackState!=Player.STATE_READY||!p.isPlaying){abort(true);return}
+        handing=true;handoffAt=SystemClock.elapsedRealtime();blendSince=0L;main.volume=0f;p.volume=1f
+        handoffTarget=OverlapCore.handoffPosition(p.currentPosition,p.duration);debug("handoff position="+handoffTarget);internalSeek=true;try{main.seekTo(to,handoffTarget)}finally{internalSeek=false}''','''        observeIncoming()
+        if(!queueMatches()){abort(true);return}
+        if(audiblePosition.audibleUntil==0L&&(p.playbackState!=Player.STATE_READY||!p.isPlaying)){abort(true);return}
+        handing=true;handoffAt=SystemClock.elapsedRealtime();lastCorrectionAt=handoffAt;blendSince=0L;main.volume=0f
+        p.volume=if(p.playbackState==Player.STATE_READY&&p.isPlaying)1f else 0f
+        observeIncoming()
+        val target=audiblePosition.target(if(p.volume>0f)p.currentPosition else 0L,p.duration)
+        debug("handoff position="+target)
+        seekIncoming(target)''')
+edit('LiveOverlap.kt','''        if(requested<=0||!eligible||!main.playWhenReady){if(preview!=null)abort(true);if(requested<=0||!eligible)clearAnalysis();return false}
+        val now=SystemClock.elapsedRealtime()
+        if(autoPending){autoPending=false;handoff()}''','''        if(!main.playWhenReady){if(preview!=null)abort(true);return false}
+        val now=SystemClock.elapsedRealtime()
+        observeIncoming()
+        if(autoPending){autoPending=false;handoff()}
+        if(!handing&&(requested<=0||!eligible)){if(preview!=null)abort(true);clearAnalysis();return false}''')
+edit('LiveOverlap.kt','''            if(!queueMatches()||now-handoffAt>1800||p.playbackState!=Player.STATE_READY){abort(true);return false}
+            // Wait for the seek to reach the incoming item; the preview fills the decoder startup gap.
+            if(main.currentMediaItemIndex==to&&main.isPlaying){
+                val error=kotlin.math.abs(main.currentPosition-p.currentPosition)
+                if(error<=250||now-handoffAt>=1000){
+                    if(blendSince==0L)blendSince=now
+                    val g=OverlapCore.gains(now-blendSince,120);p.volume=g.outgoing;main.volume=g.incoming
+                    if(now-blendSince>=120){abort(false);return false}
+                }else{blendSince=0L;main.volume=0f;p.volume=1f}
+            }else{blendSince=0L;main.volume=0f;p.volume=1f}
+            return true''','''            if(!queueMatches()){abort(true);return false}
+            val previewPlaying=p.isPlaying&&p.playbackState==Player.STATE_READY&&p.playerError==null
+            val aligned=main.currentMediaItemIndex==to&&main.isPlaying&&audiblePosition.aligned(main.currentPosition,p.currentPosition,previewPlaying)
+            if(aligned){
+                if(!previewPlaying){abort(false);return false}
+                if(blendSince==0L)blendSince=now
+                val g=OverlapCore.gains(now-blendSince,120);p.volume=g.outgoing;main.volume=g.incoming
+                if(now-blendSince>=120){abort(false);return false}
+            }else{
+                blendSince=0L;main.volume=0f;p.volume=if(previewPlaying)1f else 0f
+                observeIncoming()
+                val target=audiblePosition.target(if(previewPlaying)p.currentPosition else 0L,p.duration)
+                if(now-handoffAt>=3000){
+                    // A bounded recovery seek flushes the stale intro before restoring primary gain.
+                    debug("handoff recovery position="+target)
+                    seekIncoming(target)
+                    abort(false)
+                    return false
+                }
+                if(now-lastCorrectionAt>=350&&(main.currentMediaItemIndex!=to||main.currentPosition<target-120||main.currentPosition>target+250)){
+                    lastCorrectionAt=now;seekIncoming(target)
+                }
+            }
+            return true''')
+edit('LiveOverlap.kt','if(!main.isPlaying||duration<=0||next==C.INDEX_UNSET||next==main.currentMediaItemIndex||rejectedId==id){if(preview!=null)abort(true);return false}','''if(!main.isPlaying&&preview!=null&&started&&audiblePosition.audibleUntil>0&&main.currentMediaItemIndex==from&&queueMatches()){handoff();return handing}
+        if(!main.isPlaying||duration<=0||next==C.INDEX_UNSET||next==main.currentMediaItemIndex||rejectedId==id){if(preview!=null)abort(true);return false}''')
+edit('LiveOverlap.kt','if(p.playerError!=null){abort(true);return false}','if(p.playerError!=null){if(started&&audiblePosition.audibleUntil>0){handoff();return handing};abort(true);return false}')
+edit('LiveOverlap.kt','if(started){main.volume=1f;p.volume=0f;if(now-startedAt>1200){abort(true);return false};return true}','if(started){if(audiblePosition.audibleUntil>0){handoff();return handing};main.volume=1f;p.volume=0f;if(now-startedAt>1200){abort(true);return false};return true}')
+edit('LiveOverlap.kt','if(!p.isPlaying){main.volume=1f;p.volume=0f;if(now-startedAt>1200){abort(true);return false};return true}','if(!p.isPlaying){if(audiblePosition.audibleUntil>0){handoff();return handing};main.volume=1f;p.volume=0f;if(now-startedAt>1200){abort(true);return false};return true}')
+edit('LiveOverlap.kt','if(now-lagSince>900&&kotlin.math.abs(elapsed-p.currentPosition)>850){abort(true);return false}','if(now-lagSince>900&&kotlin.math.abs(elapsed-p.currentPosition)>850){if(audiblePosition.audibleUntil>0){handoff();return handing};abort(true);return false}')
+edit('LiveOverlap.kt','main.volume=g.outgoing;p.volume=g.incoming\n        if(duration-pos<=100)handoff()','main.volume=g.outgoing;p.volume=g.incoming\n        observeIncoming()\n        if(duration-pos<=100)handoff()')
 p=src/'MainActivity.kt';s=p.read_text()
 a=s.index('panel.addView(label("Плавное затухание в начале и конце песни.')
 b=s.index('android.app.AlertDialog.Builder(this).setTitle("Воспроизведение")',a)
