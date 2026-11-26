@@ -58,7 +58,9 @@ rep('panel.addView(label("Быстрые режимы",12,muted,true))','''sheet
 rep('popular.size*61+65','popular.size*61+175')
 p.write_text(s)
 print("PASS: 40 procedural genres, refined quick effects, offline DJ bass exchange")
+# The hard-dance kick is rendered per genre, not the same oscillator with a different label.
+edit('GenreEngine.kt','private val kicks=DoubleArray(ceil(.36*rate).toInt())','private val kicks=HardKick.curve(style.name,rate)?:DoubleArray(ceil(.36*rate).toInt())')
 p=src/'GenreEngine.kt'
-p.write_text(p.read_text()+'\n'+(Path(__file__).parent/'ProducerStyles.kt').read_text().split('\n',1)[1])
+p.write_text(p.read_text()+'\n'+(Path(__file__).parent/'ProducerStyles.kt').read_text().split('\n',1)[1]+'\n'+(Path(__file__).parent/'HardKick.kt').read_text().split('\n',2)[2])
 p=src/'TransitionMix.kt'
 p.write_text(p.read_text()+'\n'+(Path(__file__).parent/'DjBassExchange.kt').read_text().split('\n',2)[2])
