@@ -15,24 +15,29 @@ class StereoOrbit(private val rate:Int){
     fun reset(){ring.fill(0f);cursor=0;low=0f;shadowL=0f;shadowR=0f}
     private fun delayed(frames:Float):Float{
         val offset=frames.toInt();val frac=frames-offset
-        val a=ring[(cursor-offset+ring.size)%ring.size]
-        val b=ring[(cursor-offset-1+ring.size)%ring.size]
+        val i=cursor-offset
+        val index=if(i<0)i+ring.size else i
+        val a=ring[index]
+        val b=ring[if(index==0)ring.lastIndex else index-1]
         return a+(b-a)*frac
     }
     fun apply(frame:FloatArray,position:Float){
         require(frame.size==2)
         val p=if(position.isFinite())position.coerceIn(-1f,1f)else 0f
-        val l=frame[0].takeIf{it.isFinite()}?:0f;val r=frame[1].takeIf{it.isFinite()}?:0f
+        val l=if(frame[0].isFinite())frame[0]else 0f;val r=if(frame[1].isFinite())frame[1]else 0f
         val mid=(l+r)*.5f;val side=(l-r)*.5f
         low+=bassAlpha*(mid-low)
         ring[cursor]=mid-low
-        val dl=delayed(max(0f,p)*rate*.00065f);val dr=delayed(max(0f,-p)*rate*.00065f)
+        // Only the far ear needs a delayed sample. The near ear reads the current mid signal.
+        val near=ring[cursor]
+        val far=if(p==0f)near else delayed(abs(p)*rate*.00065f)
+        val dl=if(p>0f)far else near;val dr=if(p<0f)far else near
         shadowL+=shadowAlpha*(dl-shadowL);shadowR+=shadowAlpha*(dr-shadowR)
         val farL=max(0f,p);val farR=max(0f,-p)
         val highL=dl+(shadowL-dl)*farL*.72f
         val highR=dr+(shadowR-dr)*farR*.72f
         frame[0]=low+highL*sqrt(1f-.86f*p)+side*.72f
         frame[1]=low+highR*sqrt(1f+.86f*p)-side*.72f
-        cursor=(cursor+1)%ring.size
+        if(++cursor==ring.size)cursor=0
     }
 }
