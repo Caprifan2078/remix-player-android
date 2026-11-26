@@ -38,15 +38,29 @@ helper=r'''    private fun searchableLyricLines(raw:String):List<LyricLineSearch
             search.addTextChangedListener(object:android.text.TextWatcher{override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){};override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){fill(s?.toString().orEmpty())};override fun afterTextChanged(s:android.text.Editable?) {}})
         }
     }
+    private fun russianLyricsDialog(t:Track,raw:String){
+        if(translationBusy||stemBusy)return
+        val lines=searchableLyricLines(raw)
+        if(lines.isEmpty()){toast("Сначала добавьте текст");return}
+        actionSheet("Перевод на русский",330){dialog,panel->
+            panel.addView(label("Перевод выполняется на устройстве. Оригинал сверху, перевод под каждой строкой. Скачивание языковой модели — только через Wi-Fi.",14,muted))
+            sheetAction(panel,"Выбрать язык песни","Английский, испанский и другие"){dialog.dismiss()
+                val codes=LyricTranslation.languages.keys.filter{it!="ru"}
+                android.app.AlertDialog.Builder(this).setTitle("Язык оригинала").setItems(codes.map{LyricTranslation.languages.getValue(it)}.toTypedArray()){_,i->translateLyrics(t,raw,codes[i],"ru",true)}.show()
+            }
+            sheetAction(panel,"Английский → русский","Быстрый выбор"){dialog.dismiss();translateLyrics(t,raw,"en","ru",true)}
+            sheetAction(panel,"Вставить готовый перевод","Одна строка на строку оригинала"){dialog.dismiss();bilingualLyrics(t,raw)}
+        }
+    }
     private fun bilingualLyrics(t:Track,raw:String){
         val lines=searchableLyricLines(raw)
         if(lines.isEmpty()){toast("Нет текста");return}
         val prefs=getSharedPreferences("bilingual_lyrics_v1",MODE_PRIVATE)
         val id=scanKey(t.uri);val stamp=scanKey(raw)
-        val saved=if(prefs.getString(id+"_revision",null)==stamp)prefs.getString(id,"").orEmpty()else ""
+        val saved=translated(t,raw).takeIf{it.size==lines.size}?.joinToString("\n")?:if(prefs.getString(id+"_revision",null)==stamp)prefs.getString(id,"").orEmpty()else ""
         val paired=LyricLineSearch.pair(lines,saved)
         actionSheet("Оригинал и перевод",500){dialog,panel->
-            panel.addView(label("Локальный перевод · "+lines.size+" строк. Вставьте готовый перевод в том же порядке. Автоперевод не используется.",14,muted))
+            panel.addView(label("Готовый перевод · "+lines.size+" строк. Вставьте перевод в порядке оригинала.",14,muted))
             sheetAction(panel,"Добавить / изменить перевод","Одна строка перевода на строку оригинала"){
                 dialog.dismiss()
                 actionSheet("Редактор перевода",460){editDialog,content->
@@ -57,11 +71,12 @@ helper=r'''    private fun searchableLyricLines(raw:String):List<LyricLineSearch
                         val value=editor.text.toString()
                         if(current()?.uri!=t.uri||rawLyrics(t)!=raw){toast("Песня или текст изменились");return@btn}
                         if(LyricLineSearch.pair(lines,value)==null){toast("Количество строк не совпадает");return@btn}
-                        if(!prefs.edit().putString(id,value).putString(id+"_revision",stamp).commit()){toast("Не удалось сохранить перевод");return@btn}
-                        editDialog.dismiss();bilingualLyrics(t,raw)
+                        val values=LyricLineSearch.pair(lines,value)?.map{it.translation}?:return@btn
+                        if(!getSharedPreferences("translations",MODE_PRIVATE).edit().putString(translationKey(t,raw),JSONArray(values).toString()).commit()){toast("Не удалось сохранить перевод");return@btn}
+                        editDialog.dismiss();render()
                     })
                     content.addView(btn("Удалить перевод"){
-                        if(prefs.edit().remove(id).remove(id+"_revision").commit()){editDialog.dismiss();bilingualLyrics(t,raw)}else toast("Не удалось удалить перевод")
+                        if(getSharedPreferences("translations",MODE_PRIVATE).edit().remove(translationKey(t,raw)).commit()&&prefs.edit().remove(id).remove(id+"_revision").commit()){editDialog.dismiss();render()}else toast("Не удалось удалить перевод")
                     })
                 }
             }
@@ -87,6 +102,6 @@ helper=r'''    private fun searchableLyricLines(raw:String):List<LyricLineSearch
 s=s.replace(anchor,helper+anchor)
 a='val raw=rawLyrics(t);if(raw.isNotBlank()&&!stemBusy)'
 assert s.count(a)==1
-s=s.replace(a,'val raw=rawLyrics(t);if(raw.isNotBlank()){val tools=row();tools.addView(btn("Найти строку"){findLyricLine(t,raw)},weight());tools.addView(btn("Перевод"){bilingualLyrics(t,raw)},weight());body.addView(tools)};if(raw.isNotBlank()&&!stemBusy)')
+s=s.replace(a,'val raw=rawLyrics(t);if(raw.isNotBlank()){val tools=row();tools.addView(btn("Найти строку"){findLyricLine(t,raw)},weight());tools.addView(btn("Перевод"){russianLyricsDialog(t,raw)},weight());body.addView(tools)};if(raw.isNotBlank()&&!stemBusy)')
 p.write_text(s)
 print("PASS: offline lyric line search and local bilingual reader integration")
