@@ -69,7 +69,7 @@ class PulseWidget:AppWidgetProvider(){
             if(id==coverId)return
             coverId=id;cover=null;val generation=++coverGeneration
             covers.queue.clear()
-            val uri=player?.currentMediaItem?.localConfiguration?.uri
+            val uri=id?.let{Uri.parse(it)}
             if(id==null||uri?.scheme!="content")return
             val app=context.applicationContext
             covers.execute{
@@ -109,8 +109,8 @@ class PulseWidget:AppWidgetProvider(){
         fun detach(context:Context){listener?.let{player?.removeListener(it)};listener=null;player=null;publish(context)}
         fun refresh(context:Context)=publish(context)
         private fun publish(context:Context){
-            requestCover(context)
             val s=state();if(last==s)return;last=s
+            requestCover(context)
             val manager=AppWidgetManager.getInstance(context)
             manager.getAppWidgetIds(ComponentName(context,PulseWidget::class.java)).forEach{render(context,manager,it)}
         }
