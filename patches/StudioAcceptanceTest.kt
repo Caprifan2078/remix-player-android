@@ -302,21 +302,28 @@ class StudioAcceptanceTest {
             Presets.active=original
             processor.configure(androidx.media3.common.audio.AudioProcessor.AudioFormat(44100,2,androidx.media3.common.C.ENCODING_PCM_16BIT))
             processor.flush()
+            var frame=0
+            fun tone(i:Int)=(8192*kotlin.math.sin(2*kotlin.math.PI*55*i/44100)).toInt()
             fun block(preset:Preset,frames:Int):IntArray{
                 Presets.active=preset
                 val buffer=java.nio.ByteBuffer.allocateDirect(frames*4).order(java.nio.ByteOrder.nativeOrder())
-                repeat(frames){buffer.putShort(8192.toShort());buffer.putShort((-8192).toShort())};buffer.flip()
+                repeat(frames){val v=tone(frame++);buffer.putShort(v.toShort());buffer.putShort((-v).toShort())};buffer.flip()
                 processor.queueInput(buffer);assertFalse(buffer.hasRemaining())
                 val output=processor.getOutput().order(java.nio.ByteOrder.nativeOrder());assertEquals(frames*4,output.remaining())
                 return IntArray(frames){val l=output.short.toInt();val r=output.short.toInt();assertTrue(kotlin.math.abs(l+r)<=2);l}
             }
-            assertTrue(block(original,2048).all{it==8192})
-            val before=block(bass,44100).last();assertTrue(before>9500)
+            assertTrue(block(original,2048).withIndex().all{it.value==tone(it.index)})
+            val start=frame
+            val boosted=block(bass,44100)
+            val tail=boosted.indices.drop(22050)
+            assertTrue(tail.sumOf{boosted[it].toDouble()*boosted[it]}>1.3*tail.sumOf{tone(start+it).toDouble()*tone(start+it)})
+            val afterStart=frame
             val after=block(original,4410)
-            var last=before
-            for(v in after){assertTrue("Abrupt PCM switch",kotlin.math.abs(v-last)<164);last=v}
-            assertTrue(after.takeLast(100).all{it==8192})
-            assertTrue(block(original,2048).all{it==8192})
+            var last=boosted.last()
+            for(v in after){assertTrue("Abrupt PCM switch",kotlin.math.abs(v-last)<250);last=v}
+            assertTrue(after.indices.drop(2000).all{after[it]==tone(afterStart+it)})
+            val finalStart=frame
+            assertTrue(block(original,2048).withIndex().all{it.value==tone(finalStart+it.index)})
         }finally{processor.reset();Presets.active=previous;EqualizerSettings.set(eq)}
     }
 
