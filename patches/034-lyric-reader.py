@@ -48,7 +48,7 @@ helper=r'''    private fun searchableLyricLines(raw:String):List<LyricLineSearch
                 val codes=LyricTranslation.languages.keys.filter{it!="ru"}
                 android.app.AlertDialog.Builder(this).setTitle("Язык оригинала").setItems(codes.map{LyricTranslation.languages.getValue(it)}.toTypedArray()){_,i->translateLyrics(t,raw,codes[i],"ru",true)}.show()
             }
-            sheetAction(panel,"Английский → русский","Быстрый выбор"){dialog.dismiss();translateLyrics(t,raw,"en","ru",true)}
+            sheetAction(panel,"Автоматически → русский","Язык определяется на устройстве"){dialog.dismiss();translateLyrics(t,raw,"auto","ru",true)}
             sheetAction(panel,"Вставить готовый перевод","Одна строка на строку оригинала"){dialog.dismiss();bilingualLyrics(t,raw)}
         }
     }
