@@ -28,14 +28,18 @@ private class EffectRoom(rate:Int,channels:Int,p:Preset){
     }
     private val lowAlpha=(1-exp(-2*PI*profile.lowCut/rate)).toFloat()
     private val low=FloatArray(channels)
-    private val combs=Array(channels){ch->Array(4){i->
+    // A named echo has distinct repeats rather than a smeared reverb tail.
+    private val echo=if(p.name=="Daycore Echo")Array(channels){ch->
+        Comb(((if(ch%2==0).290 else .370)*rate).roundToInt().coerceAtLeast(1),.40f,(1-exp(-2*PI*3400.0.coerceAtMost(rate*.45)/rate)).toFloat())
+    }else null
+    private val combs=Array(channels){ch->Array(if(echo==null)4 else 0){i->
         val seconds=(doubleArrayOf(.0297,.0371,.0411,.0533)[i]+(ch%2)*.0019)*profile.scale
         val length=(seconds*rate).roundToInt().coerceAtLeast(1)
         Comb(length,10.0.pow(-3*seconds/profile.decay).toFloat().coerceIn(0f,.94f),(1-exp(-2*PI*profile.damping.coerceAtMost(rate*.45)/rate)).toFloat())
     }}
-    private val diffusion=Array(channels){ch->Array(2){i->Diffuser(((if(i==0).0051 else .0017)*rate*profile.scale+(ch%2)*3).roundToInt().coerceAtLeast(1))}}
+    private val diffusion=Array(channels){ch->Array(if(echo==null)2 else 0){i->Diffuser(((if(i==0).0051 else .0017)*rate*profile.scale+(ch%2)*3).roundToInt().coerceAtLeast(1))}}
     fun sample(c:Int,x:Float):Float{
-        low[c]+=lowAlpha*(x-low[c]);val high=x-low[c];var wet=0f
+        low[c]+=lowAlpha*(x-low[c]);val high=x-low[c];echo?.let{return it[c].sample(high)};var wet=0f
         for(line in combs[c])wet+=line.sample(high)
         wet*=.25f
         for(line in diffusion[c])wet=line.sample(wet)
