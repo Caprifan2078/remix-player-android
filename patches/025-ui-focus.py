@@ -37,5 +37,16 @@ a=s.index('body.addView(label("Распознавание: Vosk, экспери�
 b=s.index('\n',a)
 s=s[:a]+'''compactSection("settings-storage","Память",bodyChildren().drop(storageStart),storageStart)}'''+s[b:]
 # Keep the original action descriptions and IDs in settings, but remove duplicated work progress when global progress is active.
+# Collapse explanatory actions on an empty library into one clear onboarding CTA.
+replace('compactSection("library","Ещё",libraryTools,body.indexOfChild(list)-libraryTools.size)', '''compactSection("library","Инструменты",libraryTools,body.indexOfChild(list)-libraryTools.size)
+        if(tracks.isEmpty()&&!stemBusy){
+            bodyChildren().forEachIndexed{index,v->
+                val scan=v is Button&&(v.text.toString()=="Найти музыку на телефоне"||v.text.toString()=="Сканирование…")
+                if(index!=0&&v!==list&&!scan)v.visibility=View.GONE
+                if(scan){val button=v as Button;button.background=PremiumChrome.ripple(accent,dp(12).toFloat());button.setTextColor(bg)}
+            }
+        }''')
+# A quiet inline disclosure rather than a full-width filled card.
+replace('val toggle=btn(title){}','val toggle=btn(title){}.apply{background=PremiumChrome.ripple(Color.TRANSPARENT,dp(10).toFloat());setTextColor(muted);gravity=Gravity.START or Gravity.CENTER_VERTICAL}')
 p.write_text(s)
 print("PASS: focused player header, three library filters, grouped settings, fewer duplicate actions")

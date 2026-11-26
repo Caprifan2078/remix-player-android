@@ -6,12 +6,30 @@ pkg="app.remix.player"
 def adb(*args):
     return subprocess.check_output(["adb",*args],timeout=45)
 def tree():
-    adb("shell","uiautomator","dump","/sdcard/remix-nav.xml")
+    adb("shell","rm","-f","/sdcard/remix-nav.xml")
+    reply=adb("shell","uiautomator","dump","/sdcard/remix-nav.xml")
+    assert b"ERROR" not in reply and b"dumped to" in reply,reply
     return adb("exec-out","cat","/sdcard/remix-nav.xml")
 def tap(label):
-    nodes=list(ET.fromstring(tree()).iter("node"))
-    matches=[n for n in nodes if n.get("package")==pkg and n.get("clickable")=="true" and n.get("text")==label]
-    assert len(matches)==1,f"{label}: expected one clickable node, got {len(matches)}"
+    deadline=time.monotonic()+12
+    while True:
+        raw=tree();root=ET.fromstring(raw);nodes=list(root.iter("node"))
+        parents={child:parent for parent in root.iter() for child in parent}
+        matches=[]
+        for node in nodes:
+            if node.get("package")!=pkg or node.get("text")!=label:continue
+            target=node
+            while target is not None and target.get("package")==pkg:
+                if target.get("clickable")=="true" and target.get("enabled")=="true":
+                    if target not in matches:matches.append(target)
+                    break
+                target=parents.get(target)
+        if len(matches)==1:break
+        if time.monotonic()>=deadline:
+            (out/"failed-tap.xml").write_bytes(raw)
+            (out/"failed-tap.png").write_bytes(adb("exec-out","screencap","-p"))
+            raise AssertionError(f"{label}: expected one enabled clickable node or parent, got {len(matches)}")
+        time.sleep(.4)
     x,y,X,Y=map(int,re.findall(r"-?\d+",matches[0].get("bounds")))
     assert X>x and Y>y,label
     adb("shell","input","tap",str((x+X)//2),str((y+Y)//2))

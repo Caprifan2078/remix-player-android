@@ -150,4 +150,28 @@ class MixerLyricsUiAcceptanceTest {
             capture("karaoke-seek")
         }
     }
+    @Test fun premiumLibraryAndPlayerVisualAcceptance(){
+        fixture { p->
+            click("Музыка")
+            await("Fixture song not visible in library"){texts().any{it.isShown&&it.text.toString()=="QA UI synthetic"}}
+            await("Compact mini player entry missing"){texts().any{it.isShown&&it.contentDescription=="Открыть экран воспроизведения"}}
+            main{assertNull("Transport should not crowd library",button("⇄"));assertNull(button("Настройки"));assertNotNull(button("Ещё"))}
+            capture("premium-library")
+            main{val open=texts().first{it.isShown&&it.contentDescription=="Открыть экран воспроизведения"};assertTrue(open.performClick())}
+            await("Full player not visible"){button("Ремикс")!=null&&button("⇄")!=null}
+            main{
+                assertNull("Bottom nav should not duplicate player actions",button("Музыка"))
+                assertTrue(views(activity()!!.window.decorView).any{it.isShown&&it.contentDescription=="Обложка композиции"})
+                assertTrue(texts().any{it.isShown&&it.text.toString()=="QA UI synthetic"})
+            }
+            capture("premium-player")
+            click("Ремикс")
+            SystemClock.sleep(400)
+            val root=inst.uiAutomation.rootInActiveWindow
+            assertTrue("Grouped effect chooser not visible",root?.findAccessibilityNodeInfosByText("Эффекты")?.isNotEmpty()==true)
+            capture("premium-effect-menu")
+            shell("input keyevent 4")
+        }
+    }
+
 }
