@@ -18,8 +18,10 @@ fun main(){
  check(s.choose(listOf(a))==a.aligned)
  check(s.choose(listOf(a,a))==a.aligned)
  check(s.choose(listOf(a,a.copy(text="b")))==null)
+ check(s.choose(listOf(a,a.copy(text="b",aligned=null)))==null)
+ check(s.choose(listOf(a.copy(aligned=null),a))==a.aligned)
  check(s.choose(listOf(a.copy(matched=4)))==null)
  check(s.choose(listOf(a.copy(matched=5,total=10)))==null)
  check(s.choose(listOf(a.copy(aligned=null)))==null)
- println("PASS: 19 scan state, resume, retry and conservative match checks")
+ println("PASS: 21 scan state, resume, retry and conservative match checks")
 }
