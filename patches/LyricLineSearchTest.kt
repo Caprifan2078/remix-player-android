@@ -11,5 +11,10 @@ fun main(){
     check(LyricLineSearch.pair(lines,"One\nTwo")==null)
     check(LyricLineSearch.pair(lines,"One\n\nTwo\nThree\nFour")?.size==4)
     check(LyricLineSearch.pair(lines,"x".repeat(64001))==null)
-    println("PASS: 10 lyric search and translation pairing checks")
+    val russian=listOf(LyricLineSearch.Line("мой",1000),LyricLineSearch.Line("мои",2000))
+    check(LyricLineSearch.find(russian,"мой").single().ms==1000L)
+    check(LyricLineSearch.find(russian,"мои").single().ms==2000L)
+    check(LyricLineSearch.normalize("и\u0306")=="й")
+    check(LyricLineSearch.normalize("е\u0308")=="е")
+    println("PASS: 14 lyric search and translation pairing checks")
 }
