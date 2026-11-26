@@ -58,16 +58,17 @@ rep(anchor,'''    private fun lyricSearchChoices(t:Track,manual:()->Unit){
             if(lyricsBusy||stemBusy)return
             scanLibrary(listOf(ScanItem(live.uri,live.title,live.artist,live.lyrics)),online,false,deep,deep)
         }
-        actionSheet("Найти текст",390){dialog,panel->
+        actionSheet("Найти текст",490){dialog,panel->
             sheetAction(panel,"Автоматически","Из файла и интернета · безопасное сохранение"){dialog.dismiss();scan(true,false)}
-            sheetAction(panel,"По вокалу → найти оригинал","Whisper, проверка текста и сохранение"){dialog.dismiss();recognizeAndReview(t)}
+            sheetAction(panel,"По вокалу → найти оригинал","Whisper + поиск в интернете"){dialog.dismiss();recognizeAndReview(t)}
+            sheetAction(panel,"Поиск в браузере","По названию и исполнителю"){dialog.dismiss();lyricWebSearch(t)}
+            sheetAction(panel,"Вставить и синхронизировать","Готовые слова → автоматические субтитры"){dialog.dismiss();pasteAndSync(t)}
             sheetAction(panel,"Вся медиатека","Один запуск для всех песен"){dialog.dismiss();batchLyrics()}
             sheetAction(panel,"Другие источники","Метаданные, браузер, распознавание"){dialog.dismiss()
                 actionSheet("Источники текста",420){sources,content->
                     sheetAction(content,"Импортировать текст","LRC или TXT"){sources.dismiss();lyricTarget=t.uri;lyricRevision=lyricRevision(t);lyricPicker.launch(arrayOf("*/*"))}
                     sheetAction(content,"Только из аудиофайла","Офлайн · встроенный текст"){sources.dismiss();scan(false,false)}
                     sheetAction(content,"Уточнить название и исполнителя","Онлайн-поиск с выбором результата"){sources.dismiss();manual()}
-                    sheetAction(content,"Поиск в браузере","По названию и исполнителю"){openLyricBrowser(original.title+" "+original.artist)}
                     val raw=rawLyrics(t)
                     if(raw.isNotBlank())sheetAction(content,"Уточнить время текста","Whisper · слова сохраняются"){sources.dismiss();alignKnownLyrics(t,raw)}
                 }
@@ -130,8 +131,168 @@ s=s[:a]+'''        for(j in 0 until modes.childCount){
 rep('body.addView(whisperButton,3)','body.addView(whisperButton,3);whisperButton.visibility=View.GONE')
 # A transcript is a draft; compare against candidates before the user accepts it.
 (Path(sys.argv[1])/'app/src/main/java/app/remix/player/TranscriptMatch.kt').write_bytes((Path(__file__).parent/'TranscriptMatch.kt').read_bytes())
+(Path(sys.argv[1])/'app/src/main/java/app/remix/player/BrowserLyricImport.kt').write_bytes((Path(__file__).parent/'BrowserLyricImport.kt').read_bytes())
+assets=Path(sys.argv[1])/'app/src/main/assets';assets.mkdir(parents=True,exist_ok=True)
+(assets/'lyrics-extract.js').write_bytes((Path(__file__).parent/'lyrics-extract.js').read_bytes())
 anchor='    private fun scanDraftReview(){'
-rep(anchor,r'''    private fun recognizeAndReview(t:Track){
+rep(anchor,r'''    private fun pasteAndSync(t:Track,initial:String=""){
+        if(stemBusy||lyricsBusy){toast("Дождитесь завершения обработки");return}
+        val source=libraryIndex.get(t.group)?:t
+        actionSheet("Вставить текст песни",460){dialog,panel->
+            panel.addView(label("Вставьте правильные слова. Whisper сам попробует определить время строк и слов на оригинальной записи.",14,muted))
+            val editor=EditText(this).apply{
+                hint="Слова песни";setText(initial);setTextColor(PremiumChrome.TEXT);setHintTextColor(muted)
+                gravity=android.view.Gravity.TOP;minLines=5;maxLines=9
+                filters=arrayOf(android.text.InputFilter.LengthFilter(LyricDocument.MAX_CHARS))
+                inputType=android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+            }
+            panel.addView(editor,LinearLayout.LayoutParams(-1,dp(170)))
+            sheetAction(panel,"Вставить из буфера"){
+                val clipboard=getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                val raw=clipboard.primaryClip?.takeIf{it.itemCount>0}?.getItemAt(0)?.text?.toString().orEmpty()
+                val clean=BrowserLyricImport.candidate(raw)
+                if(clean==null)toast("В буфере нет подходящего текста")else editor.setText(clean)
+            }
+            sheetAction(panel,"Синхронизировать и проверить","Метки только из распознавания вокала"){
+                val clean=BrowserLyricImport.candidate(editor.text.toString())
+                if(clean==null){toast("Введите слова песни, а не ссылку");return@sheetAction}
+                dialog.dismiss();syncPastedLyrics(source,clean)
+            }
+        }
+    }
+    private fun syncPastedLyrics(t:Track,input:String,knownDraft:String?=null){
+        if(stemBusy||lyricsBusy)return
+        val source=libraryIndex.get(t.group)?:t
+        val id=source.uri;val revision=lyricRevision(source)
+        val clean=BrowserLyricImport.candidate(input)?:run{toast("Не удалось прочитать текст");return}
+        val reference=LyricDocument.plain(clean).trim()
+        if(reference.isBlank()){toast("Нет слов песни");return}
+        val previous=rawLyrics(source)
+        val cached=knownDraft?:runCatching{val f=scanDraftFile(id);require(f.length() in 1..262144);f.readText()}.getOrNull()
+        val modelReady=WhisperLocal.available&&WhisperLocal.installed(this)!=null
+        stemWork("Подгоняем субтитры по вокалу…",{
+            // Reuse real timing when available; do not repeat inference unnecessarily.
+            var best:KnownLyricAlignment.Result?=null
+            for(heard in listOfNotNull(cached,previous).distinct()){
+                if(Lrc.parse(heard).isEmpty())continue
+                val result=KnownLyricAlignment.align(heard,reference)
+                if(result?.wordLevel==true){best=result;break}
+                if(best==null&&result!=null)best=result
+            }
+            if(best?.wordLevel!=true&&modelReady){
+                val heard=try{scanRecognize(Uri.parse(id),id,reference)}catch(e:Exception){
+                    if(e is InterruptedException||Thread.currentThread().isInterrupted)throw e
+                    ""
+                }
+                if(heard.isNotBlank()){
+                    val result=KnownLyricAlignment.align(heard,reference)
+                    if(result?.wordLevel==true||best==null)best=result
+                }
+            }
+            check(!Thread.currentThread().isInterrupted)
+            best
+        }){aligned->
+            val target=libraryIndex.get(id)
+            if(target==null||lyricRevision(target)!=revision){toast("Песня или текст изменились");return@stemWork}
+            val status=when{
+                aligned?.wordLevel==true->"Синхронизация по словам"
+                aligned!=null->"Синхронизация по строкам"
+                !modelReady->"Нет модели Whisper · текст без времени"
+                else->"Нет надёжного совпадения · текст без времени"
+            }
+            actionSheet("Проверить субтитры",300){dialog,panel->
+                panel.addView(label(status,16,PremiumChrome.TEXT,true))
+                if(aligned==null)panel.addView(label("Существующие метки не меняются без вашего подтверждения. Можно сохранить слова без времени или вернуться.",14,muted))
+                else panel.addView(label("Слова сохранены в исходном написании. Проверьте найденные временные метки.",14,muted))
+                sheetAction(panel,if(aligned==null)"Проверить обычный текст" else "Проверить и сохранить"){
+                    dialog.dismiss()
+                    reviewTranscript(status,aligned?.lrc?:reference){accepted->
+                        val live=libraryIndex.get(id)
+                        if(live==null||lyricRevision(live)!=revision){toast("Песня или текст изменились");return@reviewTranscript}
+                        val before=live.lyrics;live.lyrics=accepted
+                        if(saveLibrary(true)){scanDraftFile(id).delete();render();toast("Текст сохранён для офлайн-просмотра")}
+                        else{live.lyrics=before;reindex();toast("Не удалось сохранить текст")}
+                    }
+                }
+                if(!modelReady&&aligned==null)sheetAction(panel,"Установить Whisper"){dialog.dismiss();whisperModelDialog()}
+                sheetAction(panel,"Вернуться к тексту"){dialog.dismiss();pasteAndSync(source,reference)}
+            }
+        }
+    }
+    @android.annotation.SuppressLint("SetJavaScriptEnabled")
+    private fun lyricWebSearch(t:Track,phrase:String?=null,knownDraft:String?=null){
+        if(stemBusy||lyricsBusy)return
+        val source=libraryIndex.get(t.group)?:t
+        val revision=lyricRevision(source)
+        val url=BrowserLyricImport.url(source.title,source.artist,phrase)
+        val script=runCatching{assets.open("lyrics-extract.js").bufferedReader().use{it.readText()}}.getOrNull()
+        if(script==null){openLyricBrowser(BrowserLyricImport.query(source.title,source.artist,phrase));return}
+        val dialog=android.app.Dialog(this)
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+        val panel=column()
+        val info=label("Поиск текста · выберите результат",14,muted)
+        panel.addView(info)
+        val web=android.webkit.WebView(this)
+        val height=(resources.displayMetrics.heightPixels-dp(240)).coerceIn(dp(180),dp(500))
+        panel.addView(web,LinearLayout.LayoutParams(-1,height))
+        var candidate:String?=null
+        var generation=0
+        var disposed=false
+        val actions=row()
+        val importButton=btn("Импортировать найденный текст"){
+            val text=candidate?:return@btn
+            val live=libraryIndex.get(source.uri)
+            if(live==null||lyricRevision(live)!=revision){toast("Песня или текст изменились");dialog.dismiss();return@btn}
+            dialog.dismiss();syncPastedLyrics(live,text,knownDraft)
+        }.apply{isEnabled=false}
+        panel.addView(importButton)
+        fun extract(){
+            if(disposed||web.url?.startsWith("https://")!=true)return
+            val token=generation;val page=web.url
+            web.evaluateJavascript(script){json->
+                if(disposed||generation!=token||web.url!=page)return@evaluateJavascript
+                val value=runCatching{org.json.JSONTokener(json?:"null").nextValue() as? String}.getOrNull()
+                candidate=value?.let(BrowserLyricImport::candidate)
+                importButton.isEnabled=candidate!=null
+                info.text=if(candidate!=null)"Текст найден · можно импортировать и синхронизировать" else "Готового блока слов не найдено · откройте результат или повторите проверку"
+            }
+        }
+        actions.addView(btn("Назад"){if(web.canGoBack())web.goBack()else dialog.dismiss()},weight())
+        actions.addView(btn("Проверить страницу"){extract()},weight())
+        panel.addView(actions)
+        panel.addView(btn("Вставить текст вручную"){dialog.dismiss();pasteAndSync(source)})
+        panel.addView(btn("Открыть обычный браузер"){
+            val link=web.url?.takeIf{it.startsWith("https://")}?:url
+            dialog.dismiss();pasteAndSync(source)
+            runCatching{startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW,Uri.parse(link)))}.onFailure{toast("Браузер недоступен")}
+        })
+        web.settings.apply{
+            javaScriptEnabled=true
+            allowFileAccess=false;allowContentAccess=false
+            setAllowFileAccessFromFileURLs(false);setAllowUniversalAccessFromFileURLs(false)
+            mixedContentMode=android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
+            safeBrowsingEnabled=true
+            setGeolocationEnabled(false);setSupportMultipleWindows(false)
+            javaScriptCanOpenWindowsAutomatically=false
+        }
+        android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(web,false)
+        web.webViewClient=object:android.webkit.WebViewClient(){
+            override fun shouldOverrideUrlLoading(view:android.webkit.WebView,request:android.webkit.WebResourceRequest):Boolean =
+                request.url.scheme!="https"
+            override fun onPageStarted(view:android.webkit.WebView,url:String?,favicon:android.graphics.Bitmap?){
+                generation++;candidate=null;importButton.isEnabled=false;info.text="Загрузка страницы…"
+            }
+            override fun onPageFinished(view:android.webkit.WebView,url:String?){extract()}
+        }
+        dialog.setContentView(panel)
+        dialog.setOnDismissListener{
+            disposed=true;web.stopLoading();(web.parent as? ViewGroup)?.removeView(web);web.destroy()
+        }
+        dialog.show()
+        dialog.window?.setLayout(-1,-2)
+        web.loadUrl(url)
+    }
+    private fun recognizeAndReview(t:Track){
         if(stemBusy||lyricsBusy)return
         val original=libraryIndex.get(t.group)?:t
         val id=original.uri;val revision=lyricRevision(original)
@@ -192,12 +353,12 @@ rep(anchor,r'''    private fun recognizeAndReview(t:Track){
                                 sheetAction(preview,"Назад"){compare.dismiss();transcriptChoices(source,raw,revision)}
                             }}
                         }
-                        sheetAction(content,"Поиск по фразе в браузере","Вернитесь сюда и импортируйте скопированный текст"){results.dismiss();transcriptChoices(source,raw,revision);openLyricBrowser(title+" "+artist+" "+phrase)}
+                        sheetAction(content,"Поиск по фразе в браузере","Открыть результат и импортировать найденный текст"){results.dismiss();lyricWebSearch(source,phrase,raw)}
                         sheetAction(content,"Назад к черновику"){results.dismiss();transcriptChoices(source,raw,revision)}
                     }
                 }
             }
-            sheetAction(panel,"Поиск по фразе в браузере","Запрос уже заполнен · без ручного ввода"){openLyricBrowser(source.title+" "+source.artist+" "+phrase)}
+            sheetAction(panel,"Поиск по фразе в браузере","Найденные слова можно импортировать автоматически"){dialog.dismiss();lyricWebSearch(source,phrase,raw)}
             sheetAction(panel,"Вставить текст из браузера","Скопируйте слова песни, затем нажмите здесь"){
                 val clipboard=getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                 val value=clipboard.primaryClip?.takeIf{it.itemCount>0}?.getItemAt(0)?.text?.toString().orEmpty()
