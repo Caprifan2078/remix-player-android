@@ -71,6 +71,8 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/030-waveform.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/031-producer-remix.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/032-adaptive-library.py" "source/$PROJECT"
+          cp "$GITHUB_WORKSPACE/patches/MoodDiscovery.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
+          python3 "$GITHUB_WORKSPACE/patches/033-mood-discovery.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
           test -f "source/$PROJECT/app/build.gradle.kts"
@@ -181,6 +183,8 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/030-waveform.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/031-producer-remix.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/032-adaptive-library.py" "source/$PROJECT"
+          cp "$GITHUB_WORKSPACE/patches/MoodDiscovery.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
+          python3 "$GITHUB_WORKSPACE/patches/033-mood-discovery.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/setup-java@v4
@@ -239,6 +243,8 @@ jobs:
         run: |
           kotlinc "source/$PROJECT/app/src/main/java/app/remix/player/GenreMix.kt" patches/ProducerAdaptationTest.kt -include-runtime -d /tmp/producer-adapt.jar
           java -jar /tmp/producer-adapt.jar
+      - name: Mood discovery and large library ranking
+        run: bash patches/run-mood-discovery.sh "source/$PROJECT"
       - name: Full regression
         working-directory: source/RemixPlayer_v0.66
         env:
@@ -316,6 +322,8 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/030-waveform.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/031-producer-remix.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/032-adaptive-library.py" "source/$PROJECT"
+          cp "$GITHUB_WORKSPACE/patches/MoodDiscovery.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
+          python3 "$GITHUB_WORKSPACE/patches/033-mood-discovery.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/download-artifact@v4
@@ -388,6 +396,8 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/030-waveform.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/031-producer-remix.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/032-adaptive-library.py" "source/$PROJECT"
+          cp "$GITHUB_WORKSPACE/patches/MoodDiscovery.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
+          python3 "$GITHUB_WORKSPACE/patches/033-mood-discovery.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/download-artifact@v4
@@ -467,6 +477,8 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/030-waveform.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/031-producer-remix.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/032-adaptive-library.py" "source/$PROJECT"
+          cp "$GITHUB_WORKSPACE/patches/MoodDiscovery.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
+          python3 "$GITHUB_WORKSPACE/patches/033-mood-discovery.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/setup-java@v4
