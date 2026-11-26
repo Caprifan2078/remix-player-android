@@ -121,14 +121,20 @@ class MixerLyricsUiAcceptanceTest {
         fixture { p->
             click("Текст")
             main{p.pause();p.seekTo(2500)}
-            fun underline(word:String):Boolean=texts().any{v->val s=v.text as? Spanned?:return@any false
-                s.toString().startsWith("Первое второе третье")&&s.getSpans(0,s.length,UnderlineSpan::class.java).any{span->s.subSequence(s.getSpanStart(span),s.getSpanEnd(span)).toString().trim()==word}}
-            await("Expected actual second-word underline"){underline("второе")}
+            fun highlighted(word:String):Boolean=texts().any{v->
+                val s=v.text as? Spanned?:return@any false
+                if(!s.toString().startsWith("Первое второе третье")||s.getSpans(0,s.length,UnderlineSpan::class.java).isNotEmpty())return@any false
+                val spans=s.getSpans(0,s.length,MainActivity.LyricInk::class.java)
+                if(spans.size!=1)return@any false
+                val ink=spans.single();val paint=android.text.TextPaint();ink.updateDrawState(paint)
+                s.subSequence(s.getSpanStart(ink),s.getSpanEnd(ink)).toString().trim()==word&&paint.color==android.graphics.Color.WHITE
+            }
+            await("Expected actual second-word color and no underline"){highlighted("второе")}
             capture("karaoke-word")
             click("Автопрокрутка: вкл.")
             await("Follow off not reflected"){button("Автопрокрутка: выкл.")!=null}
             main{p.seekTo(1000)}
-            await("Backward seek left stale active word"){underline("Первое")}
+            await("Backward seek left stale active word"){highlighted("Первое")}
             click("Музыка");click("Текст")
             await("Follow preference lost after leaving lyrics"){button("Автопрокрутка: выкл.")!=null}
             click("Автопрокрутка: выкл.")
