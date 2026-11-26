@@ -144,4 +144,26 @@ class StudioAcceptanceTest {
             println("PASS Android: actual media analysis duration, non-silent signal, invalid audio rejected")
         }finally{dir.deleteRecursively()}
     }
+    @Test fun smartDjAlignmentAndMediaDecoder(){
+        val dir=folder()
+        try{
+            val frames=44100*16
+            fun fixture(name:String,bpm:Double,phase:Double,hz:Double)=File(dir,name).apply{outputStream().buffered(65536).use{out->repeat(frames){i->
+                val t=i/44100.0;val beat=((t-phase)%(60/bpm)+60/bpm)%(60/bpm)
+                val v=(sin(2*Math.PI*hz*t)*(.03+.5*kotlin.math.exp(-beat*25))*32767).toInt().toShort()
+                StemCore.writeShort(out,v);StemCore.writeShort(out,v)
+            }}}
+            val a=fixture("a.pcm",120.0,.1,220.0);val b=fixture("b.pcm",115.0,.23,330.0)
+            val beforeA=hash(a);val beforeB=hash(b)
+            val plan=DjTransition.plan(DjTransition.analyze(a,true),DjTransition.analyze(b,false),false)
+            assertTrue(plan.speed in 1.02..1.07)
+            val out=File(dir,"smart.wav");val result=DjTransition.render(a,b,out,5,false)
+            assertEquals(44+result.frames*4,out.length())
+            assertTrue(result.overlap in 210000L..231000L)
+            val decoded=File(dir,"decoded.pcm");assertEquals(result.frames,decode(out,decoded))
+            assertArrayEquals(out.readBytes().copyOfRange(44,out.length().toInt()),decoded.readBytes())
+            assertEquals(beforeA,hash(a));assertEquals(beforeB,hash(b));assertTrue(dir.listFiles()!!.none{it.name.startsWith("dj-fit-")})
+            println("PASS Android: measured BPM matching, rendered smart transition and independently decoded WAV")
+        }finally{dir.deleteRecursively()}
+    }
 }
