@@ -165,6 +165,19 @@ class MixerLyricsUiAcceptanceTest {
                 assertTrue(texts().any{it.isShown&&it.text.toString()=="QA UI synthetic"})
             }
             await("Real waveform never appeared",25000){views(activity()!!.window.decorView).any{it is WaveSeekBar&&it.isShown&&it.tag=="waveform-ready"}}
+            main{
+                val a=activity()!!
+                val bounds=android.graphics.Rect()
+                a.window.decorView.getWindowVisibleDisplayFrame(bounds)
+                if(a.resources.configuration.screenHeightDp>=650){
+                    val actions=listOf("Ремикс","Текст","Очередь")
+                    actions.forEach{name->
+                        val v=button(name)?:error("Missing primary player action: "+name)
+                        val r=android.graphics.Rect()
+                        assertTrue("Primary action below fold: "+name,v.getGlobalVisibleRect(r)&&r.height()>=v.height*.9&&bounds.contains(r.centerX(),r.centerY()))
+                    }
+                }
+            }
             capture("premium-player")
             click("Ремикс")
             SystemClock.sleep(400)

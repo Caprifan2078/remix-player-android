@@ -26,9 +26,9 @@ rep('    private fun nowPlaying(){','''    private fun movePlayerView(view:View,
     private fun nowPlaying(){''')
 rep('heading("Сейчас играет");val t=current()?:run{body.addView(label("Выберите композицию",16,muted));return}', 'val t=current()?:run{heading("Сейчас играет");body.addView(label("Выберите композицию",16,muted));return};bar.visibility=View.GONE;body.gravity=Gravity.CENTER_HORIZONTAL')
 rep('body.addView(image,LinearLayout.LayoutParams(-1,dp(if(resources.configuration.screenHeightDp<500)180 else 270)))','''val cfg=resources.configuration
-        val coverDp=minOf((cfg.screenWidthDp-32).coerceAtLeast(100),(cfg.screenHeightDp-310).coerceAtLeast(100),342)
-        body.addView(image,LinearLayout.LayoutParams(dp(coverDp),dp(coverDp)).apply{topMargin=dp(6);bottomMargin=dp(10)})''')
-rep('body.addView(label(t.title,24,Color.WHITE,true).apply{maxLines=2;ellipsize=android.text.TextUtils.TruncateAt.END})','body.addView(label(t.title,29,PremiumChrome.TEXT,true).apply{maxLines=2;ellipsize=android.text.TextUtils.TruncateAt.END},LinearLayout.LayoutParams(-1,-2))')
+        val coverDp=minOf((cfg.screenWidthDp-48).coerceAtLeast(96),(cfg.screenHeightDp-440).coerceAtLeast(96),256)
+        body.addView(image,LinearLayout.LayoutParams(dp(coverDp),dp(coverDp)).apply{topMargin=dp(4);bottomMargin=dp(6)})''')
+rep('body.addView(label(t.title,24,Color.WHITE,true).apply{maxLines=2;ellipsize=android.text.TextUtils.TruncateAt.END})','body.addView(label(t.title,24,PremiumChrome.TEXT,true).apply{maxLines=2;ellipsize=android.text.TextUtils.TruncateAt.END},LinearLayout.LayoutParams(-1,-2))')
 rep('body.addView(meta)','body.addView(meta,LinearLayout.LayoutParams(-1,-2));movePlayerView(seek,body);movePlayerView(time,body);time.gravity=Gravity.CENTER;transportRow?.let{movePlayerView(it,body)}')
 rep('val modes=row()\n        modes.addView(btn("Ремикс"){effectPicker()}','val modes=row();playerActions=modes\n        modes.addView(btn("Ремикс"){effectPicker()}')
 rep('body.addView(modes)\n        body.addView(label("Режим: "+EffectMenu.title(Presets.active.name),13,muted))','body.addView(modes,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(8)});if(Presets.active!=Presets.all.first())body.addView(label(EffectMenu.title(Presets.active.name),13,muted))')
