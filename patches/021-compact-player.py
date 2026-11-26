@@ -38,11 +38,6 @@ helper='''    private val expandedSections=mutableSetOf<String>()
             android.app.AlertDialog.Builder(this).setTitle(groups.keys.elementAt(i)).setItems(entries.map{(if(it==Presets.active)"✓ " else "")+EffectMenu.title(it.name)}.toTypedArray()){_,j->applyPreset(entries[j]);render()}.setNegativeButton("Назад"){_,_->effectPicker()}.show()
         }.setNegativeButton("Закрыть",null).show()
     }
-    private fun openLyricBrowser(query:String){
-        val url=LyricsSearchPlan.browserUrl(query)
-        if(url==null){toast("Введите несколько слов");return}
-        runCatching{startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW,Uri.parse(url)))}.onFailure{toast("Не удалось открыть браузер")}
-    }
     private fun reviewTranscript(engine:String,raw:String,commit:()->Unit){
         val lines=Lrc.parse(raw).map{WordLyrics.parse(it).text}.filter{it.isNotBlank()}
         if(lines.isEmpty()){toast("Не удалось распознать текст");return}
@@ -55,6 +50,11 @@ helper='''    private val expandedSections=mutableSetOf<String>()
             sheetAction(panel,"Не сохранять"){dialog.dismiss()}
             panel.addView(label(lines.take(18).joinToString("\\n")+if(lines.size>18)"\\n…"else "",16,PremiumChrome.TEXT))
         }
+    }
+    private fun openLyricBrowser(query:String){
+        val url=LyricsSearchPlan.browserUrl(query)
+        if(url==null){toast("Введите несколько слов");return}
+        runCatching{startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW,Uri.parse(url)))}.onFailure{toast("Не удалось открыть браузер")}
     }
 '''
 # ViewGroup is imported by android.view.* in the app.
