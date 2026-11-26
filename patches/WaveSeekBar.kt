@@ -14,7 +14,7 @@ import java.util.concurrent.Future
 class WaveSeekBar(context:Context):AppCompatSeekBar(context){
     private val paint=Paint(Paint.ANTI_ALIAS_FLAG)
     private var samples:FloatArray?=null
-    fun setEnvelope(v:FloatArray?){samples=v;invalidate()}
+    fun setEnvelope(v:FloatArray?){samples=v;tag=if(v!=null)"waveform-ready" else null;invalidate()}
     override fun onDraw(canvas:Canvas){
         val bars=samples
         if(bars==null||bars.isEmpty()||layoutDirection==LAYOUT_DIRECTION_RTL){super.onDraw(canvas);return}

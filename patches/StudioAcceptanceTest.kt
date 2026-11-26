@@ -166,4 +166,29 @@ class StudioAcceptanceTest {
             println("PASS Android: measured BPM matching, rendered smart transition and independently decoded WAV")
         }finally{dir.deleteRecursively()}
     }
+    @Test fun realWaveformFromDecodedAudio(){
+        val dir=folder()
+        try{
+            val file=File(dir,"waveform.wav")
+            val frames=44100*4
+            file.outputStream().buffered(65536).use{out->
+                StemCore.header(out,frames.toLong())
+                repeat(frames){i->
+                    val amplitude=if(i<frames/2)3500 else 14000
+                    val v=(sin(2*Math.PI*440*i/44100)*amplitude).toInt().toShort()
+                    StemCore.writeShort(out,v);StemCore.writeShort(out,(-v).toShort())
+                }
+            }
+            val uri=FileProvider.getUriForFile(c,"app.remix.player.files",file)
+            val before=hash(file)
+            val data=WaveformDecode.scan(c,uri)?:error("Actual WAV decode failed")
+            assertEquals(96,data.size)
+            assertTrue("Stereo antiphase must not disappear",data.take(40).all{it in .47f..0.53f})
+            assertTrue("Louder second half should have bigger peaks",data.takeLast(40).all{it in .97f..1f})
+            assertEquals(before,hash(file))
+            val invalid=File(dir,"invalid.wav").apply{writeText("invalid")}
+            assertNull(WaveformDecode.scan(c,FileProvider.getUriForFile(c,"app.remix.player.files",invalid)))
+            println("PASS Android: actual WAV waveform, quiet/loud sections, antiphase, invalid file, source unchanged")
+        }finally{dir.deleteRecursively()}
+    }
 }

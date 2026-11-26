@@ -164,6 +164,7 @@ class MixerLyricsUiAcceptanceTest {
                 assertTrue(views(activity()!!.window.decorView).any{it.isShown&&it.contentDescription=="Обложка композиции"})
                 assertTrue(texts().any{it.isShown&&it.text.toString()=="QA UI synthetic"})
             }
+            await("Real waveform never appeared",25000){views(activity()!!.window.decorView).any{it is WaveSeekBar&&it.isShown&&it.tag=="waveform-ready"}}
             capture("premium-player")
             click("Ремикс")
             SystemClock.sleep(400)
