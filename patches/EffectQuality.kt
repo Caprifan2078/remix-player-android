@@ -81,12 +81,14 @@ class Dsp(private val rate:Int,private val channels:Int){
     private val low1=FloatArray(channels);private val low2=FloatArray(channels)
     private val guard=LinkedPeakGuard(rate);private val adaptiveDepth=AdaptiveEffectEnvelope(rate);private val orbit=StereoOrbit(rate)
     private var previous:Preset?=null;private var room:EffectRoom?=null
+    private val spectrum=SourceEffectBalance(rate,channels);private var tuneSource=false
     private val smoothDrive=SmoothDrive(channels);private var antiAlias=false
     private var highAlpha=0f;private var lowAlpha=0f;private var colorMix=0f
     private var driveK=1f;private var driveNorm=1f;private var driveMix=1f;private var phase=0.0;private var phaseStep=0.0;private var processed=false;private var bandpass=false
     private fun alpha(hz:Double)=(1-exp(-2*PI*hz.coerceIn(1.0,rate*.45)/rate)).toFloat()
     private fun configure(p:Preset){
         previous=p
+        spectrum.reset();tuneSource=p.name in setOf("Sped Up","Nightcore","Sped Up + Reverb","Nightcore Reverb","Slowed + Reverb","Super Slowed + Reverb","Ultra Slowed","Extreme Slowed")
         high1.fill(0f);high2.fill(0f);low1.fill(0f);low2.fill(0f)
         guard.reset();adaptiveDepth.reset();orbit.reset();phase=0.0
         bassBand.reset(when(p.name){"Sub Bass"->78.0;"Deep Bass"->115.0;"Soft Bass"->145.0;else->165.0})
@@ -123,19 +125,23 @@ class Dsp(private val rate:Int,private val channels:Int){
         if(previous!==p)configure(p)
         if(!processed){for(c in 0 until channels)out[c]=(if(input[c].isFinite())input[c] else 0f).coerceIn(-1f,1f);return}
         val depth=adaptiveDepth.frame(input)
+        if(tuneSource)spectrum.frame(input)
+        val bassDepth=depth*(if(tuneSource)spectrum.bass else 1f)
+        val driveDepth=depth*(if(tuneSource)spectrum.drive else 1f)
+        val roomDepth=depth*(if(tuneSource)spectrum.room else 1f)
         for(c in 0 until channels){
             val x=if(input[c].isFinite())input[c].coerceIn(-1f,1f)else 0f
             var y=x
-            if(p.bass>0)y+=p.bass*depth*bassBand.sample(c,x)
+            if(p.bass>0)y+=p.bass*bassDepth*bassBand.sample(c,x)
             if(colorMix>0){
                 var v=y
                 if(bandpass){high1[c]+=highAlpha*(v-high1[c]);v-=high1[c];high2[c]+=highAlpha*(v-high2[c]);v-=high2[c]}
                 low1[c]+=lowAlpha*(v-low1[c]);low2[c]+=lowAlpha*(low1[c]-low2[c]);y+=(low2[c]-y)*colorMix
             }
-            if(p.drive>0){val wet=if(antiAlias)smoothDrive.sample(c,y,driveK,driveNorm)else tanh(y*driveK)/driveNorm;y+=(wet-y)*depth*driveMix}
+            if(p.drive>0){val wet=if(antiAlias)smoothDrive.sample(c,y,driveK,driveNorm)else tanh(y*driveK)/driveNorm;y+=(wet-y)*driveDepth*driveMix}
             out[c]=y
         }
-        room?.mix(out,p.room*depth)
+        room?.mix(out,p.room*roomDepth)
         if(channels==2&&p.pan>0){orbit.apply(out,(sin(phase)*p.pan).toFloat());phase+=phaseStep;if(phase>2*PI)phase-=2*PI}
         guard.apply(out)
     }
