@@ -56,6 +56,43 @@ rep('panel.addView(label("Быстрые режимы",12,muted,true))','''sheet
             panel.addView(label("Моментальные эффекты",12,muted,true))
             panel.addView(label("Интенсивность меняется по громкости песни; скорость и тон остаются выбранными.",12,muted))''')
 rep('popular.size*61+65','popular.size*61+175')
+# Neural mood analysis is optional and only used on an explicit recommendation request.
+rep('if(cached!=null){showRecommendations(source,cached)}else stemWork("Анализ для рекомендаций…",{TrackAnalyzer.report(this,Uri.parse(source.uri),full=true)?:error("Не удалось проанализировать")}){r->completeReports[source.uri]=r;reports[source.uri]=r;showRecommendations(source,r)}','smartRecommendations(source,cached)')
+rep('    private fun showRecommendations(source:Track,report:MusicAnalysis.Report){','''    private fun smartRecommendations(source:Track,cached:MusicAnalysis.Report?){
+        if(stemBusy)return
+        val model=MoodModel.model(this)
+        stemWork("Подбор ремиксов…",{
+            val report=cached?:TrackAnalyzer.report(this,Uri.parse(source.uri),full=true)?:error("Не удалось проанализировать")
+            var arousal:Double?=null
+            if(model.isFile){
+                val am=getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+                val info=android.app.ActivityManager.MemoryInfo();am.getMemoryInfo(info)
+                if(ModelMemoryBudget.canStart(model.length(),info.availMem,info.lowMemory)){
+                    try{
+                        val mood=MoodModel.classify(this,Uri.parse(source.uri)){updateWork(it)}
+                        if(mood.label!=null)arousal=mood.arousal.toDouble().takeIf{it.isFinite()&&it in 0.0..1.0}
+                    }catch(e:Exception){
+                        if(e is InterruptedException||Thread.currentThread().isInterrupted)throw e
+                    }
+                }
+            }
+            check(!Thread.currentThread().isInterrupted)
+            report to arousal
+        }){(report,arousal)->
+            if(libraryIndex.get(source.uri)!=null){completeReports[source.uri]=report;reports[source.uri]=report;showRecommendations(source,report,arousal)}
+        }
+    }
+    private fun showRecommendations(source:Track,report:MusicAnalysis.Report,neuralArousal:Double?=null){''')
+rep('RemixAdvisor.recommend(report,manualBeat(source)?.bpm,goals[i])','RemixAdvisor.recommend(report,manualBeat(source)?.bpm,goals[i],neuralArousal)')
+# Keep popular genres ahead of secondary controls on the existing genre screen.
+rep('if(available)body.addView(btn(if(useSeparation)','val genreToolsStart=body.childCount\n        if(available)body.addView(btn(if(useSeparation)')
+rep('val featured=ProducerStyles.featured()','''val genreTools=bodyChildren().drop(genreToolsStart)
+        val advisor=genreTools.filterIsInstance<Button>().firstOrNull{it.text.toString()=="Подобрать 5 ремиксов по характеру"}
+        if(advisor!=null){body.removeView(advisor);body.addView(advisor,genreToolsStart)}
+        val featured=ProducerStyles.featured()''')
+rep('compactSection("genre-more","Все направления · "+ProducerStyles.more().size,bodyChildren().drop(moreStart),moreStart)','''compactSection("genre-more","Все направления · "+ProducerStyles.more().size,bodyChildren().drop(moreStart),moreStart)
+        val controls=genreTools.filter{it!==advisor}
+        compactSection("genre-options","Настройки аранжировки и модели",controls,body.childCount-controls.size)''')
 p.write_text(s)
 print("PASS: 40 procedural genres, refined quick effects, offline DJ bass exchange")
 # The hard-dance kick is rendered per genre, not the same oscillator with a different label.
