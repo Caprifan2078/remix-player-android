@@ -6,3 +6,5 @@ kotlinc "$1"/app/src/main/java/app/remix/player/{AudioCore,LyricsMatch,LyricsSea
 java -jar "$tmp/test.jar"
 kotlinc "$1/app/src/main/java/app/remix/player/AudioCore.kt" patches/StereoOrbitTest.kt -include-runtime -d "$tmp/orbit.jar"
 java -jar "$tmp/orbit.jar"
+kotlinc "$1/app/src/main/java/app/remix/player/AudioCore.kt" patches/EffectQualityTest.kt -include-runtime -d "$tmp/quality.jar"
+java -jar "$tmp/quality.jar"
