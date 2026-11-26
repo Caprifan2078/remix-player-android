@@ -3,6 +3,9 @@ package app.remix.player
 /** Pinned multilingual GGML artifacts. Memory thresholds are conservative heuristics, not benchmarks. */
 object WhisperModelSpec {
     data class Model(val id:String,val size:Long,val sha:String,val minFreeRam:Long,val revision:String="main"){
+        /** Extra memory margin for three competing decoder hypotheses; not a measured peak. */
+        fun beamSize(available:Long,lowMemory:Boolean):Int=
+            if(id!="tiny"&&!lowMemory&&available>=minFreeRam+512L*1024*1024)3 else 1
         val source get()="https://huggingface.co/ggerganov/whisper.cpp/blob/$revision/ggml-$id.bin"
         val title get()="Whisper $id · ${size/1_000_000} МБ"
     }
