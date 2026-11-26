@@ -537,5 +537,56 @@ else:
     anchor='override fun onDestroy(){'
     assert s.count(anchor)==1
     s=s.replace(anchor,'override fun onResume(){super.onResume();AutoLyrics.schedule(this);if(mergeAutomaticLyrics())render()}\n    '+anchor)
+# Reuse existing translation storage/backup format, validate exact line identity and stale results.
+a=s.index('    private fun translateLyrics(t:Track,raw:String,source:String,target:String,download:Boolean){')
+b=s.index('\n',a)
+s=s[:a]+'''    private fun translateLyrics(t:Track,raw:String,source:String,target:String,download:Boolean){
+        if(translationBusy||stemBusy)return
+        val reference=searchableLyricLines(raw).map{it.text}
+        if(reference.isEmpty()||reference.size>2000){toast("Неподдерживаемое количество строк");return}
+        val id=t.uri;val revision=lyricRevision(t)
+        translationBusy=true;render()
+        io.execute{
+            val result=runCatching{LyricTranslation.translate(reference,source,target,download)}
+            runOnUiThread{
+                if(!isDestroyed){
+                    translationBusy=false
+                    result.onSuccess{values->
+                        val live=libraryIndex.get(id)
+                        if(live==null||lyricRevision(live)!=revision){toast("Песня или текст изменились; перевод не сохранён")}
+                        else if(values.size!=reference.size||values.any{it.isBlank()||it.length>4000}||values.sumOf{it.length}>256000){toast("Перевод неполный")}
+                        else if(getSharedPreferences("translations",MODE_PRIVATE).edit().putString(translationKey(live,raw),JSONArray(values).toString()).commit()){toast("Перевод сохранён")}
+                        else toast("Не удалось сохранить перевод")
+                    }.onFailure{toast("Перевод не выполнен: "+(it.message?:"ошибка"))}
+                    render()
+                }
+            }
+        }
+    }'''+s[b:]
+# Manual and automatic translations now share the renderer. Legacy manual entries are read only if the lyric revision matches.
+rep('private fun translated(t:Track,raw:String):List<String> = runCatching{val a=JSONArray(getSharedPreferences("translations",MODE_PRIVATE).getString(translationKey(t,raw),"[]"));(0 until a.length()).map{a.getString(it)}}.getOrDefault(emptyList())', '''private fun translated(t:Track,raw:String):List<String>{
+        fun stored(track:Track,value:String):List<String>{
+            val prefs=getSharedPreferences("translations",MODE_PRIVATE)
+            val key=translationKey(track,value)
+            if(prefs.contains(key))return runCatching{val a=JSONArray(prefs.getString(key,"[]"));(0 until a.length()).map{a.getString(it)}}.getOrDefault(emptyList())
+            val old=getSharedPreferences("bilingual_lyrics_v1",MODE_PRIVATE)
+            val id=scanKey(track.uri)
+            return if(old.getString(id+"_revision",null)==scanKey(value))LyricLineSearch.pair(searchableLyricLines(value),old.getString(id,"").orEmpty())?.map{it.translation}.orEmpty()else emptyList()
+        }
+        val own=stored(t,raw)
+        if(own.isNotEmpty()||getSharedPreferences("translations",MODE_PRIVATE).contains(translationKey(t,raw)))return own
+        val original=libraryIndex.get(t.group)
+        if(original!=null&&original.uri!=t.uri&&t.tempoRatio!=null&&searchableLyricLines(raw).map{it.text}==searchableLyricLines(original.lyrics).map{it.text})return stored(original,original.lyrics)
+        return emptyList()
+    }''')
+rep('body.addView(btn(if(translationBusy)"Перевод…" else "Перевести текст"){chooseTranslation(t,raw)});','')
+rep('getSharedPreferences("translations",MODE_PRIVATE).edit().remove(translationKey(t,raw)).apply();render()','getSharedPreferences("translations",MODE_PRIVATE).edit().putString(translationKey(t,raw),"[]").apply();render()')
+# Untimed lyrics can be translated as paired text, without pretending they are synchronized.
+rep('val plain=label(raw,20,Color.WHITE);plain.setTextIsSelectable(true);body.addView(plain)','''val pairs=translated(t,raw)
+                    val originals=searchableLyricLines(raw)
+                    if(pairs.size==originals.size&&pairs.isNotEmpty()){
+                        originals.forEachIndexed{idx,line->body.addView(label(line.text,20,PremiumChrome.TEXT,true));body.addView(label(pairs[idx],15,muted).apply{setPadding(0,dp(2),0,dp(12))})}
+                    }else{val plain=label(raw,20,Color.WHITE);plain.setTextIsSelectable(true);body.addView(plain)}''')
+rep('val tr=label(visibleTranslation[idx],15,muted);tr.setOnClickListener','val tr=label(visibleTranslation[idx],17,muted).apply{setPadding(0,dp(2),0,dp(14))};tr.setOnClickListener')
 p.write_text(s)
 print("PASS: persistent default-off PRO controls; core player unchanged")
