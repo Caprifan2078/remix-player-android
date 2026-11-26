@@ -33,6 +33,7 @@ a=audio.index('class Dsp(');b=audio.index('data class Lyric(',a)
 quality=(Path(__file__).parent/'EffectQuality.kt').read_text().split('\n',4)[4]
 bass=(Path(__file__).parent/'BassBand.kt').read_text().split('\n',3)[3]
 p.write_text(audio[:a]+bass+'\n'+quality+'\n'+audio[b:])
+(src/'SourceEffectBalance.kt').write_bytes((Path(__file__).parent/'SourceEffectBalance.kt').read_bytes())
 # Live-only effect switching: retain export DSP and its exact original path.
 (src/'LiveEffectSwitch.kt').write_bytes((Path(__file__).parent/'LiveEffectSwitch.kt').read_bytes())
 edit('PlaybackService.kt','private var dsp: Dsp? = null','private var dsp: LiveEffectSwitch? = null')
@@ -77,7 +78,7 @@ assert eqsource.count('fun eqRenderTests(){')==1
 eqsource=eqsource.replace('fun eqRenderTests(){','fun eqRenderTests(){eqHeadroomQualityTests();')
 eqtest.write_text(eqsource+'\n'+(Path(__file__).parent/'EqHeadroomQualityTest.kt').read_text().split('\n',2)[2])
 # Do not reuse a render checkpoint from an older DSP algorithm.
-edit('EffectCheckpoint.kt','dsp-peak-guard-v60','dsp-quality-v8')
+edit('EffectCheckpoint.kt','dsp-peak-guard-v60','dsp-quality-v9')
 edit('GenreCheckpoint.kt','genre-render-v7','genre-render-v8')
 edit('TransitionMix.kt','    fun renderFrames(first:File,second:File,out:File,overlap:Long,progress:(Int)->Unit={}):Long {','''    fun renderFrames(first:File,second:File,out:File,overlap:Long,progress:(Int)->Unit={}):Long = renderInternal(first,second,out,overlap,false,progress)
     fun renderSmartFrames(first:File,second:File,out:File,overlap:Long,progress:(Int)->Unit={}):Long = renderInternal(first,second,out,overlap,true,progress)
