@@ -8,7 +8,15 @@ object KnownLyricAlignment {
   if(words?.complete==true)return Result(words.lrc,true)
   check(!Thread.currentThread().isInterrupted)
   val phrases=try{PhraseAlign.align(heard,reference,false)}catch(e:IllegalArgumentException){null}
-  return if(phrases?.complete==true)Result(phrases.lrc,false) else alignNoisyPhrases(heard,reference)
+  return if(phrases?.complete==true)Result(phrases.lrc,false) else alignGroupedPhrases(heard,reference)?:alignNoisyPhrases(heard,reference)
+ }
+ /** Use only the measured onset of the first segment, preserving original reference words. */
+ fun alignGroupedPhrases(heard:String,reference:String):Result?{
+  if(heard.length>LyricDocument.MAX_CHARS||reference.length>LyricDocument.MAX_CHARS)return null
+  val lines=LyricDocument.plain(reference).lineSequence().map{it.trim()}.filter{it.isNotEmpty()}.take(301).toList()
+  val segments=Lrc.parse(heard).take(501).map{GroupedLyricMatch.Segment(it.ms,WordLyrics.parse(it).text)}
+  val times=GroupedLyricMatch.align(segments,lines)?:return null
+  return Result(lines.indices.joinToString("\n"){i->"["+SubtitleCore.stamp(times[i])+"]"+lines[i]},false)
  }
  /** Conservative line-level recovery when ASR mishears individual words.
   * Preserve the exact reference and use only observed phrase onsets. Reject ambiguous paths. */
