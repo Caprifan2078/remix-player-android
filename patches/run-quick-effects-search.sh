@@ -14,3 +14,5 @@ kotlinc "$1/app/src/main/java/app/remix/player/AudioCore.kt" patches/EffectAlias
 java -jar "$tmp/alias.jar"
 kotlinc "$1/app/src/main/java/app/remix/player/AudioCore.kt" patches/DspOptimizationTest.kt -include-runtime -d "$tmp/opt.jar"
 java -jar "$tmp/opt.jar"
+kotlinc "$1/app/src/main/java/app/remix/player/AudioCore.kt" patches/BassBandTest.kt -include-runtime -d "$tmp/bass.jar"
+java -jar "$tmp/bass.jar"
