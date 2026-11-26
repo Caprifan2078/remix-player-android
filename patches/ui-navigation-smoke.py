@@ -18,6 +18,11 @@ def tap(label):
         matches=[]
         for node in nodes:
             if node.get("package")!=pkg or node.get("text")!=label:continue
+            # Android AlertDialog rows delegate taps to ListView and may report clickable=false.
+            parent=parents.get(node)
+            if node.get("enabled")=="true" and node.get("resource-id")=="android:id/text1" and parent is not None and parent.get("resource-id")=="android:id/select_dialog_listview":
+                matches.append(node)
+                continue
             target=node
             while target is not None and target.get("package")==pkg:
                 if target.get("clickable")=="true" and target.get("enabled")=="true":
