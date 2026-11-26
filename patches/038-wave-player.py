@@ -39,7 +39,10 @@ replace('    private fun nowPlaying(){',r'''    private val waveCache=android.ut
         val active=Presets.active
         if(quickEffectState!=active){
             quickEffectState=active
-            quickEffectButtons.forEach{(p,b)->b.isSelected=p==active;b.setTextColor(if(p==active)accent else Color.WHITE)}
+            quickEffectButtons.forEach{(p,b)->
+                val selected=p==active||(p.name=="Sped Up"&&active.name=="Sped Up + Reverb")||(p.name=="Nightcore"&&active.name=="Nightcore Reverb")
+                b.isSelected=selected;b.setTextColor(if(selected)accent else Color.WHITE)
+            }
         }
     }
     private fun cancelWave(){
@@ -74,7 +77,18 @@ replace('val targetScreen=screen;mainScroll.post','syncWave();val targetScreen=s
 replace('override fun onStop(){seekTarget=null;','override fun onStop(){cancelWave();seekTarget=null;')
 replace('override fun onStart(){super.onStart();uiStarted=true;','override fun onStart(){super.onStart();uiStarted=true;syncWave();')
 replace('override fun onDestroy(){uiStarted=false;','override fun onDestroy(){cancelWave();waveIo.shutdownNow();waveCache.evictAll();uiStarted=false;')
-replace('setTextChanged(time,"${fmt(pos)} / ${fmt(dur)}")','setTextChanged(time,"${fmt(pos)} / ${fmt(dur)}");updateQuickEffects()')
+replace('setTextChanged(time,"${fmt(pos)} / ${fmt(dur)}")','if(!dragging)setTextChanged(time,"${fmt(pos)} / ${fmt(dur)}");syncWave()')
+replace('override fun onProgressChanged(s:SeekBar,p:Int,user:Boolean){if(user&&!dragging)applySeek(currentSeekTarget(),p)}',r'''override fun onProgressChanged(s:SeekBar,p:Int,user:Boolean){
+                if(!user)return
+                if(!dragging){applySeek(currentSeekTarget(),p);return}
+                val target=seekTarget;val actual=currentSeekTarget()
+                val request=MixerSession.request
+                val length=request?.frames?:controller?.duration?:0L
+                val value=PlayerUiSafety.seekPosition(target,actual,length,p)?:return
+                val preview=if(request!=null)value*1000/44100 else value
+                val duration=if(request!=null)length*1000/44100 else length
+                setTextChanged(time,"${fmt(preview)} / ${fmt(duration)}")
+            }''')
 replace('found.onSuccess{list->reports.clear();completeReports.clear();tempoSearchCache.clear();tempos.clear();','found.onSuccess{list->cancelWave();waveCache.evictAll();reports.clear();completeReports.clear();tempoSearchCache.clear();tempos.clear();')
 # Player screen remains compact; the transport waveform is always usable immediately.
 replace('dp(if(resources.configuration.screenHeightDp<500)180 else 270)','dp(if(resources.configuration.screenHeightDp<600)140 else 220)')
