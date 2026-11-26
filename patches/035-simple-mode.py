@@ -58,8 +58,9 @@ rep(anchor,'''    private fun lyricSearchChoices(t:Track,manual:()->Unit){
             if(lyricsBusy||stemBusy)return
             scanLibrary(listOf(ScanItem(live.uri,live.title,live.artist,live.lyrics)),online,false,deep,deep)
         }
-        actionSheet("Найти текст",330){dialog,panel->
+        actionSheet("Найти текст",390){dialog,panel->
             sheetAction(panel,"Автоматически","Из файла и интернета · безопасное сохранение"){dialog.dismiss();scan(true,false)}
+            sheetAction(panel,"По вокалу → найти оригинал","Whisper, проверка текста и сохранение"){dialog.dismiss();recognizeAndReview(t)}
             sheetAction(panel,"Вся медиатека","Один запуск для всех песен"){dialog.dismiss();batchLyrics()}
             sheetAction(panel,"Другие источники","Метаданные, браузер, распознавание"){dialog.dismiss()
                 actionSheet("Источники текста",420){sources,content->
@@ -67,11 +68,8 @@ rep(anchor,'''    private fun lyricSearchChoices(t:Track,manual:()->Unit){
                     sheetAction(content,"Только из аудиофайла","Офлайн · встроенный текст"){sources.dismiss();scan(false,false)}
                     sheetAction(content,"Уточнить название и исполнителя","Онлайн-поиск с выбором результата"){sources.dismiss();manual()}
                     sheetAction(content,"Поиск в браузере","По названию и исполнителю"){openLyricBrowser(original.title+" "+original.artist)}
-                    sheetAction(content,"По вокалу · Whisper","Локальное распознавание или синхронизация"){
-                        sources.dismiss()
-                        val raw=rawLyrics(t)
-                        if(raw.isBlank())recognizeAndReview(t)else alignKnownLyrics(t,raw)
-                    }
+                    val raw=rawLyrics(t)
+                    if(raw.isNotBlank())sheetAction(content,"Уточнить время текста","Whisper · слова сохраняются"){sources.dismiss();alignKnownLyrics(t,raw)}
                 }
             }
         }
@@ -153,11 +151,12 @@ rep(anchor,r'''    private fun recognizeAndReview(t:Track){
         val heard=LyricDocument.plain(raw)
         val phrase=TranscriptMatch.query(heard)
         fun accept(candidate:String,verify:Boolean){
-            val text=LyricDocument.plain(candidate)
+            val clean=runCatching{LyricDocument.decode(candidate.toByteArray(Charsets.UTF_8))}.getOrElse{toast(it.message?:"Некорректный текст");return}
+            val text=LyricDocument.plain(clean)
             if(text.isBlank()){toast("Нет текста");return}
             // Only use measured timestamps from this recording, never silently copy another remix's timeline.
             val aligned=if(verify)KnownLyricAlignment.align(raw,text) else null
-            val prepared=if(verify)aligned?.lrc?:text else candidate
+            val prepared=if(verify)aligned?.lrc?:text else clean
             if(prepared.toByteArray(Charsets.UTF_8).size>LyricDocument.MAX_BYTES){toast("Текст слишком большой");return}
             reviewTranscript(if(verify)"Текст · сверка с вокалом" else "Whisper · черновик",prepared){accepted->
                 val target=libraryIndex.get(id)
@@ -186,9 +185,14 @@ rep(anchor,r'''    private fun recognizeAndReview(t:Track){
                     actionSheet("Варианты оригинала",440){results,content->
                         if(matches.isEmpty())content.addView(label("Надёжных совпадений в каталоге нет. Черновик сохранён.",14,muted))
                         matches.forEach{(item,text,score)->
-                            sheetAction(content,item.title+" · "+item.artist,"Совпало фраз: "+score.matching+" / "+score.total){results.dismiss();accept(text,true)}
+                            sheetAction(content,item.title+" · "+item.artist,"Совпало фраз: "+score.matching+" / "+score.total){results.dismiss();actionSheet("Сравнить тексты",460){compare,preview->
+                                preview.addView(label("Распознано Whisper",14,muted,true));preview.addView(label(heard.take(420),15,PremiumChrome.TEXT))
+                                preview.addView(label("Найденный вариант",14,muted,true));preview.addView(label(text.take(420),15,PremiumChrome.TEXT))
+                                sheetAction(preview,"Проверить и сохранить","Полный текст и проверка временных меток"){compare.dismiss();accept(text,true)}
+                                sheetAction(preview,"Назад"){compare.dismiss();transcriptChoices(source,raw,revision)}
+                            }}
                         }
-                        sheetAction(content,"Поиск по фразе в браузере","Вернитесь сюда и импортируйте скопированный текст"){results.dismiss();openLyricBrowser(title+" "+artist+" "+phrase);transcriptChoices(source,raw,revision)}
+                        sheetAction(content,"Поиск по фразе в браузере","Вернитесь сюда и импортируйте скопированный текст"){results.dismiss();transcriptChoices(source,raw,revision);openLyricBrowser(title+" "+artist+" "+phrase)}
                         sheetAction(content,"Назад к черновику"){results.dismiss();transcriptChoices(source,raw,revision)}
                     }
                 }
