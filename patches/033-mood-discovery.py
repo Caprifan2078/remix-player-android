@@ -8,7 +8,7 @@ def rep(a,b):
  assert s.count(a)==1,(a[:100],s.count(a))
  s=s.replace(a,b)
 # A first-class discovery entry in the library; organize the remaining More actions by task.
-rep('val tools=row();tools.addView(filter,weight());','if(tracks.isNotEmpty())body.addView(btn("Подборки"){moodDiscoveryDialog()});val tools=row();tools.addView(filter,weight());')
+rep('val tools=row();tools.addView(filter,weight());','if(tracks.isNotEmpty())body.addView(btn("Настроение и подборки"){moodDiscoveryDialog()});val tools=row();tools.addView(filter,weight());')
 rep("val names=listOf(\"Версии\",\"Загрузки\",\"Очередь\",\"История\",\"Эквалайзер\",\"Настройки\",\"Тексты библиотеки\")","val groups=listOf(\"Воспроизведение\" to listOf(\"Очередь\",\"История\"),\"Звук\" to listOf(\"Версии\",\"Эквалайзер\"),\"Библиотека\" to listOf(\"Загрузки\",\"Сканирование библиотеки\"),\"Приложение\" to listOf(\"Настройки\"))")
 rep("actionSheet(\"Ещё\",names.size*61){dialog,panel->names.forEach{ name->sheetAction(panel,name){dialog.dismiss();if(name==\"Тексты библиотеки\")batchLyrics()else{screen=name;render()}}}}","actionSheet(\"Ещё\",520){dialog,panel->\n            groups.forEach{(heading,items)->\n                panel.addView(label(heading,13,muted,true))\n                items.forEach{name->sheetAction(panel,name){dialog.dismiss();when(name){\"Сканирование библиотеки\"->batchLyrics();else->{screen=name;render()}}}}\n            }\n        }")
 # Keep cached acoustic summaries from the full-library scan as well.
@@ -37,6 +37,20 @@ helper='''    private fun moodPrefs()=getSharedPreferences("mood_discovery_v1",M
             panel.addView(label("Проанализировано: "+indexed.size+" / "+songs.size,15,muted))
             sheetAction(panel,if(indexed.size==songs.size)"Пересканировать музыку" else "Сканировать новые песни","Офлайн · без дополнительных моделей"){
                 dialog.dismiss();startMoodScan(songs,indexed.map{it.id}.toSet(),indexed.size==songs.size)
+            }
+            sheetAction(panel,"По настроению","Меланхолия, спокойствие, энергия и ещё 5"){
+                if(indexed.isEmpty()){toast("Сначала просканируйте медиатеку");return@sheetAction}
+                dialog.dismiss()
+                actionSheet("Музыка по настроению",510){moodDialog,moodPanel->
+                    MoodDiscovery.profiles.forEach{profile->
+                        sheetAction(moodPanel,profile.title,profile.detail){
+                            if(indexed.isEmpty()){toast("Сначала просканируйте медиатеку");return@sheetAction}
+                            if(stemBusy){toast("Дождитесь завершения обработки");return@sheetAction}
+                            moodDialog.dismiss()
+                            stemWork("Подбор музыки…",{MoodDiscovery.rank(indexed,profile)}){ids->moodMixPreview(profile.title,profile.detail,ids)}
+                        }
+                    }
+                }
             }
             val now=current()
             val seed=now?.let{t->indexed.firstOrNull{it.id==t.group}}
@@ -72,15 +86,7 @@ helper='''    private fun moodPrefs()=getSharedPreferences("mood_discovery_v1",M
                 if(indexed.isEmpty()){toast("Сначала просканируйте медиатеку");return@sheetAction}
                 dialog.dismiss();moodJourneyDialog(indexed)
             }
-            panel.addView(label("Под настроение",13,muted,true))
-            MoodDiscovery.profiles.forEach{profile->
-                sheetAction(panel,profile.title,profile.detail){
-                    if(indexed.isEmpty()){toast("Сначала просканируйте медиатеку");return@sheetAction}
-                    if(stemBusy){toast("Дождитесь завершения обработки");return@sheetAction}
-                    dialog.dismiss()
-                    stemWork("Подбор музыки…",{MoodDiscovery.rank(indexed,profile)}){ids->moodMixPreview(profile.title,profile.detail,ids)}
-                }
-            }
+
             panel.addView(label("Подборка по акустическим признакам, а не по словам песни или настроению слушателя. Оценки приблизительны.",12,muted))
         }
     }
