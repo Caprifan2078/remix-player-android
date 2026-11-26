@@ -95,6 +95,7 @@ s=s[:a]+'''    private data class ScanItem(val uri:String,val title:String,val a
             if(e is InterruptedException||Thread.currentThread().isInterrupted)throw e
             null
         }
+        var fallback:String?=null
         if(stem!=null){
             updateWork("Whisper · выделенный вокал")
             val heard=try{WhisperLocal.transcribe(this,uri,stem,"auto"){updateWork(it)}}catch(e:Exception){
@@ -102,10 +103,25 @@ s=s[:a]+'''    private data class ScanItem(val uri:String,val title:String,val a
                 ""
             }
             check(!Thread.currentThread().isInterrupted)
-            if(heard.isNotBlank()&&(reference==null||KnownLyricAlignment.align(heard,reference)!=null))return heard
+            if(heard.isNotBlank()){
+                if(reference==null)return heard
+                val match=KnownLyricAlignment.align(heard,reference)
+                if(match?.wordLevel==true)return heard
+                if(match!=null)fallback=heard
+            }
         }
         updateWork("Whisper · исходная композиция")
-        return WhisperLocal.transcribe(this,uri,null,"auto"){updateWork(it)}
+        val original=try{WhisperLocal.transcribe(this,uri,null,"auto"){updateWork(it)}}catch(e:Exception){
+            if(e is InterruptedException||Thread.currentThread().isInterrupted)throw e
+            fallback?.let{return it}
+            throw e
+        }
+        check(!Thread.currentThread().isInterrupted)
+        if(reference!=null&&fallback!=null){
+            val match=KnownLyricAlignment.align(original,reference)
+            if(match?.wordLevel!=true)return fallback
+        }
+        return original
     }
     private fun scanLibrary(pending:List<ScanItem>,search:Boolean,analyze:Boolean,local:Boolean,align:Boolean){
         var completed=0;var saved=0;var unresolved=0;var errors=0;var analyzed=0;var drafts=0
