@@ -38,11 +38,23 @@ helper='''    private val expandedSections=mutableSetOf<String>()
             android.app.AlertDialog.Builder(this).setTitle(groups.keys.elementAt(i)).setItems(entries.map{(if(it==Presets.active)"✓ " else "")+EffectMenu.title(it.name)}.toTypedArray()){_,j->applyPreset(entries[j]);render()}.setNegativeButton("Назад"){_,_->effectPicker()}.show()
         }.setNegativeButton("Закрыть",null).show()
     }
+    private fun openLyricBrowser(query:String){
+        val url=LyricsSearchPlan.browserUrl(query)
+        if(url==null){toast("Введите несколько слов");return}
+        runCatching{startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW,Uri.parse(url)))}.onFailure{toast("Не удалось открыть браузер")}
+    }
     private fun reviewTranscript(engine:String,raw:String,commit:()->Unit){
         val lines=Lrc.parse(raw).map{WordLyrics.parse(it).text}.filter{it.isNotBlank()}
         if(lines.isEmpty()){toast("Не удалось распознать текст");return}
-        val preview=lines.take(18).joinToString("\\n")
-        android.app.AlertDialog.Builder(this).setTitle("Черновик · "+engine).setMessage("Сверьте слова с песней. Автоматическое распознавание не гарантирует правильный текст.\\n\\n"+preview+if(lines.size>18)"\\n…" else "").setNegativeButton("Не сохранять",null).setPositiveButton("Сохранить черновик"){_,_->commit();render()}.show()
+        actionSheet("Проверка распознавания",490){dialog,panel->
+            panel.addView(label("Черновик · "+engine+". Проверьте слова. Для поиска правильного текста можно открыть браузер с коротким фрагментом.",14,muted))
+            val query=EditText(this).apply{setText(LyricsSearchPlan.transcriptHint(lines));hint="Несколько услышанных слов";setTextColor(PremiumChrome.TEXT);setHintTextColor(muted);setSingleLine(true);filters=arrayOf(android.text.InputFilter.LengthFilter(180))}
+            panel.addView(query,LinearLayout.LayoutParams(-1,dp(50)))
+            sheetAction(panel,"Найти слова в браузере","Будет отправлен только выбранный фрагмент"){openLyricBrowser(query.text.toString())}
+            sheetAction(panel,"Сохранить черновик","Слова могут содержать ошибки"){dialog.dismiss();commit();render()}
+            sheetAction(panel,"Не сохранять"){dialog.dismiss()}
+            panel.addView(label(lines.take(18).joinToString("\\n")+if(lines.size>18)"\\n…"else "",16,PremiumChrome.TEXT))
+        }
     }
 '''
 # ViewGroup is imported by android.view.* in the app.
@@ -86,7 +98,7 @@ replace('btn("Модели распознавания · каталог"){showMo
 replace('btn("Vosk · распознать слова")','btn("Vosk · эксперимент")')
 replace('else "Whisper · установить модель"','else "Whisper · установить"')
 # Blank lyrics used to expose every tool. Keep search/import/Whisper outside advanced section.
-replace('if(activeLyrics.isEmpty()){body.addView(label(','if(activeLyrics.isEmpty()){val whisperButton=bodyChildren().filterIsInstance<Button>().firstOrNull{it.text.toString().startsWith("Whisper ·")};if(whisperButton!=null){body.removeView(whisperButton);body.addView(whisperButton,3)};val advanced=bodyChildren().drop(if(whisperButton==null)3 else 4);if(!stemBusy)compactSection("lyrics-empty","Дополнительно",advanced,if(whisperButton==null)3 else 4);body.addView(label(')
+replace('if(activeLyrics.isEmpty()){body.addView(label(','if(activeLyrics.isEmpty()){val whisperButton=bodyChildren().filterIsInstance<Button>().firstOrNull{it.text.toString().startsWith("Whisper ·")};if(whisperButton!=null){body.removeView(whisperButton);body.addView(whisperButton,3)};val advanced=bodyChildren().drop(if(whisperButton==null)3 else 4);if(!stemBusy)compactSection("lyrics-empty","Дополнительно",advanced,if(whisperButton==null)3 else 4);if(raw.isNotBlank()&&!stemBusy){val sync=bodyChildren().flatMap{v->if(v is ViewGroup)(0 until v.childCount).map{v.getChildAt(it)}else listOf(v)}.filterIsInstance<Button>().firstOrNull{it.text.toString()=="Уточнить по вокалу"};if(sync!=null){(sync.parent as? ViewGroup)?.removeView(sync);sync.text="Синхронизировать по вокалу";body.addView(sync,if(whisperButton==null)3 else 4)}};body.addView(label(')
 # Existing lyrics retain their original karaoke view and advanced tools.
 replace('private fun showModelCatalog(){if(stemBusy)return;val items=ModelCatalog.entries;','private fun showModelCatalog(kind:ModelCatalog.Kind?=null){if(stemBusy)return;val items=ModelCatalog.entries.filter{kind==null||it.kind==kind};')
 # Review recognizer output BEFORE mutating tracks, preserving the original concurrency checks.
