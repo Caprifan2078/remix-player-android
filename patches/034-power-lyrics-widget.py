@@ -26,9 +26,9 @@ replace(p,'        if(lastPreset!==p){lastPreset=p;dsp=if(a.isNotEmpty())Dsp(inp
         if(lastPreset!==p){lastPreset=p;dsp=if(needsDsp&&a.isNotEmpty())Dsp(inputAudioFormat.sampleRate,a.size) else null}''')
 replace(p,'if((p==Presets.all.first() && levels.all{it==0f}) || d==null || a.isEmpty() || inputBuffer.remaining()%(a.size*2)!=0)','if((!needsDsp&&frameEq==null)||(needsDsp&&d==null)||a.isEmpty()||inputBuffer.remaining()%(a.size*2)!=0)')
 replace(p,'d.frame(a,b,p); frameEq?.frame(b);','if(d!=null)d.frame(a,b,p)else a.copyInto(b); frameEq?.frame(b);')
-replace(p,'handler.postDelayed(this,if((PlaybackOptions.fadeMs>0||PlaybackOptions.overlapMs>0||RepeatRegion.active!=null)&&p.isPlaying)50 else 500)','''handler.removeCallbacks(this)
+replace(p,'handler.postDelayed(this,if(PlaybackOptions.overlapMs>0&&p.playWhenReady)25 else if((PlaybackOptions.fadeMs>0||RepeatRegion.active!=null)&&p.isPlaying)50 else 500)','''handler.removeCallbacks(this)
         val sleep=PlaybackOptions.sleepDeadline.takeIf{it>0}?.let{it-now}
-        handler.postDelayed(this,PlaybackCadence.delay(p.isPlaying,p.currentPosition,p.duration,PlaybackOptions.fadeMs,PlaybackOptions.overlapMs,RepeatRegion.active!=null,sleep))''')
+        handler.postDelayed(this,PlaybackCadence.delay(p.isPlaying||(p.playWhenReady&&PlaybackOptions.overlapMs>0),p.currentPosition,p.duration,PlaybackOptions.fadeMs,PlaybackOptions.overlapMs,RepeatRegion.active!=null,sleep,mixing))''')
 replace(p,'val checkpoint=object:Runnable{override fun run(){bookmark();historyTick();handler.postDelayed(this,5000)}}','val checkpoint=object:Runnable{override fun run(){if(session?.player?.isPlaying==true){bookmark();historyTick();handler.postDelayed(this,5000)}}}')
 replace(p,'{bookmark();historyTick()}}})','{bookmark();historyTick();handler.removeCallbacks(checkpoint);if(player.isPlaying)handler.postDelayed(checkpoint,5000);handler.removeCallbacks(playbackClock);handler.post(playbackClock)}}})')
 replace(p,'handler.postDelayed(checkpoint,5000);handler.post(playbackClock)','PulseWidget.attach(this,player);handler.postDelayed(checkpoint,5000);handler.post(playbackClock)')
