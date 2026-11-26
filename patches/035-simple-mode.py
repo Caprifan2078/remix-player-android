@@ -79,19 +79,31 @@ rep(anchor,'''    private fun lyricSearchChoices(t:Track,manual:()->Unit){
 # Replace the checkbox-heavy bulk dialog with a default action and a secondary mode sheet.
 a=s.index('        actionSheet("Сканирование библиотеки",390)')
 b=s.index('    private fun scanKey(',a)
-s=s[:a]+'''        actionSheet("Тексты всей медиатеки",300){dialog,panel->
-            panel.addView(label("Песен: "+pending.size+" · глубокий поиск может уточнить построчные метки до слов",14,muted))
-            sheetAction(panel,"Начать автоматически","Встроенные тексты + онлайн-поиск"){dialog.dismiss();scanLibrary(pending,true,false,false,false)}
-            sheetAction(panel,"Другие режимы","Офлайн, глубокий поиск, анализ музыки"){dialog.dismiss()
-                actionSheet("Режим сканирования",390){options,content->
-                    sheetAction(content,"Только метаданные","Без интернета и нейросетей"){options.dismiss();scanLibrary(pending,false,false,false,false)}
-                    sheetAction(content,"Глубокий поиск","Интернет + Whisper · поиск и уточнение времени слов"){
-                        if(!WhisperLocal.available||WhisperLocal.installed(this)==null){options.dismiss();whisperModelDialog();return@sheetAction}
-                        options.dismiss();scanLibrary(pending,true,false,true,true)
-                    }
-                    sheetAction(content,"Анализ музыки","Темп, тональность, подборки по настроению"){options.dismiss();scanLibrary(pending,false,true,false,false)}
-                    sheetAction(content,"Черновики Whisper","Проверить распознанные слова"){options.dismiss();scanDraftReview()}
-                    panel.contentDescription="Тексты всей медиатеки"
+s=s[:a]+'''        val ready=WhisperLocal.available&&WhisperLocal.installed(this)!=null
+        val songs=tracks.filter{it.uri==it.group}
+        val states=songs.associate{it.uri to lyricState(it)}
+        val done=states.values.count{it==LyricScanState.State.WORDS||it==LyricScanState.State.LINES}
+        val pendingSmart=songs.filter{LyricScanState.pending(states.getValue(it.uri),lyricAttempt(it)!=null,false)}
+        val retry=songs.filter{LyricScanState.pending(states.getValue(it.uri),lyricAttempt(it)!=null,true)}
+        fun launch(items:List<Track>){
+            if(!ready){whisperModelDialog();return}
+            if(items.isEmpty()){lyricScanLog();return}
+            scanLibrary(items.map{ScanItem(it.uri,it.title,it.artist,it.lyrics)},true,false,true,true,true)
+        }
+        actionSheet("Тексты медиатеки",430){dialog,panel->
+            panel.addView(label("С субтитрами: "+done+" / "+songs.size,20,PremiumChrome.TEXT,true))
+            panel.addView(label("Нужно проверить: "+states.values.count(LyricScanState::needsReview)+" · Не обработано: "+pendingSmart.size,14,muted))
+            sheetAction(panel,if(pendingSmart.isEmpty())"Все новые песни проверены" else "Умное сканирование · "+pendingSmart.size,
+                if(ready)"Метаданные, интернет, локальный Whisper · продолжение с оставшихся" else "Нужна локальная модель Whisper"){
+                dialog.dismiss();launch(pendingSmart)
+            }
+            sheetAction(panel,"Журнал и фильтры","Все песни · готовые, без текста и с ошибками"){dialog.dismiss();lyricScanLog()}
+            if(retry.isNotEmpty())sheetAction(panel,"Повторить неполные · "+retry.size,"Проверить снова без готовых пословных текстов"){dialog.dismiss();launch(retry)}
+            sheetAction(panel,"Другие режимы","Быстрый поиск, офлайн и анализ музыки"){dialog.dismiss()
+                actionSheet("Режим сканирования",350){options,content->
+                    sheetAction(content,"Быстрый поиск","Метаданные + интернет, без Whisper"){options.dismiss();scanLibrary(pending,true,false,false,false)}
+                    sheetAction(content,"Только метаданные","Без интернета"){options.dismiss();scanLibrary(pending,false,false,false,false)}
+                    sheetAction(content,"Анализ музыки","Темп, тональность, подборки"){options.dismiss();scanLibrary(pending,false,true,false,false)}
                 }
             }
         }
@@ -131,11 +143,63 @@ s=s[:a]+'''        for(j in 0 until modes.childCount){
 rep('body.addView(whisperButton,3)','body.addView(whisperButton,3);whisperButton.visibility=View.GONE')
 # A transcript is a draft; compare against candidates before the user accepts it.
 (Path(sys.argv[1])/'app/src/main/java/app/remix/player/TranscriptMatch.kt').write_bytes((Path(__file__).parent/'TranscriptMatch.kt').read_bytes())
+(Path(sys.argv[1])/'app/src/main/java/app/remix/player/LyricScanState.kt').write_bytes((Path(__file__).parent/'LyricScanState.kt').read_bytes())
 (Path(sys.argv[1])/'app/src/main/java/app/remix/player/BrowserLyricImport.kt').write_bytes((Path(__file__).parent/'BrowserLyricImport.kt').read_bytes())
 assets=Path(sys.argv[1])/'app/src/main/assets';assets.mkdir(parents=True,exist_ok=True)
 (assets/'lyrics-extract.js').write_bytes((Path(__file__).parent/'lyrics-extract.js').read_bytes())
 anchor='    private fun scanDraftReview(){'
-rep(anchor,r'''    private fun pasteAndSync(t:Track,initial:String=""){
+rep(anchor,r'''    private fun lyricAttempt(t:Track):String? {
+        val raw=getSharedPreferences("lyric_scan_v1",MODE_PRIVATE).getString(scanKey(t.uri),null)?:return null
+        val prefix=lyricRevision(t)+":"
+        return raw.takeIf{it.startsWith(prefix)}?.substring(prefix.length)
+    }
+    private fun recordLyricAttempt(t:Track,outcome:String){
+        val ok=getSharedPreferences("lyric_scan_v1",MODE_PRIVATE).edit().putString(scanKey(t.uri),lyricRevision(t)+":"+outcome).commit()
+        if(!ok)android.util.Log.w("RemixLyrics","Could not persist scan status")
+    }
+    private fun lyricState(t:Track):LyricScanState.State {
+        val raw=rawLyrics(t);val lines=Lrc.parse(raw)
+        return LyricScanState.classify(raw.isNotBlank(),lines.isNotEmpty(),lines.isNotEmpty()&&lines.all{WordLyrics.parse(it).words.isNotEmpty()},scanDraftFile(t.uri).isFile,lyricAttempt(t))
+    }
+    private fun lyricScanLog(filter:Int=0,page:Int=0){
+        if(stemBusy||lyricsBusy){toast("Дождитесь завершения обработки");return}
+        val rows=tracks.filter{it.uri==it.group}.map{it to lyricState(it)}
+        val filters=listOf("Нужна проверка","Все песни","С субтитрами","Без текста","Не проверено")
+        val selected=filter.coerceIn(filters.indices)
+        val filtered=rows.filter{(_,state)->when(selected){
+            0->LyricScanState.needsReview(state)
+            2->state==LyricScanState.State.WORDS||state==LyricScanState.State.LINES
+            3->state in setOf(LyricScanState.State.REVIEW,LyricScanState.State.ERROR,LyricScanState.State.MISSING,LyricScanState.State.NEW)
+            4->state==LyricScanState.State.NEW
+            else->true
+        }}
+        val pageStart=(page.coerceAtLeast(0)*30).coerceAtMost(((filtered.size-1).coerceAtLeast(0)/30)*30)
+        actionSheet("Журнал текстов",500){dialog,panel->
+            panel.addView(btn(filters[selected]+" · "+filtered.size){
+                android.app.AlertDialog.Builder(this).setTitle("Фильтр песен").setItems(filters.toTypedArray()){_,i->dialog.dismiss();lyricScanLog(i)}.show()
+            })
+            if(filtered.isEmpty())panel.addView(label("В этом разделе нет песен",15,muted))
+            filtered.drop(pageStart).take(30).forEach{(t,state)->sheetAction(panel,t.title,state.label+" · "+t.artist){
+                dialog.dismiss()
+                actionSheet(t.title,350){song,actions->
+                    actions.addView(label(state.label+" · "+t.artist,14,muted))
+                    sheetAction(actions,"Воспроизвести"){song.dismiss();start(t)}
+                    if(scanDraftFile(t.uri).isFile)sheetAction(actions,"Проверить черновик"){song.dismiss();recognizeAndReview(t)}
+                    sheetAction(actions,"Найти в браузере"){song.dismiss();lyricWebSearch(t)}
+                    sheetAction(actions,"Вставить и синхронизировать"){song.dismiss();pasteAndSync(t)}
+                    if(rawLyrics(t).isNotBlank())sheetAction(actions,"Уточнить субтитры"){song.dismiss();syncPastedLyrics(t,rawLyrics(t))}
+                }
+            }}
+            if(filtered.size>30){
+                val nav=row()
+                if(pageStart>0)nav.addView(btn("←"){dialog.dismiss();lyricScanLog(selected,pageStart/30-1)},weight())
+                nav.addView(label((pageStart+1).toString()+"–"+minOf(pageStart+30,filtered.size)+" / "+filtered.size,14,muted),weight())
+                if(pageStart+30<filtered.size)nav.addView(btn("→"){dialog.dismiss();lyricScanLog(selected,pageStart/30+1)},weight())
+                panel.addView(nav)
+            }
+        }
+    }
+    private fun pasteAndSync(t:Track,initial:String=""){
         if(stemBusy||lyricsBusy){toast("Дождитесь завершения обработки");return}
         val source=libraryIndex.get(t.group)?:t
         val revision=lyricRevision(source)
@@ -387,5 +451,6 @@ a=s.index('                reviewTranscript("Whisper",raw){accepted->',s.index('
 b=s.index('            }}',a)
 s=s[:a]+'''                transcriptChoices(t,raw,lyricRevision(t))
 '''+s[b:]
+rep('if(tracks.isNotEmpty())body.addView(btn("Настроение и подборки"){moodDiscoveryDialog()});val tools=row();tools.addView(filter,weight());','if(tracks.isNotEmpty()){val quick=row();quick.addView(btn("Подборки"){moodDiscoveryDialog()},weight());quick.addView(btn("Тексты"){batchLyrics()},weight());body.addView(quick)};val tools=row();tools.addView(filter,weight());')
 p.write_text(s)
 print("PASS: persistent default-off PRO controls; core player unchanged")
