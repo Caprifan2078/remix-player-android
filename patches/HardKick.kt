@@ -24,9 +24,10 @@ object HardKick {
         val envelope=exp(-age/p.decay)*minOf(1.0,age/.0015,(length-age)/.012).coerceAtLeast(0.0)
         return ((1-p.body)*punch+p.body*tail)*envelope*.65
     }
-    fun curve(name:String,rate:Int):DoubleArray?{
+    fun curve(name:String,rate:Int,tunedHz:Double?=null):DoubleArray?{
         require(rate in 8000..384000)
-        val p=profile(name)?:return null
+        val original=profile(name)?:return null
+        val p=tunedHz?.takeIf{it.isFinite()&&it in 40.0..75.0}?.let{original.copy(hz=it)}?:original
         val length=if(name=="Uptempo Hardcore") .22 else if(name=="Hardcore"||name=="Frenchcore") .29 else .36
         return DoubleArray(ceil(length*rate).toInt()){sample(p,it.toDouble()/rate,length)}
     }
