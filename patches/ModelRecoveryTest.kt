@@ -1,9 +1,24 @@
 package app.remix.player
 import java.net.URI
 fun main(){
- val min=ModelMemoryBudget.MIN_FREE;val large=166L*1024*1024
- check(!ModelMemoryBudget.canStart(large,min-1,false));check(ModelMemoryBudget.canStart(large,min,false))
- check(!ModelMemoryBudget.canStart(large,min,true));check(ModelMemoryBudget.canStart(1024,0,false));check(!ModelMemoryBudget.canStart(0,min,false))
+ val mb=1024L*1024
+ val min=ModelMemoryBudget.MIN_FREE
+ val cases=listOf(
+  Triple(1L,0L,false) to false,
+  Triple(1L,-1L,false) to false,
+  Triple(mb,min,true) to false,
+  Triple(mb,64*mb-1,false) to false,
+  Triple(mb,64*mb,false) to true,
+  Triple(32*mb,128*mb-1,false) to false,
+  Triple(32*mb,128*mb,false) to true,
+  Triple(32*mb+1,min-1,false) to false,
+  Triple(32*mb+1,min,false) to true,
+  Triple(166*mb,min,true) to false,
+  Triple(0L,min,false) to false,
+  Triple(-1L,min,false) to false,
+  Triple(Long.MAX_VALUE,min,false) to false
+ )
+ cases.forEachIndexed{i,(c,want)->check(ModelMemoryBudget.canStart(c.first,c.second,c.third)==want){"Memory case ${i+1}"}}
  for(spec in WhisperModelSpec.models){
   val src=WhisperDownload.source(spec);check(WhisperDownload.allowed(src));check(src.path.contains("/resolve/"));check(spec.sha.matches(Regex("[a-f0-9]{64}")))
   for(host in listOf("us.aws.cdn.hf.co","cas-bridge.xethub.hf.co","cdn-lfs.hf.co"))check(WhisperDownload.redirect(src,"https://$host/model?token=abc").host==host)
