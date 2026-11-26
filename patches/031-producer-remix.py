@@ -39,7 +39,7 @@ edit('PlaybackService.kt','dsp=Dsp(inputAudioFormat.sampleRate,a.size)','dsp=Liv
 edit('PlaybackService.kt','if(lastPreset!==p){lastPreset=p;dsp=if(a.isNotEmpty())Dsp(inputAudioFormat.sampleRate,a.size) else null}','if(lastPreset!==p)lastPreset=p')
 edit('PlaybackService.kt','(p==Presets.all.first() && levels.all{it==0f}) || d==null','(p==Presets.all.first() && levels.all{it==0f} && d?.canBypass(p)==true) || d==null')
 # Do not reuse a render checkpoint from an older DSP algorithm.
-edit('EffectCheckpoint.kt','dsp-peak-guard-v60','dsp-quality-v3')
+edit('EffectCheckpoint.kt','dsp-peak-guard-v60','dsp-quality-v4')
 edit('GenreCheckpoint.kt','genre-render-v7','genre-render-v8')
 edit('TransitionMix.kt','    fun renderFrames(first:File,second:File,out:File,overlap:Long,progress:(Int)->Unit={}):Long {','''    fun renderFrames(first:File,second:File,out:File,overlap:Long,progress:(Int)->Unit={}):Long = renderInternal(first,second,out,overlap,false,progress)
     fun renderSmartFrames(first:File,second:File,out:File,overlap:Long,progress:(Int)->Unit={}):Long = renderInternal(first,second,out,overlap,true,progress)
