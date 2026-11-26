@@ -56,5 +56,19 @@ fun main(){
         check(right>1e-8&&right/left in .01.. .20){"Missing or excessive room crossfeed: $sr Hz, $right/$left"}
         println("PASS: $sr Hz stereo room reflections and preserved dry localization")
     }
+    for(sr in listOf(8000,44100,48000)){
+        val d=Dsp(sr,2);val f=FloatArray(2);val out=FloatArray(2);val p=preset("Daycore Echo")
+        val l=(.290*sr).roundToInt();val r=(.370*sr).roundToInt()
+        var firstL=0f;var firstR=0f;var second=0f
+        repeat(sr*2){i->
+            f.fill(if(i==0).5f else 0f);d.frame(f,out,p)
+            check(out.all{it.isFinite()&&abs(it)<=1f})
+            if(i==l)firstL=abs(out[0])
+            if(i==r)firstR=abs(out[1])
+            if(i in l*2..l*2+8)second=max(second,abs(out[0]))
+        }
+        check(firstL>.02f&&firstR>.02f&&second>firstL*.03f&&second<firstL*.65f){"Echo repeats missing or unstable at $sr"}
+        println("PASS: $sr Hz distinct decaying Daycore Echo repeats")
+    }
     check(measurements.all{it.second}){"Quality regression: ${measurements.filterNot{it.second}.map{it.first}}"}
 }
