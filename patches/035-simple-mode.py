@@ -81,12 +81,12 @@ rep(anchor,'''    private fun lyricSearchChoices(t:Track,manual:()->Unit){
 a=s.index('        actionSheet("Сканирование библиотеки",390)')
 b=s.index('    private fun scanKey(',a)
 s=s[:a]+'''        actionSheet("Тексты всей медиатеки",300){dialog,panel->
-            panel.addView(label("Песен: "+pending.size+" · сохранённые синхронные тексты не заменяются",14,muted))
+            panel.addView(label("Песен: "+pending.size+" · глубокий поиск может уточнить построчные метки до слов",14,muted))
             sheetAction(panel,"Начать автоматически","Встроенные тексты + онлайн-поиск"){dialog.dismiss();scanLibrary(pending,true,false,false,false)}
             sheetAction(panel,"Другие режимы","Офлайн, глубокий поиск, анализ музыки"){dialog.dismiss()
                 actionSheet("Режим сканирования",390){options,content->
                     sheetAction(content,"Только метаданные","Без интернета и нейросетей"){options.dismiss();scanLibrary(pending,false,false,false,false)}
-                    sheetAction(content,"Глубокий поиск","Интернет + Whisper для пропусков и текстов без времени"){
+                    sheetAction(content,"Глубокий поиск","Интернет + Whisper · поиск и уточнение времени слов"){
                         if(!WhisperLocal.available||WhisperLocal.installed(this)==null){options.dismiss();whisperModelDialog();return@sheetAction}
                         options.dismiss();scanLibrary(pending,true,false,true,true)
                     }
