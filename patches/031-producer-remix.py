@@ -10,6 +10,16 @@ edit('LeadSynth.kt','private val color=when(style.name){','private val color=whe
 edit('AudioCore.kt','Preset("Sped Up",1.25f)','Preset("Sped Up",1.25f,bass=.12f,room=.075f,drive=.025f)')
 edit('AudioCore.kt','Preset("Nightcore",1.25f,1.25f)','Preset("Nightcore",1.25f,1.25f,bass=.16f,room=.09f,drive=.035f)')
 edit('AudioCore.kt','Preset("Slowed + Reverb",.85f,.9f,room=.35f)','Preset("Slowed + Reverb",.85f,.9f,bass=.13f,room=.35f,muffled=.06f)')
+# Real-time and offline preset rendering share Dsp. Adapt wet/dry depth to actual PCM.
+edit('AudioCore.kt','private val guard=LinkedPeakGuard(rate)','private val guard=LinkedPeakGuard(rate)\n    private val adaptiveDepth=AdaptiveEffectEnvelope(rate)')
+edit('AudioCore.kt',';guard.reset() }',';guard.reset();adaptiveDepth.reset() }')
+edit('AudioCore.kt','val sweep = if(p.pan>0','val depth=if(processed)adaptiveDepth.frame(input)else 1f\n        val sweep = if(p.pan>0')
+edit('AudioCore.kt','out[c]=y','out[c]=if(processed)x+(y-x)*depth else y')
+p=src/'AudioCore.kt'
+envelope=(Path(__file__).parent/'AdaptiveEffectEnvelope.kt').read_text().splitlines()
+p.write_text(p.read_text()+'\n'+'\n'.join(envelope[5:])+'\n')
+# Do not reuse a render checkpoint from an older DSP algorithm.
+edit('EffectCheckpoint.kt','dsp-peak-guard-v60','dsp-adaptive-depth-v1')
 edit('GenreCheckpoint.kt','genre-render-v7','genre-render-v8')
 edit('TransitionMix.kt','    fun renderFrames(first:File,second:File,out:File,overlap:Long,progress:(Int)->Unit={}):Long {','''    fun renderFrames(first:File,second:File,out:File,overlap:Long,progress:(Int)->Unit={}):Long = renderInternal(first,second,out,overlap,false,progress)
     fun renderSmartFrames(first:File,second:File,out:File,overlap:Long,progress:(Int)->Unit={}):Long = renderInternal(first,second,out,overlap,true,progress)
@@ -34,8 +44,9 @@ rep('val styles=GenreEngine.styles;val selected=BooleanArray(styles.size)','val 
 rep('.setNeutralButton("Все 30"){_,_->confirmBatch(source,styles)}','.setNeutralButton("30 основных"){_,_->confirmBatch(source,GenreEngine.styles)}')
 rep('if(chosen.isEmpty())toast("Выберите хотя бы один жанр") else confirmBatch(source,chosen)','if(chosen.isEmpty())toast("Выберите хотя бы один жанр") else if(chosen.size>30)toast("Не более 30 версий за пакет") else confirmBatch(source,chosen)')
 rep('panel.addView(label("Быстрые режимы",12,muted,true))','''sheetAction(panel,"Hardstyle и жанровые ремиксы","Создать новую версию с новыми ударными и басом"){dialog.dismiss();screen="Жанры";render()}
-            panel.addView(label("Моментальные эффекты",12,muted,true))''')
-rep('popular.size*61+65','popular.size*61+130')
+            panel.addView(label("Моментальные эффекты",12,muted,true))
+            panel.addView(label("Интенсивность меняется по громкости песни; скорость и тон остаются выбранными.",12,muted))''')
+rep('popular.size*61+65','popular.size*61+175')
 p.write_text(s)
 print("PASS: 40 procedural genres, refined quick effects, offline DJ bass exchange")
 p=src/'GenreEngine.kt'
