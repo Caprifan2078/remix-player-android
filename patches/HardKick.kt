@@ -15,6 +15,9 @@ object HardKick {
         "Hardtekk"->Profile(51.0,270.0,.13,7.5,.55)
         else->null
     }
+    /** Keep the tail audible over a source mix and reserve low-frequency headroom until it decays. */
+    fun mixDrumGain(name:String):Float=if(profile(name)!=null).54f else .38f
+    fun sidechainDecay(name:String):Double=profile(name)?.let{(it.decay*.70).coerceIn(.065,.135)}?:.065
     fun sample(p:Profile,age:Double,length:Double):Double{
         if(!age.isFinite()||!length.isFinite()||age<0||age>=length||length<=0)return 0.0
         val phase=2*PI*(p.hz*age+p.sweep*.018*(1-exp(-age/.018)))
