@@ -130,7 +130,7 @@ s=s[:a]+'''    private data class ScanItem(val uri:String,val title:String,val a
                 while(!latch.await(200,java.util.concurrent.TimeUnit.MILLISECONDS))check(!Thread.currentThread().isInterrupted)
             }
             Unit
-        }{
+        }){
             actionSheet("Сканирование завершено",290){dialog,panel->
                 panel.addView(label("Проверено: "+completed+" / "+pending.size,20,PremiumChrome.TEXT,true))
                 panel.addView(label("Сохранены тексты: "+saved+"\\nПолный анализ: "+analyzed+"\\nНужна проверка: "+unresolved+"\\nЧерновики Whisper: "+drafts+"\\nОшибки: "+errors,16,muted))
