@@ -33,7 +33,7 @@ class WaveSeekBar(context:Context):AppCompatSeekBar(context){
         val x=left+span*ratio;canvas.drawLine(x,height*.08f,x,height*.92f,paint)
     }
 }
-/** One cancellable background request, session-only cache, guarded main-thread delivery. */
+/** One cancellable background request, bounded session and versioned disk cache, guarded main-thread delivery. */
 class WaveformLoader(context:Context){
     private val app=context.applicationContext
     private val worker=Executors.newSingleThreadExecutor()
@@ -43,18 +43,58 @@ class WaveformLoader(context:Context){
     private var future:Future<*>?=null
     private var generation=0L
     private var closed=false
+    // Persist only when a provider exposes a file size and modification time.
+    private val disk by lazy{java.io.File(app.cacheDir,"waveforms-v1")}
+    private fun fingerprint(uri:Uri):String?{
+        for(column in listOf("last_modified","date_modified")){
+            val version=runCatching{
+                app.contentResolver.query(uri,arrayOf("_size",column),null,null,null)?.use{c->
+                    val size=c.getColumnIndex("_size");val modified=c.getColumnIndex(column)
+                    if(size<0||modified<0||!c.moveToFirst()||c.isNull(size)||c.isNull(modified))null
+                    else c.getLong(size).takeIf{it>0}?.let{bytes->c.getLong(modified).takeIf{it>0}?.let{"$bytes:$column:$it"}}
+                }
+            }.getOrNull()
+            if(version!=null){
+                val raw=uri.toString()+"|"+version
+                return java.security.MessageDigest.getInstance("SHA-256").digest(raw.toByteArray(Charsets.UTF_8)).joinToString(""){(it.toInt() and 255).toString(16).padStart(2,'0')}
+            }
+        }
+        return null
+    }
+    private fun readDisk(id:String):FloatArray?=runCatching{
+        val f=java.io.File(disk,id+".bin")
+        require(f.length()==96L*4)
+        val data=java.io.DataInputStream(f.inputStream().buffered()).use{input->FloatArray(96){input.readFloat()}}
+        require(data.all{it.isFinite()&&it in 0f..1f});f.setLastModified(System.currentTimeMillis());data
+    }.getOrNull()
+    private fun writeDisk(id:String,data:FloatArray){
+        if(data.size!=96||data.any{!it.isFinite()||it !in 0f..1f}||Thread.currentThread().isInterrupted)return
+        runCatching{
+            check(disk.isDirectory||disk.mkdirs())
+            val tmp=java.io.File.createTempFile("wave-",".tmp",disk)
+            try{
+                java.io.DataOutputStream(tmp.outputStream().buffered()).use{out->data.forEach{out.writeFloat(it)}}
+                check(!Thread.currentThread().isInterrupted)
+                check(tmp.renameTo(java.io.File(disk,id+".bin")))
+            }finally{tmp.delete()}
+            disk.listFiles().orEmpty().filter{it.extension=="bin"}.sortedByDescending{it.lastModified()}.drop(128).forEach{it.delete()}
+        }
+    }
     fun show(uri:String,deliver:(FloatArray?)->Unit){
         if(closed||key==uri)return
         clear();key=uri;val token=generation
-        val cached=cache.get(uri)
-        if(cached!=null){deliver(cached);return}
         deliver(null)
         future=worker.submit{
             android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND)
-            val data=WaveformDecode.scan(app,Uri.parse(uri)){part->
+            val source=Uri.parse(uri);val id=fingerprint(source);val cacheKey=id?:uri
+            if(Thread.currentThread().isInterrupted)return@submit
+            val cached=cache.get(cacheKey)?:id?.let{readDisk(it)}
+            val data=cached?:WaveformDecode.scan(app,source){part->
                 handler.post{if(!closed&&generation==token&&key==uri)deliver(part)}
             }
-            handler.post{if(!closed&&generation==token&&key==uri){if(data!=null)cache.put(uri,data);deliver(data)}}
+            if(Thread.currentThread().isInterrupted)return@submit
+            if(data!=null&&cached==null&&id!=null)writeDisk(id,data)
+            handler.post{if(!closed&&generation==token&&key==uri){if(data!=null)cache.put(cacheKey,data);deliver(data)}}
         }
     }
     fun clear(){generation++;key=null;future?.cancel(true);future=null}
