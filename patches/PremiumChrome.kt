@@ -21,7 +21,12 @@ object PremiumChrome {
     fun dp(c:Context,n:Int)=(n*c.resources.displayMetrics.density+.5f).toInt()
     fun icon(c:Context,name:String,color:Int=TEXT,size:Int=24)=Icon(name,color,dp(c,size))
     private val transport=mapOf("⇄" to "shuffle","|◀" to "previous","▶" to "play","Ⅱ" to "pause","▶|" to "next","↻" to "repeat","⋮" to "more","♥" to "heartFill","♡" to "heart")
-    class Control(context:Context):Button(context){
+    class Control(context:Context):androidx.appcompat.widget.AppCompatButton(context){
+        private val controlPaint=Paint(Paint.ANTI_ALIAS_FLAG)
+        private var cachedIcon:Icon?=null
+        private var cachedKey=""
+        private var cachedTint=0
+        private var cachedSize=0
         override fun onDraw(canvas:Canvas){
             val name=transport[text.toString()]
             if(name==null){super.onDraw(canvas);return}
@@ -29,10 +34,12 @@ object PremiumChrome {
             val side=dp(context,if(primary)26 else 22)
             val x=(width-side)/2;val y=(height-side)/2
             if(primary){
-                val p=Paint(Paint.ANTI_ALIAS_FLAG).apply{color=ACCENT}
-                canvas.drawCircle(width/2f,height/2f,minOf(width,height)/2f-dp(context,3),p)
+                controlPaint.color=ACCENT
+                canvas.drawCircle(width/2f,height/2f,(minOf(width,height)/2f-dp(context,3)).coerceAtLeast(0f),controlPaint)
             }
-            val d=Icon(name,if(primary)BG else currentTextColor,side)
+            val tint=if(primary)BG else currentTextColor
+            if(cachedIcon==null||cachedKey!=name||cachedTint!=tint||cachedSize!=side){cachedKey=name;cachedTint=tint;cachedSize=side;cachedIcon=Icon(name,tint,side)}
+            val d=cachedIcon?:return
             d.setBounds(x,y,x+side,y+side);d.draw(canvas)
         }
     }
