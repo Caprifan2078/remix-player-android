@@ -65,5 +65,8 @@ fun main(){
  val longJourney=MoodDiscovery.journey(big,minor,free,100)
  check(longJourney.size==100)
  check(longJourney.distinct().size==100)
- println("PASS: 38 mood, description and journey checks")
+ Thread.currentThread().interrupt()
+ val cancelled=try{runCatching{MoodDiscovery.rank(many,p.getValue("Меланхолия"),100)}}finally{Thread.interrupted()}
+ check(cancelled.isFailure)
+ println("PASS: 39 mood, description, journey and cancellation checks")
 }
