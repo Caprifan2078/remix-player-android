@@ -161,6 +161,8 @@ for filename in ('BasicPitchHint.kt','BasicPitchModel.kt'):
     (src/filename).write_bytes((Path(__file__).parent/filename).read_bytes())
 edit('GenreEngine.kt','val oldDrums:Float,val bass:Float)','val oldDrums:Float,val bass:Float,val kickHz:Double?=null)')
 edit('GenreCheckpoint.kt','o.writeFloat(s.oldDrums);o.writeFloat(s.bass)','o.writeFloat(s.oldDrums);o.writeFloat(s.bass);o.writeBoolean(s.kickHz!=null);s.kickHz?.let{o.writeDouble(it)}')
+edit('GenreEngine.kt','private val kickLevels=FloatArray(kicks.size){i->exp(-i.toDouble()/rate/.065).toFloat()}','private val sidechainDecay=HardKick.sidechainDecay(style.name);private val kickLevels=FloatArray(kicks.size){i->exp(-i.toDouble()/rate/sidechainDecay).toFloat()}')
+edit('GenreEngine.kt','beat.sample(f)*levels.drums*.38f','beat.sample(f)*levels.drums*HardKick.mixDrumGain(style.name)')
 # The hard-dance kick is rendered per genre, not the same oscillator with a different label.
 edit('GenreEngine.kt','private val kicks=DoubleArray(ceil(.36*rate).toInt())','private val kicks=HardKick.curve(style.name,rate,style.kickHz)?:DoubleArray(ceil(.36*rate).toInt())')
 p=src/'GenreEngine.kt'
