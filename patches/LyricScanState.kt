@@ -16,5 +16,5 @@ object LyricScanState {
     fun pending(state:State,attempted:Boolean,retry:Boolean):Boolean = state!=State.WORDS && if(retry) needsReview(state)||state==State.LINES else !attempted
     data class Match(val text:String,val matched:Int,val total:Int,val aligned:String?)
     /** Never auto-accept competing distinct texts, or one without observed timing. */
-    fun choose(matches:List<Match>):String?=matches.filter{it.total>0&&it.matched>=5&&it.matched.toDouble()/it.total>=.55&& !it.aligned.isNullOrBlank()}.distinctBy{it.text}.singleOrNull()?.aligned
+    fun choose(matches:List<Match>):String?=matches.filter{it.total>0&&it.matched>=5&&it.matched.toDouble()/it.total>=.55}.groupBy{it.text}.values.singleOrNull()?.firstNotNullOfOrNull{it.aligned?.takeIf(String::isNotBlank)}
 }
