@@ -27,8 +27,13 @@ p.write_text(p.read_text()+'\n'+(Path(__file__).parent/'StereoOrbit.kt').read_te
 p=src/'AudioCore.kt'
 envelope=(Path(__file__).parent/'AdaptiveEffectEnvelope.kt').read_text().splitlines()
 p.write_text(p.read_text()+'\n'+'\n'.join(envelope[5:])+'\n')
+# Replace the assembled legacy DSP; keep preset definitions, guards, lyric parser and shared helpers.
+p=src/'AudioCore.kt';audio=p.read_text()
+a=audio.index('class Dsp(');b=audio.index('data class Lyric(',a)
+quality=(Path(__file__).parent/'EffectQuality.kt').read_text().split('\n',4)[4]
+p.write_text(audio[:a]+quality+'\n'+audio[b:])
 # Do not reuse a render checkpoint from an older DSP algorithm.
-edit('EffectCheckpoint.kt','dsp-peak-guard-v60','dsp-adaptive-depth-orbit-v2')
+edit('EffectCheckpoint.kt','dsp-peak-guard-v60','dsp-quality-v3')
 edit('GenreCheckpoint.kt','genre-render-v7','genre-render-v8')
 edit('TransitionMix.kt','    fun renderFrames(first:File,second:File,out:File,overlap:Long,progress:(Int)->Unit={}):Long {','''    fun renderFrames(first:File,second:File,out:File,overlap:Long,progress:(Int)->Unit={}):Long = renderInternal(first,second,out,overlap,false,progress)
     fun renderSmartFrames(first:File,second:File,out:File,overlap:Long,progress:(Int)->Unit={}):Long = renderInternal(first,second,out,overlap,true,progress)
