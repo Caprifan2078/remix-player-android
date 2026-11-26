@@ -201,4 +201,26 @@ class StudioAcceptanceTest {
             println("PASS Android: actual WAV waveform, quiet/loud sections, antiphase, invalid file, source unchanged")
         }finally{dir.deleteRecursively()}
     }
+    @Test fun producerVariantsAndBassExchange(){
+        val all=ProducerStyles.all
+        assertEquals(40,all.size);assertEquals(40,all.map{it.name}.distinct().size)
+        assertEquals(30,GenreEngine.styles.size)
+        val dir=folder()
+        try{
+            val input=File(dir,"input.pcm");raw(input,44100*2)
+            val hashes=mutableSetOf<String>()
+            for(p in ProducerStyles.extra){
+                val out=File(dir,"genre.wav")
+                GenreEngine.renderFromMix(input,out,p.style,p.style.target.toDouble(),0.0,emptyList(),emptyList()){}
+                assertEquals(44+input.length(),out.length());assertTrue(hashes.add(hash(out)))
+                assertEquals(input.length()/4,decode(out,File(dir,"decoded.pcm")))
+                out.delete();File(dir,"decoded.pcm").delete()
+            }
+            val e=DjBassExchange()
+            assertEquals(1.0,e.lowGain(0.0,false),0.0);assertEquals(1.0,e.lowGain(1.0,true),0.0)
+            assertTrue(e.lowGain(.5,false)<.15&&e.lowGain(.5,true)<.15)
+            assertEquals(.75,e.sample(0,.75,-.3,0.0,1.0,0.0,1.0),0.0)
+            assertEquals(-.3,e.sample(0,.75,-.3,1.0,0.0,1.0,1.0),0.0)
+        }finally{dir.deleteRecursively()}
+    }
 }
