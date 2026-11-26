@@ -87,21 +87,15 @@ s=s[:a]+'''    private data class ScanItem(val uri:String,val title:String,val a
                 val uri=Uri.parse(t.uri);var raw:String?=null;var report:MusicAnalysis.Report?=null;var status="Пропущено";var draft:String?=null
                 try{
                     if(analyze){report=TrackAnalyzer.report(this,uri,full=true)}
-                    if(t.before.isBlank()){
-                        raw=TrackLyricSource.embedded(this,uri)
-                        if(raw==null&&search){
-                            val info=TrackLyricSource.metadata(this,uri,t.title,t.artist,null)
-                            if(info.seconds!=null)raw=BatchLyricPolicy.choose(LyricsLookup.search(info.title,info.artist,info.seconds,false),info.title,info.artist,info.seconds)
-                            Thread.sleep(1100)
-                        }
-                        // ASR is explicitly enabled by the user. Store only when the known text can be aligned;
-                        // raw recognizer output is a draft requiring individual review, never silently installed.
-                        if(raw==null&&local&&!scanDraftFile(t.uri).isFile){
+                    if(t.before.isBlank()||Lrc.parse(t.before).isEmpty()){
+                        raw=TrackLyricSource.automatic(this,uri,t.title,t.artist,t.before,search)
+                        if(search)Thread.sleep(1100)
+                        if(raw.isNullOrBlank()&&local&&!scanDraftFile(t.uri).isFile){
                             draft=WhisperLocal.transcribe(this,uri,null,"auto"){updateWork(it)}.takeIf{it.isNotBlank()&&it.length<=256000};status=if(draft!=null)"Черновик Whisper" else "Нет совпадения"
-                        }else status=if(raw!=null)"Текст найден" else "Нет совпадения"
+                        }else status=when{raw.isNullOrBlank()->"Нет совпадения";Lrc.parse(raw).isEmpty()->"Только слова";raw==t.before->"Пропущено";else->"Текст найден"}
                     }
                     val reference=raw?:t.before
-                    if(align&&reference.isNotBlank()){
+                    if(align&&reference.isNotBlank()&&Lrc.parse(reference).isEmpty()){
                         val heard=WhisperLocal.transcribe(this,uri,null,"auto"){updateWork(it)}
                         val result=KnownLyricAlignment.align(heard,LyricDocument.plain(reference))
                         if(result!=null){raw=result.lrc;status="Синхронизировано"}else if(raw==null)status="Нет уверенной синхронизации"
