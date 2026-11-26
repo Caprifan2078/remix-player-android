@@ -542,7 +542,8 @@ a=s.index('    private fun translateLyrics(t:Track,raw:String,source:String,targ
 b=s.index('\n',a)
 s=s[:a]+'''    private fun translateLyrics(t:Track,raw:String,source:String,target:String,download:Boolean){
         if(translationBusy||stemBusy)return
-        val reference=searchableLyricLines(raw).map{it.text}
+        val timed=Lrc.parse(raw)
+        val reference=if(timed.isNotEmpty())timed.map{WordLyrics.parse(it).text}else searchableLyricLines(raw).map{it.text}
         if(reference.isEmpty()||reference.size>2000){toast("Неподдерживаемое количество строк");return}
         val id=t.uri;val revision=lyricRevision(t)
         translationBusy=true;render()
@@ -554,7 +555,7 @@ s=s[:a]+'''    private fun translateLyrics(t:Track,raw:String,source:String,targ
                     result.onSuccess{values->
                         val live=libraryIndex.get(id)
                         if(live==null||lyricRevision(live)!=revision){toast("Песня или текст изменились; перевод не сохранён")}
-                        else if(values.size!=reference.size||values.any{it.isBlank()||it.length>4000}||values.sumOf{it.length}>256000){toast("Перевод неполный")}
+                        else if(values.size!=reference.size||values.indices.any{i->values[i].length>4000||(reference[i].isNotBlank()&&values[i].isBlank())}||values.sumOf{it.length}>256000){toast("Перевод неполный")}
                         else if(getSharedPreferences("translations",MODE_PRIVATE).edit().putString(translationKey(live,raw),JSONArray(values).toString()).commit()){toast("Перевод сохранён")}
                         else toast("Не удалось сохранить перевод")
                     }.onFailure{toast("Перевод не выполнен: "+(it.message?:"ошибка"))}
@@ -588,5 +589,38 @@ rep('val plain=label(raw,20,Color.WHITE);plain.setTextIsSelectable(true);body.ad
                         originals.forEachIndexed{idx,line->body.addView(label(line.text,20,PremiumChrome.TEXT,true));body.addView(label(pairs[idx],15,muted).apply{setPadding(0,dp(2),0,dp(12))})}
                     }else{val plain=label(raw,20,Color.WHITE);plain.setTextIsSelectable(true);body.addView(plain)}''')
 rep('val tr=label(visibleTranslation[idx],15,muted);tr.setOnClickListener','val tr=label(visibleTranslation[idx],17,muted).apply{setPadding(0,dp(2),0,dp(14))};tr.setOnClickListener')
+# Bounded second inference pass: try only incomplete phrases, retain the same words and observed timing.
+(p.parent/'PhraseTimingRetry.kt').write_bytes((Path(__file__).parent/'PhraseTimingRetry.kt').read_bytes())
+whisper=p.parent/'WhisperLocal.kt';w=whisper.read_text()
+old='var start=0L;var fresh=0;val filter=VocalConditioning.Filter()'
+assert w.count(old)==1
+w=w.replace(old,old+';var retryBudget=8')
+old='result.add(WhisperSegments.Window(offset,offset+ms,segments))'
+assert w.count(old)==1
+w=w.replace(old,'''val refined=if(prepared==null||retryBudget<=0)segments else segments.map{seg->
+                        val span=PhraseTimingRetry.Span(seg.startMs,seg.endMs,seg.text,seg.wordStarts)
+                        if(retryBudget<=0||!PhraseTimingRetry.eligible(span))seg else{
+                            val from=((seg.startMs-offset-350).coerceAtLeast(0)*16).toInt().coerceIn(0,prepared.size)
+                            val until=((seg.endMs-offset+350).coerceAtLeast(0)*16).toInt().coerceIn(from,prepared.size)
+                            if(until-from<5600)seg else{
+                                retryBudget--
+                                check(!Thread.currentThread().isInterrupted)
+                                val retryOffset=offset+from/16
+                                val retryDuration=(until-from)/16L
+                                val data=recognize(handle,prepared.copyOfRange(from,until),language,Runtime.getRuntime().availableProcessors().coerceIn(1,4),beam)
+                                check(!Thread.currentThread().isInterrupted)
+                                val alternatives=if(data==null)emptyList()else WhisperSegments.parse(data.toString(Charsets.UTF_8),retryOffset,retryDuration)
+                                val recovered=PhraseTimingRetry.select(span,alternatives.map{PhraseTimingRetry.Span(it.startMs,it.endMs,it.text,it.wordStarts)})
+                                if(recovered==null)seg else seg.copy(wordStarts=recovered)
+                            }
+                        }
+                    }
+                    result.add(WhisperSegments.Window(offset,offset+ms,refined))''')
+whisper.write_text(w)
+# Simultaneous words do not qualify as reliable per-word alignment.
+align=p.parent/'LyricAlign.kt';al=align.read_text()
+old='heard[b].second-heard[a].second in 0..3500'
+assert al.count(old)==1
+align.write_text(al.replace(old,'heard[b].second-heard[a].second in 1..3500'))
 p.write_text(s)
 print("PASS: persistent default-off PRO controls; core player unchanged")
