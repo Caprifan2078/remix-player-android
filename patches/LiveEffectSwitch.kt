@@ -10,6 +10,11 @@ class LiveEffectSwitch(private val rate:Int,private val channels:Int){
     private var elapsed=0
     private val oldFrame=FloatArray(channels)
     private val newFrame=FloatArray(channels)
+    /** Prime initial bypass and retain an exact PCM fast path only when no transition is pending. */
+    fun canBypass(preset:Preset):Boolean{
+        if(current==null)current=preset
+        return incoming==null&&current==preset
+    }
     fun frame(input:FloatArray,out:FloatArray,preset:Preset){
         if(current==null)current=preset
         if(incoming==null&&current!=preset){incoming=Dsp(rate,channels);next=preset;elapsed=0}
