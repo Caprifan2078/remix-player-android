@@ -20,7 +20,7 @@ object BasicPitchHint {
                 val p=notes[t*NOTES+n]
                 if(p>top){second=top;top=p;best=n}else if(p>second)second=p
             }
-            if(best>=0&&top>=.55f&&top-second>=.12f){scores[(best+21)%12]+=top;frames++}
+            if(best>=0&&top>=.55f&&top-second>=.12f){scores[(best+21)%12]+=top.toDouble();frames++}
         }
         if(frames<12)return null
         val sorted=scores.indices.sortedByDescending{scores[it]};val total=scores.sum()
