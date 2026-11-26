@@ -34,5 +34,40 @@ rep('val modes=row()\n        modes.addView(btn("Ремикс"){effectPicker()}'
 rep('body.addView(modes)\n        body.addView(label("Режим: "+EffectMenu.title(Presets.active.name),13,muted))','body.addView(modes,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(8)});if(Presets.active!=Presets.all.first())body.addView(label(EffectMenu.title(Presets.active.name),13,muted))')
 # Never leak center alignment into library and other screens.
 rep('body.removeAllViews();activeLyrics=','body.removeAllViews();body.gravity=Gravity.TOP or Gravity.START;activeLyrics=')
+(p.parent/'CoverSwipe.kt').write_bytes((Path(__file__).parent/'CoverSwipe.kt').read_bytes())
+rep('val token=++coverToken', '''installCoverSwipe(image,t.uri)
+        val token=++coverToken''')
+rep('    private fun nowPlaying(){','''    @android.annotation.SuppressLint("ClickableViewAccessibility")
+    private fun installCoverSwipe(image:ImageView,id:String){
+        image.contentDescription="Обложка · влево следующая песня, вправо предыдущая"
+        var x=0f;var y=0f;var horizontal=false
+        val slop=android.view.ViewConfiguration.get(this).scaledTouchSlop
+        image.setOnTouchListener{v,e->
+            when(e.actionMasked){
+                android.view.MotionEvent.ACTION_DOWN->{x=e.x;y=e.y;horizontal=false;true}
+                android.view.MotionEvent.ACTION_MOVE->{
+                    val dx=e.x-x;val dy=e.y-y
+                    if(!horizontal&&kotlin.math.abs(dx)>slop&&kotlin.math.abs(dx)>kotlin.math.abs(dy)*1.6f){
+                        horizontal=true;v.parent?.requestDisallowInterceptTouchEvent(true)
+                    }
+                    true
+                }
+                android.view.MotionEvent.ACTION_UP->{
+                    v.parent?.requestDisallowInterceptTouchEvent(false)
+                    val d=CoverSwipe.direction(e.x-x,e.y-y,dp(56).toFloat())
+                    if(horizontal&&d!=null&&current()?.uri==id){
+                        controller?.let{p->
+                            val can=if(d==CoverSwipe.Direction.NEXT)p.hasNextMediaItem() else p.hasPreviousMediaItem()
+                            if(can){stopPreview();if(d==CoverSwipe.Direction.NEXT)p.seekToNextMediaItem() else p.seekToPreviousMediaItem()}
+                        }
+                    }else if(!horizontal&&kotlin.math.abs(e.x-x)<=slop&&kotlin.math.abs(e.y-y)<=slop)v.performClick()
+                    horizontal=false;true
+                }
+                android.view.MotionEvent.ACTION_CANCEL,android.view.MotionEvent.ACTION_POINTER_DOWN->{horizontal=false;v.parent?.requestDisallowInterceptTouchEvent(false);false}
+                else->true
+            }
+        }
+    }
+    private fun nowPlaying(){''')
 p.write_text(s)
 print("PASS: shared real controls are relocated into the player; adaptive artwork and single header")
