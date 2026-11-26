@@ -9,13 +9,19 @@ new='''    /** Only boost a quiet, non-silent Whisper window. Keep sample count 
     fun prepareWhisper(block:FloatArray,n:Int):FloatArray? {
         require(n in 1..block.size)
         var sum=0.0;var peak=0.0
+        var localSum=0.0;var localCount=0;var localActive=0;var audiblePhrase=false
         for(i in 0 until n){
             if(i%8192==0)check(!Thread.currentThread().isInterrupted){"Отменено"}
             val x=block[i].toDouble();require(x.isFinite()&&abs(x)<=1.0){"Некорректный сигнал Whisper"}
             sum+=x*x;peak=max(peak,abs(x))
+            localSum+=x*x;localCount++;if(abs(x)>=.002)localActive++
+            if(localCount==4000||i==n-1){
+                if(localCount>=1600&&localActive>=800&&sqrt(localSum/localCount)>=.003)audiblePhrase=true
+                localSum=0.0;localCount=0;localActive=0
+            }
         }
         val rms=sqrt(sum/n)
-        if(rms<=.001)return null
+        if(rms<=.001&&!audiblePhrase)return null
         val gain=minOf(4.0,.025/rms,.90/peak).coerceAtLeast(1.0)
         val result=block.copyOf(n)
         if(gain>1.0)for(i in result.indices){
