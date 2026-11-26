@@ -8,7 +8,7 @@ import kotlin.math.abs
 
 /** A full-song preview, no temporary PCM file, bounded memory and time. */
 object WaveformDecode {
-    fun scan(context:Context,uri:Uri):FloatArray?{
+    fun scan(context:Context,uri:Uri,preview:(FloatArray)->Unit={}):FloatArray?{
         if(uri.scheme!="content")return null
         val extractor=MediaExtractor();var codec:MediaCodec?=null
         try{
@@ -23,6 +23,7 @@ object WaveformDecode {
             var rate=format.getInteger(MediaFormat.KEY_SAMPLE_RATE);var channels=format.getInteger(MediaFormat.KEY_CHANNEL_COUNT);var encoding=AudioFormat.ENCODING_PCM_16BIT
             var inputDone=false;var outputDone=false;val info=MediaCodec.BufferInfo();var idle=0
             val deadline=SystemClock.elapsedRealtime()+18000
+            var lastPreview=0L
             while(!outputDone&&idle<150&&SystemClock.elapsedRealtime()<deadline&&!Thread.currentThread().isInterrupted){
                 var progressed=false
                 if(!inputDone){val i=decoder.dequeueInputBuffer(5000);if(i>=0){
@@ -49,6 +50,10 @@ object WaveformDecode {
                         }
                         outputDone=(info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM)!=0
                     }finally{decoder.releaseOutputBuffer(i,false)};progressed=true}
+                }
+                val now=SystemClock.elapsedRealtime()
+                if(!outputDone&&rate in 8000..384000&&now-lastPreview>=120){
+                    lastPreview=now;env.preview(rate)?.let(preview)
                 }
                 idle=if(progressed)0 else idle+1
             }
