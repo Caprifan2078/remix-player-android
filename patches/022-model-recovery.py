@@ -44,6 +44,9 @@ t=t.replace(old,'check(models.map{it.id}==listOf("tiny","base-q5_1","base","smal
 old='check(models.zipWithNext().all{(a,b)->a.size<b.size&&a.minFreeRam<b.minFreeRam})'
 assert t.count(old)==1
 t=t.replace(old,'check(models.map{it.size}.distinct().size==models.size&&models.zipWithNext().all{(a,b)->a.minFreeRam<=b.minFreeRam})')
+old='check(WhisperModelSpec.maxBytes==487601967L)'
+assert t.count(old)==1
+t=t.replace(old,'check(WhisperModelSpec.maxBytes==1081140203L)')
 test.write_text(t)
 # Direct Whisper download, sharing the same checked activation as local import.
 p=src/'WhisperLocal.kt';s=p.read_text()
