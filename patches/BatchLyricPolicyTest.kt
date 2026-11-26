@@ -15,5 +15,11 @@ fun main(){
  check(pick(listOf(a),t="Song.mp3")==text)
  check(pick(listOf(a.copy(synced=null,plain="example")))==null)
  check(pick(listOf(a.copy(artist="Another")))==null)
- println("PASS: 12 conservative batch lyric selection cases")
+ val plain=a.copy(synced=null,plain="example")
+ fun automatic(items:List<LyricsMatch.Candidate>,title:String="Song",artist:String="Artist",seconds:Long?=200)=BatchLyricPolicy.chooseAutomatic(items,title,artist,seconds)
+ val checks=listOf(automatic(listOf(a))==text,automatic(listOf(plain))=="example",automatic(listOf(a,plain))==text,automatic(listOf(plain,plain.copy(id=2)))=="example",automatic(listOf(plain,plain.copy(id=2,plain="other")))==null,automatic(listOf(a,a.copy(id=2,synced="[00:02]example")))==null,automatic(listOf(plain),artist="Unknown artist")==null,automatic(listOf(plain),seconds=204)==null,automatic(listOf(plain),title="Song (Live)")==null,automatic(listOf(plain),title="Song.mp3")=="example",automatic(listOf(plain.copy(duration=0)),seconds=1)==null,automatic(listOf(plain.copy(title="Song x Other")),title="Song x Other")==null)
+ fun merge(x:String?,y:String?)=BatchLyricPolicy.merge(x,y,{it.startsWith("[")},{it.substringAfter(']',it)})
+ val merges=listOf(merge(null,text)==text,merge("Example!",text)==text,merge("wrong",text)=="wrong",merge(text,"[00:02]example")==text,merge("example",null)=="example",merge("example","other")=="example",merge(null,null)==null)
+ (checks+merges).forEachIndexed{i,pass->check(pass){"Automatic lyric case "+(i+1)}}
+ println("PASS: 31 conservative selection, automatic lookup and safe merge cases")
 }
