@@ -89,6 +89,21 @@ s=s[:a]+'''    private data class ScanItem(val uri:String,val title:String,val a
             if(items.size>100)panel.addView(label("Показаны первые 100. После проверки откроются следующие.",13,muted))
         }
     }
+    // Prefer already separated vocals. Do not start an expensive separation job implicitly.
+    private fun scanRecognize(uri:Uri,id:String):String{
+        val stem=getSharedPreferences("stem_cache",MODE_PRIVATE).getString(id,null)?.let{StemEngine.load(this,it)}
+        if(stem!=null){
+            updateWork("Whisper · выделенный вокал")
+            val heard=try{WhisperLocal.transcribe(this,uri,stem,"auto"){updateWork(it)}}catch(e:Exception){
+                if(e is InterruptedException||Thread.currentThread().isInterrupted)throw e
+                ""
+            }
+            check(!Thread.currentThread().isInterrupted)
+            if(heard.isNotBlank())return heard
+        }
+        updateWork("Whisper · исходная композиция")
+        return WhisperLocal.transcribe(this,uri,null,"auto"){updateWork(it)}
+    }
     private fun scanLibrary(pending:List<ScanItem>,search:Boolean,analyze:Boolean,local:Boolean,align:Boolean){
         var completed=0;var saved=0;var unresolved=0;var errors=0;var analyzed=0;var drafts=0
         // Commit each verified track individually on the UI thread. A cancellation keeps completed tracks.
@@ -103,12 +118,12 @@ s=s[:a]+'''    private data class ScanItem(val uri:String,val title:String,val a
                         raw=try{TrackLyricSource.automatic(this,uri,t.title,t.artist,t.before,search)}catch(e:Exception){if(Thread.currentThread().isInterrupted||e is InterruptedException||!local)throw e;TrackLyricSource.automatic(this,uri,t.title,t.artist,t.before,false)}
                         if(search)Thread.sleep(1100)
                         if(raw.isNullOrBlank()&&local&&!scanDraftFile(t.uri).isFile){
-                            draft=WhisperLocal.transcribe(this,uri,null,"auto"){updateWork(it)}.takeIf{it.isNotBlank()&&it.length<=256000};status=if(draft!=null)"Черновик Whisper" else "Нет совпадения"
+                            draft=scanRecognize(uri,t.uri).takeIf{it.isNotBlank()&&it.length<=256000};status=if(draft!=null)"Черновик Whisper" else "Нет совпадения"
                         }else status=when{raw.isNullOrBlank()->"Нет совпадения";Lrc.parse(raw).isEmpty()->"Только слова";raw==t.before->"Пропущено";else->"Текст найден"}
                     }
                     val reference=raw?:t.before
                     if(align&&reference.isNotBlank()&&Lrc.parse(reference).isEmpty()){
-                        val heard=WhisperLocal.transcribe(this,uri,null,"auto"){updateWork(it)}
+                        val heard=scanRecognize(uri,t.uri)
                         val result=KnownLyricAlignment.align(heard,LyricDocument.plain(reference))
                         if(result!=null){raw=result.lrc;status="Синхронизировано"}else if(raw==null)status="Нет уверенной синхронизации"
                     }
