@@ -1,0 +1,35 @@
+package app.remix.player
+import java.net.URLDecoder
+fun main(){
+ fun decoded(s:String,a:String="",expanded:Boolean=true)=LyricsSearchPlan.queries(s,a,expanded).map{URLDecoder.decode(it,"UTF-8")}
+ val split="Can You Feel My Heart x Astronaut In The Ocean (Slowed + Reverb).mp3"
+ check(LyricsSearchPlan.clean(split)=="Can You Feel My Heart x Astronaut In The Ocean")
+ check(decoded(split).contains("track_name=Can You Feel My Heart"))
+ check(decoded(split).contains("track_name=Astronaut In The Ocean"))
+ check(LyricsSearchPlan.clean("01. Example (Official Music Video).flac")=="Example")
+ check(LyricsSearchPlan.clean("Example (Live)")=="Example (Live)")
+ check(LyricsSearchPlan.clean("Song (Video Games)")=="Song (Video Games)")
+ check(LyricsSearchPlan.clean("Song (Audio Slave)")=="Song (Audio Slave)")
+ check(LyricsSearchPlan.clean("Song (Remix to Ignition)")=="Song (Remix to Ignition)")
+ check(LyricsSearchPlan.clean("Song (DJ Name Remix)")=="Song")
+ check(LyricsSearchPlan.clean("Song (Slowed + Reverb)")=="Song")
+ check(LyricsSearchPlan.clean("Example - Slowed + Reverb")=="Example")
+ check(decoded("Artist - Example").contains("track_name=Example&artist_name=Artist"))
+ check(decoded("Example","Unknown artist").none{it.contains("artist_name")})
+ check(decoded(split,"Artist").size<=7)
+ check(decoded(split,"Artist",false).size<=2)
+ val candidate=LyricsMatch.Candidate(1,"Can You Feel My Heart","Bring Me The Horizon",200,"[00:00.00]sample",null)
+ check(!LyricsSearchPlan.exact(split,"Bring Me The Horizon",200,candidate))
+ check(LyricsSearchPlan.exact(candidate.title,candidate.artist,201,candidate))
+ check(!LyricsSearchPlan.exact(candidate.title,candidate.artist,204,candidate))
+ check(!LyricsSearchPlan.exact(candidate.title,candidate.artist,201,candidate.copy(synced=" ")))
+ check(!LyricsSearchPlan.exact(candidate.title,candidate.artist,0,candidate.copy(duration=0)))
+ check(!LyricsSearchPlan.exact("!!!","???",200,candidate.copy(title="!!!",artist="???")))
+ val wrong=candidate.copy(id=2,title="Unrelated",artist="Other")
+ check(LyricsMatch.rank(listOf(wrong,candidate),split,"",200).first()==candidate)
+ val first=QuickEffects.defaults(Presets.all);val rest=QuickEffects.extra(Presets.all)
+ check(first.size==7&&first.first().name=="Оригинал")
+ check(first[1].name=="Sped Up"&&first[2].name=="Slowed + Reverb")
+ check(first.size+rest.size==41&&first.intersect(rest.toSet()).isEmpty())
+ println("PASS: 25 search and quick effect policy checks")
+}

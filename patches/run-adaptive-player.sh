@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+kotlinc "$1"/app/src/main/java/app/remix/player/{AdaptiveOverlap,OverlapCore,LyricsMatch,LyricsSearchPlan,AudioCore}.kt patches/AdaptivePlayerTest.kt -include-runtime -d "$tmp/test.jar"
+java -jar "$tmp/test.jar"
+kotlinc "$1/app/src/main/java/app/remix/player/OverlapHandoff.kt" patches/OverlapHandoffTest.kt -include-runtime -d "$tmp/handoff.jar"
+java -jar "$tmp/handoff.jar"

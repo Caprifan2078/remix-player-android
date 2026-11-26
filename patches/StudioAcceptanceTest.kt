@@ -144,4 +144,187 @@ class StudioAcceptanceTest {
             println("PASS Android: actual media analysis duration, non-silent signal, invalid audio rejected")
         }finally{dir.deleteRecursively()}
     }
+    @Test fun smartDjAlignmentAndMediaDecoder(){
+        val dir=folder()
+        try{
+            val frames=44100*16
+            fun fixture(name:String,bpm:Double,phase:Double,hz:Double)=File(dir,name).apply{outputStream().buffered(65536).use{out->repeat(frames){i->
+                val t=i/44100.0;val beat=((t-phase)%(60/bpm)+60/bpm)%(60/bpm)
+                val v=(sin(2*Math.PI*hz*t)*(.03+.5*kotlin.math.exp(-beat*25))*32767).toInt().toShort()
+                StemCore.writeShort(out,v);StemCore.writeShort(out,v)
+            }}}
+            val a=fixture("a.pcm",120.0,.1,220.0);val b=fixture("b.pcm",115.0,.23,330.0)
+            val beforeA=hash(a);val beforeB=hash(b)
+            val plan=DjTransition.plan(DjTransition.analyze(a,true),DjTransition.analyze(b,false),false)
+            assertTrue(plan.speed in 1.02..1.07)
+            val out=File(dir,"smart.wav");val result=DjTransition.render(a,b,out,5,false)
+            assertEquals(44+result.frames*4,out.length())
+            assertTrue(result.overlap in 210000L..231000L)
+            val decoded=File(dir,"decoded.pcm");assertEquals(result.frames,decode(out,decoded))
+            assertEquals("Decoded length",out.length()-44,decoded.length())
+            // Compare every byte, without allocating three copies of the song in a 16 MiB heap.
+            java.io.DataInputStream(out.inputStream().buffered()).use{expected->
+                java.io.DataInputStream(decoded.inputStream().buffered()).use{actual->
+                    expected.readFully(ByteArray(44))
+                    val x=ByteArray(16384);val y=ByteArray(16384)
+                    var remaining=decoded.length();var offset=0L
+                    while(remaining>0){val n=minOf(x.size.toLong(),remaining).toInt();expected.readFully(x,0,n);actual.readFully(y,0,n);for(i in 0 until n)if(x[i]!=y[i])fail("PCM mismatch at byte "+(offset+i));remaining-=n;offset+=n}
+                    assertEquals(-1,expected.read());assertEquals(-1,actual.read())
+                }
+            }
+            assertEquals(beforeA,hash(a));assertEquals(beforeB,hash(b));assertTrue(dir.listFiles()!!.none{it.name.startsWith("dj-fit-")})
+            println("PASS Android: measured BPM matching, rendered smart transition and independently decoded WAV")
+        }finally{dir.deleteRecursively()}
+    }
+    @Test fun realWaveformFromDecodedAudio(){
+        val dir=folder()
+        try{
+            val file=File(dir,"waveform.wav")
+            val frames=44100*4
+            file.outputStream().buffered(65536).use{out->
+                StemCore.header(out,frames.toLong())
+                repeat(frames){i->
+                    val amplitude=if(i<frames/2)3500 else 14000
+                    val v=(sin(2*Math.PI*440*i/44100)*amplitude).toInt().toShort()
+                    StemCore.writeShort(out,v);StemCore.writeShort(out,(-v).toShort())
+                }
+            }
+            val uri=FileProvider.getUriForFile(c,"app.remix.player.files",file)
+            val before=hash(file)
+            val data=WaveformDecode.scan(c,uri)?:error("Actual WAV decode failed")
+            assertEquals(96,data.size)
+            assertTrue("Stereo antiphase must not disappear",data.take(40).all{it in .47f..0.53f})
+            assertTrue("Louder second half should have bigger peaks",data.takeLast(40).all{it in .97f..1f})
+            assertEquals(before,hash(file))
+            val invalid=File(dir,"invalid.wav").apply{writeText("invalid")}
+            assertNull(WaveformDecode.scan(c,FileProvider.getUriForFile(c,"app.remix.player.files",invalid)))
+            println("PASS Android: actual WAV waveform, quiet/loud sections, antiphase, invalid file, source unchanged")
+        }finally{dir.deleteRecursively()}
+    }
+    @Test fun producerVariantsAndBassExchange(){
+        val all=ProducerStyles.all
+        assertEquals(40,all.size);assertEquals(40,all.map{it.name}.distinct().size)
+        assertEquals(30,GenreEngine.styles.size)
+        val dir=folder()
+        try{
+            val input=File(dir,"input.pcm");raw(input,44100*2)
+            val hashes=mutableSetOf<String>()
+            for(p in ProducerStyles.extra){
+                val out=File(dir,"genre.wav")
+                GenreEngine.renderFromMix(input,out,p.style,p.style.target.toDouble(),0.0,emptyList(),emptyList()){}
+                assertEquals(44+input.length(),out.length());assertTrue(hashes.add(hash(out)))
+                assertEquals(input.length()/4,decode(out,File(dir,"decoded.pcm")))
+                out.delete();File(dir,"decoded.pcm").delete()
+            }
+            val e=DjBassExchange()
+            assertEquals(1.0,e.lowGain(0.0,false),0.0);assertEquals(1.0,e.lowGain(1.0,true),0.0)
+            assertEquals(1.0,e.lowGain(.5,false)+e.lowGain(.5,true),1e-9)
+            assertEquals(.75,e.sample(0,.75,-.3,0.0,1.0,0.0,1.0),0.0)
+            assertEquals(-.3,e.sample(0,.75,-.3,1.0,0.0,1.0,1.0),0.0)
+        }finally{dir.deleteRecursively()}
+    }
+    @Test fun basicPitchRunsRealBundledOnnxOnAndroid(){
+        val probabilities=BasicPitchModel.probe(c)
+        assertEquals(BasicPitchHint.FRAMES*BasicPitchHint.NOTES,probabilities.size)
+        assertTrue(probabilities.all{it.isFinite()&&it in 0f..1f})
+        assertTrue("Model output must respond to synthetic audio",(probabilities.maxOrNull()?:0f)-(probabilities.minOrNull()?:0f)>.0001f)
+        assertTrue(c.assets.open("basic-pitch/LICENSE").bufferedReader().use{it.readText()}.contains("Apache License"))
+        println("PASS Android: real pinned Basic Pitch ONNX inference and finite note probabilities")
+    }
+
+    @androidx.media3.common.util.UnstableApi
+    @Test fun crossfadeDoesNotReplayIncomingIntroAfterDelayedTick(){
+        val dir=folder()
+        val inst=InstrumentationRegistry.getInstrumentation()
+        var ownedPlayer:androidx.media3.exoplayer.ExoPlayer?=null
+        var ownedOverlap:LiveOverlap?=null
+        lateinit var player:androidx.media3.exoplayer.ExoPlayer
+        lateinit var overlap:LiveOverlap
+        fun onMain(block:()->Unit){inst.runOnMainSync(block)}
+        fun await(message:String,timeout:Long=15000L,condition:()->Boolean){
+            val end=android.os.SystemClock.elapsedRealtime()+timeout
+            var ok=false
+            while(!ok&&android.os.SystemClock.elapsedRealtime()<end){
+                onMain{ok=condition()}
+                if(!ok)android.os.SystemClock.sleep(30)
+            }
+            assertTrue(message,ok)
+        }
+        try{
+            val a=File(dir,"first.wav");val b=File(dir,"next.wav");val pcm=File(dir,"source.pcm")
+            raw(pcm,44100*12,440.0);wav(pcm,a)
+            raw(pcm,44100*12,660.0);wav(pcm,b)
+            fun item(f:File,id:String)=androidx.media3.common.MediaItem.Builder().setMediaId(id).setUri(FileProvider.getUriForFile(c,"app.remix.player.files",f)).build()
+            onMain{
+                player=androidx.media3.exoplayer.ExoPlayer.Builder(c).build();ownedPlayer=player
+                overlap=LiveOverlap(c,player);ownedOverlap=overlap
+                player.setMediaItems(listOf(item(a,"qa-first"),item(b,"qa-next")))
+                player.seekTo(0,6500L);player.prepare();player.play()
+            }
+            await("First track never became ready"){player.isPlaying&&player.currentMediaItemIndex==0}
+            await("Incoming track never became audible"){
+                overlap.tick(4000L,true)
+                player.currentMediaItemIndex==0&&player.volume<.70f&&player.currentPosition>8000L
+            }
+            // No coordinator ticks until Media3 auto-advances, reproducing a busy main clock.
+            await("Automatic transition did not occur",10000L){player.currentMediaItemIndex==1}
+            onMain{assertEquals("The stale intro must stay muted on automatic advance",0f,player.volume,.001f)}
+            await("Primary did not continue from the already heard intro",10000L){
+                overlap.tick(4000L,true)
+                player.currentMediaItemIndex==1&&player.isPlaying&&player.currentPosition>=2000L&&player.volume>.99f
+            }
+            var previous=0L
+            onMain{previous=player.currentPosition}
+            repeat(10){
+                android.os.SystemClock.sleep(80)
+                onMain{
+                    overlap.tick(4000L,true)
+                    assertEquals(1,player.currentMediaItemIndex)
+                    assertTrue("Incoming position moved backwards",player.currentPosition>=previous-80)
+                    previous=player.currentPosition
+                }
+            }
+            println("PASS Android: real automatic crossfade transition preserves already heard incoming intro")
+        }finally{
+            onMain{ownedOverlap?.close();ownedPlayer?.release()}
+            dir.deleteRecursively()
+        }
+    }
+
+    @androidx.media3.common.util.UnstableApi
+    @Test fun liveEffectSwitchKeepsPcmContinuousWithoutFlush(){
+        val processor=RemixProcessor()
+        val previous=Presets.active;val eq=EqualizerSettings.get()
+        try{
+            EqualizerSettings.set(List(10){0f})
+            val original=Presets.all.first()
+            val bass=Presets.all.single{it.name=="Deep Bass"}
+            Presets.active=original
+            processor.configure(androidx.media3.common.audio.AudioProcessor.AudioFormat(44100,2,androidx.media3.common.C.ENCODING_PCM_16BIT))
+            processor.flush()
+            var frame=0
+            fun tone(i:Int)=(8192*kotlin.math.sin(2*kotlin.math.PI*55*i/44100)).toInt()
+            fun block(preset:Preset,frames:Int):IntArray{
+                Presets.active=preset
+                val buffer=java.nio.ByteBuffer.allocateDirect(frames*4).order(java.nio.ByteOrder.nativeOrder())
+                repeat(frames){val v=tone(frame++);buffer.putShort(v.toShort());buffer.putShort((-v).toShort())};buffer.flip()
+                processor.queueInput(buffer);assertFalse(buffer.hasRemaining())
+                val output=processor.getOutput().order(java.nio.ByteOrder.nativeOrder());assertEquals(frames*4,output.remaining())
+                return IntArray(frames){val l=output.short.toInt();val r=output.short.toInt();assertTrue(kotlin.math.abs(l+r)<=2);l}
+            }
+            assertTrue(block(original,2048).withIndex().all{it.value==tone(it.index)})
+            val start=frame
+            val boosted=block(bass,44100)
+            val tail=boosted.indices.drop(22050)
+            assertTrue(tail.sumOf{boosted[it].toDouble()*boosted[it]}>1.3*tail.sumOf{tone(start+it).toDouble()*tone(start+it)})
+            val afterStart=frame
+            val after=block(original,4410)
+            var last=boosted.last()
+            for(v in after){assertTrue("Abrupt PCM switch",kotlin.math.abs(v-last)<250);last=v}
+            assertTrue(after.indices.drop(2000).all{after[it]==tone(afterStart+it)})
+            val finalStart=frame
+            assertTrue(block(original,2048).withIndex().all{it.value==tone(finalStart+it.index)})
+        }finally{processor.reset();Presets.active=previous;EqualizerSettings.set(eq)}
+    }
+
 }

@@ -121,19 +121,112 @@ class MixerLyricsUiAcceptanceTest {
         fixture { p->
             click("Текст")
             main{p.pause();p.seekTo(2500)}
-            fun underline(word:String):Boolean=texts().any{v->val s=v.text as? Spanned?:return@any false
-                s.toString().startsWith("Первое второе третье")&&s.getSpans(0,s.length,UnderlineSpan::class.java).any{span->s.subSequence(s.getSpanStart(span),s.getSpanEnd(span)).toString().trim()==word}}
-            await("Expected actual second-word underline"){underline("второе")}
+            fun highlighted(word:String):Boolean=texts().any{v->
+                val s=v.text as? Spanned?:return@any false
+                if(!s.toString().startsWith("Первое второе третье")||s.getSpans(0,s.length,UnderlineSpan::class.java).isNotEmpty())return@any false
+                val spans=s.getSpans(0,s.length,MainActivity.LyricInk::class.java)
+                if(spans.size!=1)return@any false
+                val ink=spans.single();val paint=android.text.TextPaint();ink.updateDrawState(paint)
+                s.subSequence(s.getSpanStart(ink),s.getSpanEnd(ink)).toString().trim()==word&&paint.color==android.graphics.Color.WHITE
+            }
+            await("Expected actual second-word color and no underline"){highlighted("второе")}
             capture("karaoke-word")
             click("Автопрокрутка: вкл.")
             await("Follow off not reflected"){button("Автопрокрутка: выкл.")!=null}
             main{p.seekTo(1000)}
-            await("Backward seek left stale active word"){underline("Первое")}
+            await("Backward seek left stale active word"){highlighted("Первое")}
             click("Музыка");click("Текст")
             await("Follow preference lost after leaving lyrics"){button("Автопрокрутка: выкл.")!=null}
             click("Автопрокрутка: выкл.")
             await("Follow on not restored"){button("Автопрокрутка: вкл.")!=null}
+            main{
+                val scroll=views(activity()!!.window.decorView).first{it.tag=="karaoke-scroll"}
+                val now=SystemClock.uptimeMillis()
+                fun send(action:Int,x:Float,y:Float,time:Long){
+                    val e=android.view.MotionEvent.obtain(now,time,action,x,y,0)
+                    try{scroll.dispatchTouchEvent(e)}finally{e.recycle()}
+                }
+                send(android.view.MotionEvent.ACTION_DOWN,20f,140f,now)
+                send(android.view.MotionEvent.ACTION_MOVE,20f,40f,now+80)
+                send(android.view.MotionEvent.ACTION_CANCEL,20f,40f,now+100)
+            }
+            await("Manual swipe must pause follow"){button("Автопрокрутка: выкл.")!=null}
+            click("Автопрокрутка: выкл.")
+            await("Resume follow after manual scroll"){button("Автопрокрутка: вкл.")!=null}
             capture("karaoke-seek")
         }
     }
+    @Test fun premiumLibraryAndPlayerVisualAcceptance(){
+        fixture { p->
+            click("Музыка")
+            await("Fixture song not visible in library"){texts().any{it.isShown&&it.text.toString()=="QA UI synthetic"}}
+            await("Compact mini player entry missing"){texts().any{it.isShown&&it.contentDescription=="Открыть экран воспроизведения"}}
+            main{assertNull("Transport should not crowd library",button("⇄"));assertNull(button("Настройки"));assertNotNull(button("Ещё"))}
+            capture("premium-library")
+            main{val open=texts().first{it.isShown&&it.contentDescription=="Открыть экран воспроизведения"};assertTrue(open.performClick())}
+            await("Full player not visible"){button("Ремикс")!=null&&button("⇄")!=null}
+            main{
+                assertNull("Bottom nav should not duplicate player actions",button("Музыка"))
+                assertTrue(views(activity()!!.window.decorView).any{it.isShown&&it.contentDescription=="Обложка композиции"})
+                assertTrue(texts().any{it.isShown&&it.text.toString()=="QA UI synthetic"})
+            }
+            await("Real waveform never appeared",25000){views(activity()!!.window.decorView).any{it is WaveSeekBar&&it.isShown&&it.tag=="waveform-ready"}}
+            main{
+                val a=activity()!!
+                val bounds=android.graphics.Rect()
+                a.window.decorView.getWindowVisibleDisplayFrame(bounds)
+                if(a.resources.configuration.screenHeightDp>=650){
+                    val actions=listOf("Ремикс","Текст","Очередь")
+                    actions.forEach{name->
+                        val v=button(name)?:error("Missing primary player action: "+name)
+                        val r=android.graphics.Rect()
+                        assertTrue("Primary action below fold: "+name,v.getGlobalVisibleRect(r)&&r.height()>=v.height*.9&&bounds.contains(r.centerX(),r.centerY()))
+                    }
+                }
+            }
+            capture("premium-player")
+            click("Ремикс")
+            SystemClock.sleep(400)
+            val root=inst.uiAutomation.rootInActiveWindow
+            assertTrue("Grouped effect chooser not visible",root?.findAccessibilityNodeInfosByText("Эффекты")?.isNotEmpty()==true)
+            capture("premium-effect-menu")
+            shell("input keyevent 4")
+        }
+    }
+
+    @Test fun proModeDefaultsOffAndPersistsWithoutRemovingPlayback(){
+        val prefs=c.getSharedPreferences("interface_mode",0)
+        val existed=prefs.contains("pro");val before=prefs.getBoolean("pro",false)
+        check(prefs.edit().remove("pro").commit())
+        try{fixture{p->
+            click("Студия")
+            fun visible(title:String)=texts().any{it.isShown&&it.text.toString()==title}
+            await("Core studio not shown"){visible("Remix Studio")}
+            main{assertFalse(visible("Инструментал"));assertFalse(visible("Сведение"));assertNull(button("Пакет эффектов…"))}
+            fun settings(){
+                click("Ещё")
+                val deadline=SystemClock.elapsedRealtime()+5000
+                var selected=false
+                while(SystemClock.elapsedRealtime()<deadline&&!selected){
+                    val nodes=inst.uiAutomation.rootInActiveWindow?.findAccessibilityNodeInfosByText("Настройки").orEmpty()
+                    val node=nodes.firstOrNull{it.text?.toString()=="Настройки"}
+                    var target=node
+                    while(target!=null&&!target.isClickable)target=target.parent
+                    selected=target?.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)==true
+                    if(!selected)SystemClock.sleep(100)
+                }
+                assertTrue("Settings menu action missing",selected)
+            }
+            settings();click("PRO-инструменты: выкл.")
+            await("PRO toggle not persisted"){prefs.getBoolean("pro",false)&&button("PRO-инструменты: вкл.")!=null}
+            click("Студия")
+            await("Expert tools unavailable after enabling"){visible("Инструментал")&&visible("Сведение")}
+            settings();click("PRO-инструменты: вкл.")
+            await("PRO toggle not disabled"){!prefs.getBoolean("pro",true)&&button("PRO-инструменты: выкл.")!=null}
+            click("Студия")
+            main{assertFalse(visible("Инструментал"));assertFalse(visible("Сведение"));assertNotNull(p.currentMediaItem)}
+            capture("simple-studio")
+        }}finally{prefs.edit().apply{if(existed)putBoolean("pro",before)else remove("pro")}.commit()}
+    }
+
 }

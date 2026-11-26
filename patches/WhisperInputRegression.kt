@@ -16,5 +16,14 @@ fun main(){
  invalid[1]=Float.POSITIVE_INFINITY;check(runCatching{VocalConditioning.prepareWhisper(invalid,n)}.isFailure)
  invalid[1]=1.1f;check(runCatching{VocalConditioning.prepareWhisper(invalid,n)}.isFailure)
  Thread.currentThread().interrupt();val cancelled=try{runCatching{VocalConditioning.prepareWhisper(quiet,n)}}finally{Thread.interrupted()};check(cancelled.isFailure)
+ val sparse=FloatArray(16000*25);for(i in 32000 until 36000)sparse[i]=(.005*sin(2*PI*233*i/16000)).toFloat()
+ check(rms(sparse)<.001)
+ val speech=VocalConditioning.prepareWhisper(sparse,sparse.size)!!
+ check(speech.size==sparse.size&&speech.sliceArray(0 until 32000).all{it==0f})
+ check(abs(rms(speech)/rms(sparse)-4.0)<.0001)
+ val click=FloatArray(16000*25);click[32000]=.5f
+ check(VocalConditioning.prepareWhisper(click,click.size)==null)
+ val weak=FloatArray(16000*25);for(i in 32000 until 36000)weak[i]=(.0008*sin(2*PI*233*i/16000)).toFloat()
+ check(VocalConditioning.prepareWhisper(weak,weak.size)==null)
  println("PASS: quiet signal boost, normal/loud preservation, transient headroom, silence/noise floor, exact sample count, invalid values and cancellation")
 }
