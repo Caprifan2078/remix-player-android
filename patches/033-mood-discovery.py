@@ -46,6 +46,24 @@ helper='''    private fun moodPrefs()=getSharedPreferences("mood_discovery_v1",M
                     dialog.dismiss();relatedMixDialog(seed,indexed,now.title)
                 }
             }
+            sheetAction(panel,"По моим любимым песням","Новые рекомендации из вашей медиатеки · офлайн"){
+                if(stemBusy){toast("Дождитесь завершения обработки");return@sheetAction}
+                val liked=tracks.filter{it.favorite}.map{it.group}.toSet()
+                if(indexed.none{it.id in liked}){toast("Добавьте песни в избранное и просканируйте медиатеку");return@sheetAction}
+                val pool=indexed.map{e->val f=e.features;LocalDiscovery.Entry(e.id,e.artist,listOf(f.energy,f.activity,f.brightness,f.low,f.valence,f.dynamics))}
+                dialog.dismiss()
+                actionSheet("По любимым песням",250){modeDialog,modePanel->
+                    LocalDiscovery.Mode.values().forEach{mode->
+                        val similar=mode==LocalDiscovery.Mode.SIMILAR
+                        val name=if(similar)"Ближе к любимым" else "Разнообразнее"
+                        sheetAction(modePanel,name,"Без песен, уже добавленных в избранное"){
+                            if(stemBusy){toast("Дождитесь завершения обработки");return@sheetAction}
+                            modeDialog.dismiss()
+                            stemWork("Подбор по избранному…",{LocalDiscovery.favorites(pool,liked,mode)}){ids->moodMixPreview("По любимым · "+name,"Акустическое сходство с проанализированными любимыми песнями",ids)}
+                        }
+                    }
+                }
+            }
             sheetAction(panel,"Поиск по описанию","Например: грустная музыка с глубоким басом"){
                 if(indexed.isEmpty()){toast("Сначала просканируйте медиатеку");return@sheetAction}
                 dialog.dismiss();moodDescriptionDialog(indexed)
