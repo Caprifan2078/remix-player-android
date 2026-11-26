@@ -133,6 +133,13 @@ class MixerLyricsUiAcceptanceTest {
     }
     @Test fun compactVersionsAndStudioKeepActionsReachable(){
         fixture {
+            click("Музыка")
+            await("Library did not start compact"){button("Фильтры и инструменты…")!=null&&button("Инструменты библиотеки…")==null}
+            capture("compact-library")
+            click("Фильтры и инструменты…")
+            await("Library tools not reachable"){button("Инструменты библиотеки…")!=null&&button("Добавить найденные песни в очередь…")!=null}
+            click("Скрыть инструменты")
+            await("Library tools still shown"){button("Инструменты библиотеки…")==null}
             click("Версии")
             await("Compact version actions missing"){button("Экспорт…")!=null&&button("Управление версией…")!=null}
             main{
