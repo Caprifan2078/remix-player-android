@@ -4,3 +4,5 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 kotlinc "$1/app/src/main/java/app/remix/player/VocalConditioning.kt" patches/WhisperInputRegression.kt -include-runtime -d "$tmp/test.jar"
 java -jar "$tmp/test.jar"
+kotlinc "$1/app/src/main/java/app/remix/player/WhisperModelSpec.kt" patches/WhisperDecodePolicyTest.kt -include-runtime -d "$tmp/policy.jar"
+java -jar "$tmp/policy.jar"
