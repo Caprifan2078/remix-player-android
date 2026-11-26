@@ -31,3 +31,21 @@ object HardKick {
         return DoubleArray(ceil(length*rate).toInt()){sample(p,it.toDouble()/rate,length)}
     }
 }
+
+/** Duck only the original low end around the new kick, not the full mix or vocals. */
+class HardMixSpace(rate:Int){
+    init{require(rate in 8000..384000)}
+    private val alpha=(1-exp(-2*PI*180/rate)).toFloat()
+    private val attack=(1-exp(-1.0/(.004*rate))).toFloat()
+    private val release=(1-exp(-1.0/(.09*rate))).toFloat()
+    private var lowL=0f;private var lowR=0f;private var duck=0f
+    var left=0f;private set
+    var right=0f;private set
+    fun frame(l:Float,r:Float,kick:Float,enabled:Boolean){
+        val a=if(l.isFinite())l else 0f;val b=if(r.isFinite())r else 0f
+        lowL+=alpha*(a-lowL);lowR+=alpha*(b-lowR)
+        val target=if(enabled&&kick.isFinite())kick.coerceIn(0f,1f)*.65f else 0f
+        duck+=(target-duck)*(if(target>duck)attack else release)
+        left=a-lowL*duck;right=b-lowR*duck
+    }
+}
