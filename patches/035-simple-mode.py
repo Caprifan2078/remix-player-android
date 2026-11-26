@@ -452,5 +452,90 @@ b=s.index('            }}',a)
 s=s[:a]+'''                transcriptChoices(t,raw,lyricRevision(t))
 '''+s[b:]
 rep('if(tracks.isNotEmpty())body.addView(btn("Настроение и подборки"){moodDiscoveryDialog()});val tools=row();tools.addView(filter,weight());','if(tracks.isNotEmpty()){val quick=row();quick.addView(btn("Подборки"){moodDiscoveryDialog()},weight());quick.addView(btn("Тексты"){batchLyrics()},weight());body.addView(quick)};val tools=row();tools.addView(filter,weight());')
+# System-managed automatic scan. The active library remains owned by the Activity.
+import re
+for filename in ('AutoLyricsJob.kt','TrackIdentityFix.kt'):
+    (p.parent/filename).write_bytes((Path(__file__).parent/filename).read_bytes())
+manifest=Path(sys.argv[1])/'app/src/main/AndroidManifest.xml'
+xml=manifest.read_text()
+assert xml.count('</application>')==1
+xml=xml.replace('</application>','    <service android:name=".AutoLyricsJob" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="true"/>\n    </application>')
+if 'android.permission.RECEIVE_BOOT_COMPLETED' not in xml:
+    xml=xml.replace('<application ','<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />\n    <application ',1)
+manifest.write_text(xml)
+# Prevent two native Whisper sessions from competing for phone memory.
+whisper=p.parent/'WhisperLocal.kt'
+w=whisper.read_text()
+anchor='fun transcribe(c:Context,uri:Uri,stem:StemEngine.Bundle?,language:String,status:(String)->Unit):String{'
+assert w.count(anchor)==1
+whisper.write_text(w.replace(anchor,'@Synchronized '+anchor+'\n        check(!Thread.currentThread().isInterrupted)'))
+rep('    private fun lyricAttempt(t:Track):String? {',r'''    private fun mergeAutomaticLyrics():Boolean{
+        if(stemBusy||lyricsBusy)return false
+        data class Pending(val file:java.io.File,val entry:JSONObject,val index:Int,val before:Track,val after:Track)
+        val pending=mutableListOf<Pending>()
+        for(file in AutoLyrics.staged(this)){
+            val result=AutoLyrics.read(file)?:continue
+            val id=result.optString("uri")
+            val current=libraryIndex.get(id)?.takeIf{it.uri==it.group}
+            if(current==null){file.delete();continue}
+            val revision=AutoLyrics.revision(id,current.title,current.artist,current.lyrics)
+            if(result.optString("revision")!=revision){file.delete();continue}
+            val index=tracks.indexOfFirst{it.uri==id};if(index<0)continue
+            val text=if(result.isNull("raw"))current.lyrics else result.optString("raw").takeIf{it.length<=LyricDocument.MAX_CHARS&&it.isNotBlank()}?:current.lyrics
+            val title=result.optString("title").takeIf{it.isNotBlank()&&it.length<=300}?:current.title
+            val artist=result.optString("artist").takeIf{it.isNotBlank()&&it.length<=200}?:current.artist
+            val after=current.copy(title=title,artist=artist,lyrics=text)
+            pending.add(Pending(file,result,index,current,after))
+        }
+        if(pending.isEmpty())return false
+        val changed=pending.any{it.before!=it.after}
+        if(changed){
+            pending.forEach{tracks[it.index]=it.after}
+            if(!saveLibrary(true)){pending.forEach{tracks[it.index]=it.before};reindex();return false}
+        }
+        for(entry in pending){
+            val t=entry.after;val result=entry.entry
+            val draft=result.optString("draft").takeIf{!result.isNull("draft")&&it.isNotBlank()}
+            val stored=draft==null||saveScanDraft(t.uri,draft)
+            if(!stored){recordLyricAttempt(t,"error");continue}
+            val outcome=result.optString("outcome")
+            if(outcome!="waiting")recordLyricAttempt(t,if(outcome=="error")"error" else "done")
+            val rev=AutoLyrics.revision(t.uri,t.title,t.artist,t.lyrics)
+            if(AutoLyrics.mark(this,t.uri,rev,outcome)&&AutoLyrics.read(entry.file)?.optString("revision")==result.optString("revision"))entry.file.delete()
+        }
+        return changed
+    }
+    private fun automaticLyricsSettings(){
+        val enabled=AutoLyrics.enabled(this)
+        actionSheet("Автоматические тексты",330){dialog,panel->
+            panel.addView(label(if(enabled)"Автоматическая обработка включена" else "Автоматическая обработка выключена",16,PremiumChrome.TEXT,true))
+            panel.addView(label("Android запускает задачи при зарядке, достаточной памяти и неметрируемой сети. Экран может быть выключен. Готовые тексты и подтверждённые данные сохраняются отдельно, спорные — в журнале. Аудио остаётся на телефоне.",14,muted))
+            sheetAction(panel,if(enabled)"Выключить автосканирование" else "Включить автосканирование"){
+                dialog.dismiss()
+                if(!AutoLyrics.setEnabled(this,!enabled)){toast("Не удалось изменить режим");return@sheetAction}
+                toast(if(enabled)"Автосканирование выключено" else "Автосканирование включено")
+                batchLyrics()
+            }
+            if(!enabled&&(!WhisperLocal.available||WhisperLocal.installed(this)==null))sheetAction(panel,"Установить Whisper","Для локальной синхронизации"){dialog.dismiss();whisperModelDialog()}
+        }
+    }
+    private fun lyricAttempt(t:Track):String? {''')
+rep('    private fun batchLyrics(){','    private fun batchLyrics(){\n        mergeAutomaticLyrics()')
+rep('            sheetAction(panel,"Журнал и фильтры","Все песни · готовые, без текста и с ошибками")','            sheetAction(panel,if(AutoLyrics.enabled(this))"Автосканирование: включено" else "Автосканирование: выключено","При зарядке и Wi-Fi · без открытого экрана"){dialog.dismiss();automaticLyricsSettings()}\n            sheetAction(panel,"Журнал и фильтры","Все песни · готовые, без текста и с ошибками")')
+rep('actionSheet("Тексты медиатеки",430)','actionSheet("Тексты медиатеки",480)')
+rep('val filters=listOf("Нужна проверка","Все песни","С субтитрами","Без текста","Не проверено")','val filters=listOf("Нужна проверка","Все песни","С субтитрами","Без текста","Не проверено","Без исполнителя")')
+rep('val filtered=rows.filter{(_,state)->when(selected){','val filtered=rows.filter{(track,state)->when(selected){')
+rep('            4->state==LyricScanState.State.NEW','            4->state==LyricScanState.State.NEW\n            5->!TrackIdentityFix.knownArtist(track.artist)')
+# Apply staged results after Activity initialization, not while loading an incomplete library.
+resume=re.search(r'override\s+fun\s+onResume\s*\(\s*\)\s*\{',s)
+if resume:
+    i=resume.end()
+    assert s[i:].lstrip().startswith('super.onResume()')
+    j=s.index('super.onResume()',i)+len('super.onResume()')
+    s=s[:j]+';AutoLyrics.schedule(this);if(mergeAutomaticLyrics())render();'+s[j:]
+else:
+    anchor='override fun onDestroy(){'
+    assert s.count(anchor)==1
+    s=s.replace(anchor,'override fun onResume(){super.onResume();AutoLyrics.schedule(this);if(mergeAutomaticLyrics())render()}\n    '+anchor)
 p.write_text(s)
 print("PASS: persistent default-off PRO controls; core player unchanged")
