@@ -68,7 +68,7 @@ helper='''    private fun moodPrefs()=getSharedPreferences("mood_discovery_v1",M
                 if(indexed.isEmpty()){toast("Сначала просканируйте медиатеку");return@sheetAction}
                 dialog.dismiss();moodDescriptionDialog(indexed)
             }
-            sheetAction(panel,"Смена настроения","Подборка до 30 песен с постепенным изменением звучания"){
+            sheetAction(panel,"Смена настроения","Плавное изменение звучания от песни к песне"){
                 if(indexed.isEmpty()){toast("Сначала просканируйте медиатеку");return@sheetAction}
                 dialog.dismiss();moodJourneyDialog(indexed)
             }
@@ -114,7 +114,7 @@ helper='''    private fun moodPrefs()=getSharedPreferences("mood_discovery_v1",M
                     dialog.dismiss();launchMoodJourney(indexed,from,to,30)
                 }
             }
-            sheetAction(panel,"Свой маршрут","Выбрать начальное и конечное настроение, длину подборки"){
+            if(proMode())sheetAction(panel,"Свой маршрут","Выбрать начальное и конечное настроение, длину подборки"){
                 dialog.dismiss();customMoodJourney(indexed)
             }
         }

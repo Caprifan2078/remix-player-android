@@ -35,7 +35,7 @@ helper='''    private fun calibrateLyrics(t:Track,raw:String){
             })
             panel.addView(btn("Применить"){
                 val f=first;if(f==null){toast("Добавьте хотя бы одну отметку");return@btn}
-                runCatching{val target=libraryIndex.get(id)?:error("Песня удалена");require(lyricRevision(target)==revision){"Текст изменился"};val corrected=LyricClock.correct(raw,LyricClock.mapping(f,second));target.lyrics=corrected;save();dialog.dismiss();render()}.onFailure{toast(it.message?:"Ошибка синхронизации")}
+                runCatching{val target=libraryIndex.get(id)?:error("Песня удалена");require(lyricRevision(target)==revision){"Текст изменился"};val corrected=LyricClock.correct(raw,LyricClock.mapping(f,second));val previous=target.lyrics;target.lyrics=corrected;if(!saveLibrary(true)){target.lyrics=previous;reindex();error("Не удалось сохранить синхронизацию")};dialog.dismiss();render()}.onFailure{toast(it.message?:"Ошибка синхронизации")}
             })
             sheetAction(panel,"Точный сдвиг ±","Настройка в миллисекундах"){dialog.dismiss();shiftLyricsDialog(t,raw)}
         }

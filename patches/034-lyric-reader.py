@@ -19,6 +19,7 @@ helper=r'''    private fun searchableLyricLines(raw:String):List<LyricLineSearch
     }
     private fun findLyricLine(t:Track,raw:String){
         val lines=searchableLyricLines(raw)
+        val index=LyricLineSearch.Index(lines)
         actionSheet("Поиск по тексту",480){dialog,panel->
             val search=EditText(this).apply{hint="Введите слова песни";setSingleLine(true);setTextColor(PremiumChrome.TEXT);setHintTextColor(muted);filters=arrayOf(android.text.InputFilter.LengthFilter(200))}
             panel.addView(search,LinearLayout.LayoutParams(-1,dp(52)))
@@ -26,7 +27,7 @@ helper=r'''    private fun searchableLyricLines(raw:String):List<LyricLineSearch
             fun fill(q:String){
                 results.removeAllViews()
                 if(q.isBlank()){results.addView(label("Поиск работает без интернета",14,muted));return}
-                val found=LyricLineSearch.find(lines,q)
+                val found=index.find(q)
                 results.addView(label(if(found.isEmpty())"Совпадений нет" else if(found.size==LyricLineSearch.MAX_RESULTS)"Первые 80 совпадений" else "Найдено: "+found.size,14,muted))
                 found.forEach{line->sheetAction(results,line.text,line.ms?.let{fmt(it)}?:"Без тайминга"){
                     if(line.ms!=null){dialog.dismiss();jumpFoundLyric(t,raw,line.ms)}

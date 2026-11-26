@@ -19,8 +19,12 @@ object LyricLineSearch {
         if(lines.isEmpty()||translated.size!=lines.size)return null
         return lines.zip(translated){line,text->PairLine(line,text)}
     }
-    fun find(lines:List<Line>,query:String):List<Line>{
-        val q=normalize(query.take(200));if(q.isBlank())return emptyList()
-        return lines.asSequence().filter{it.text.isNotBlank()&&normalize(it.text).contains(q)}.take(MAX_RESULTS).toList()
+    class Index(lines:List<Line>){
+        private val entries=lines.mapNotNull{line->normalize(line.text).takeIf{it.isNotBlank()}?.let{line to it}}
+        fun find(query:String):List<Line>{
+            val q=normalize(query.take(200));if(q.isBlank())return emptyList()
+            return entries.asSequence().filter{it.second.contains(q)}.take(MAX_RESULTS).map{it.first}.toList()
+        }
     }
+    fun find(lines:List<Line>,query:String):List<Line> = Index(lines).find(query)
 }
