@@ -39,6 +39,22 @@ object LyricsSearchPlan {
         if(artistKnown(a))q("$clean $a")
         return out.take(7)
     }
+    /** Keep the user's corrected query first; use file tags only as an alternative. */
+    fun metadataTitles(entered:String,tag:String?):List<String> =
+        listOfNotNull(entered,tag).map{it.trim().take(300)}.filter{it.isNotBlank()}.distinctBy{LyricsMatch.normalize(it)}
+    /** A short editable snippet, not the entire recognized song. */
+    fun transcriptHint(lines:List<String>):String {
+        val candidates=lines.asSequence().take(100).map{line->
+            Regex("[\\p{L}\\p{N}]+(?:['’][\\p{L}]+)?").findAll(line.take(500)).map{it.value}.take(10).toList()
+        }.filter{it.size>=3}.toList()
+        val words=candidates.maxWithOrNull(compareBy<List<String>>{it.map{w->w.lowercase(Locale.ROOT)}.distinct().size}.thenBy{it.size})?:return ""
+        return words.joinToString(" ").take(120)
+    }
+    fun browserUrl(query:String):String? {
+        val q=query.trim().replace(Regex("\\s+")," ").take(180)
+        if(q.isBlank())return null
+        return "https://www.google.com/search?q="+enc("$q lyrics")
+    }
     fun exact(title:String,artist:String,seconds:Long?,candidate:LyricsMatch.Candidate):Boolean =
         artistKnown(artist)&&LyricsMatch.normalize(artist).isNotBlank()&&LyricsMatch.normalize(title).isNotBlank()&&!isComposite(title)&&LyricsMatch.normalize(title)==LyricsMatch.normalize(candidate.title)&&LyricsMatch.normalize(artist)==LyricsMatch.normalize(candidate.artist)&&seconds!=null&&seconds>0&&candidate.duration!=null&&candidate.duration>0&&kotlin.math.abs(seconds-candidate.duration)<=3&&!candidate.synced.isNullOrBlank()
 }
