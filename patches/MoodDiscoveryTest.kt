@@ -13,6 +13,8 @@ fun main(){
  val rows=listOf(MoodDiscovery.Entry("1","A",sad),MoodDiscovery.Entry("2","A",sad),MoodDiscovery.Entry("3","B",sad),MoodDiscovery.Entry("1","A",sad))
  check(MoodDiscovery.rank(rows,p.getValue("Меланхолия"))==listOf("1","3","2"))
  check(MoodDiscovery.rank(rows,p.getValue("Меланхолия"),2)==listOf("1","3"))
+ val unknown=listOf(MoodDiscovery.Entry("1","",sad),MoodDiscovery.Entry("2","A",sad.copy(energy=.30)))
+ check(MoodDiscovery.rank(unknown,p.getValue("Меланхолия")).first()=="1")
  val r=MusicAnalysis.Report(null,null,null,0.0,0.0,20.0,listOf(0.0,0.0))
  check(MoodDiscovery.from(r)==null)
  val spec=SoundProfile.Features(.35,.5,.15,500.0,30)
@@ -23,5 +25,5 @@ fun main(){
  check(MoodDiscovery.from(measured.copy(keyConfidence=0.0))!!.valence==null)
  val many=(0 until 10000).map{MoodDiscovery.Entry(it.toString(),"Artist "+it%50,sad)}
  check(MoodDiscovery.rank(many,p.getValue("Меланхолия"),100).distinct().size==100)
- println("PASS: 12 mood ranking checks including 10,000-entry library")
+ println("PASS: 13 mood ranking checks including 10,000-entry library")
 }

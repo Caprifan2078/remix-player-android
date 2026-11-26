@@ -42,7 +42,7 @@ object MoodDiscovery {
   val out=mutableListOf<String>();var last=""
   while(sorted.isNotEmpty()&&out.size<limit){
    val best=sorted.first().second
-   val i=sorted.indexOfFirst{it.second>=best-.055&&it.first.artist.isNotBlank()&&!it.first.artist.equals(last,true)}.takeIf{it>=0}?:0
+   val i=if(last.isBlank())0 else sorted.indexOfFirst{it.second>=best-.055&&it.first.artist.isNotBlank()&&!it.first.artist.equals(last,true)}.takeIf{it>=0}?:0
    val item=sorted.removeAt(i).first;out.add(item.id);last=item.artist
   }
   return out

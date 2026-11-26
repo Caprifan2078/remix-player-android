@@ -5,7 +5,7 @@ import java.util.Locale
 /** Broader discovery without treating a remix or mashup as a verified original. */
 object LyricsSearchPlan {
     private val format=Regex("(?i)\\.(mp3|flac|wav|m4a|ogg|opus|aac|webm|mp4)$")
-    private val extra=Regex("(?i)\\s*[\\[(][^\\])]*(?:official|lyrics?|visualizer|audio|video|remix|mashup|sped\\s*up|slowed|reverb|nightcore|daycore|bass\\s*boost)[^\\])]*[\\])]\\s*")
+    private val extra=Regex("(?i)\\s*[\\[(]\\s*(?:official(?:\\s+(?:music\\s+video|video|audio|lyrics?))?|lyrics?|lyric\\s+video|visualizer|audio|video|sped\\s*up|slowed(?:\\s*(?:\\+|and|&)\\s*reverb)?|reverb|nightcore|daycore|bass\\s*boost|(?:[^\\]\\)]+\\s+)?(?:remix|mashup))\\s*[\\])]\\s*")
     private val suffix=Regex("(?i)\\s+(?:[-–—|]\\s*)?(?:sped\\s*up|slowed(?:\\s*(?:\\+|and|&)\\s*reverb)?|nightcore|daycore|bass\\s*boost|official\\s+(?:music\\s+)?video|lyrics?|mashup|remix)\\s*$")
     private val mash=Regex("(?i)\\s+(?:x|×|vs\\.?|versus)\\s+")
     private val artistTitle=Regex("\\s+[-–—]\\s+")
@@ -40,5 +40,5 @@ object LyricsSearchPlan {
         return out.take(7)
     }
     fun exact(title:String,artist:String,seconds:Long?,candidate:LyricsMatch.Candidate):Boolean =
-        artistKnown(artist)&&!isComposite(title)&&LyricsMatch.normalize(title)==LyricsMatch.normalize(candidate.title)&&LyricsMatch.normalize(artist)==LyricsMatch.normalize(candidate.artist)&&seconds!=null&&candidate.duration!=null&&kotlin.math.abs(seconds-candidate.duration)<=3&&candidate.synced!=null
+        artistKnown(artist)&&LyricsMatch.normalize(artist).isNotBlank()&&LyricsMatch.normalize(title).isNotBlank()&&!isComposite(title)&&LyricsMatch.normalize(title)==LyricsMatch.normalize(candidate.title)&&LyricsMatch.normalize(artist)==LyricsMatch.normalize(candidate.artist)&&seconds!=null&&seconds>0&&candidate.duration!=null&&candidate.duration>0&&kotlin.math.abs(seconds-candidate.duration)<=3&&!candidate.synced.isNullOrBlank()
 }

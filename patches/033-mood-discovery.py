@@ -58,7 +58,7 @@ helper='''    private fun moodPrefs()=getSharedPreferences("mood_discovery_v1",M
                 updateWork("Настроения: "+(i+1)+"/"+pending.size+" · "+t.second)
                 val f=try{TrackAnalyzer.report(this,Uri.parse(t.first))?.let{MoodDiscovery.from(it)}}catch(e:Exception){if(Thread.currentThread().isInterrupted||e is InterruptedException)throw e;null}
                 check(!Thread.currentThread().isInterrupted)
-                if(f!=null){saveMood(t.first,t.second,t.third,f);saved++}else skipped++
+                if(f!=null){saveMood(t.first,t.second,t.third,f);saved++}else{moodPrefs().edit().remove(moodStamp(t.first,t.second,t.third)).apply();skipped++}
             }
             saved to skipped
         }){r->toast("Добавлено: "+r.first+" · недостаточно данных: "+r.second);moodDiscoveryDialog()}
