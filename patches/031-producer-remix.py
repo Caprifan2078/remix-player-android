@@ -95,6 +95,13 @@ rep('compactSection("genre-more","Все направления · "+ProducerSty
         compactSection("genre-options","Настройки аранжировки и модели",controls,body.childCount-controls.size)''')
 p.write_text(s)
 print("PASS: 40 procedural genres, refined quick effects, offline DJ bass exchange")
+# Avoid excessive overlap of original low frequencies and the new kick when stems are unavailable.
+edit('GenreEngine.kt','val lead=LeadSynth(harmonies,bpm,phase,style,grid=grid);val envelope=Arrangement.Envelope','val lead=LeadSynth(harmonies,bpm,phase,style,grid=grid);val hardMix=HardMixSpace(44100);val hardStyle=HardKick.profile(style.name)!=null;val envelope=Arrangement.Envelope')
+edit('GenreEngine.kt','val l=StemCore.readShort(r)/32768f*.72f*controls.source+b;val rr=StemCore.readShort(r)/32768f*.72f*controls.source+b;dynamics.frame(l,rr)','hardMix.frame(StemCore.readShort(r)/32768f,StemCore.readShort(r)/32768f,beat.kickEnvelope*levels.drums*controls.drums,hardStyle);val l=hardMix.left*.72f*controls.source+b;val rr=hardMix.right*.72f*controls.source+b;dynamics.frame(l,rr)')
+edit('GenreEngine.kt','sourceDrumScale:Float,controls:GenreMix):Float','sourceDrumScale:Float,controls:GenreMix,sourceBassScale:Float=1f):Float')
+edit('GenreEngine.kt','samples[1]/32768f*style.bass*controls.source','samples[1]/32768f*style.bass*controls.source*sourceBassScale')
+edit('GenreEngine.kt','val kickSpace=KickSpace();out.outputStream()','val kickSpace=KickSpace();val hardStyle=HardKick.profile(style.name)!=null;out.outputStream()')
+edit('GenreEngine.kt','sum(samples,beat*(.75f+.25f*duck),style,newBass*duck,levels.sourceDrums,controls),sum(right,beat*(.75f+.25f*duck),style,newBass*duck,levels.sourceDrums,controls)','sum(samples,beat*(.75f+.25f*duck),style,newBass*duck,levels.sourceDrums,controls,if(hardStyle)kickGain else 1f),sum(right,beat*(.75f+.25f*duck),style,newBass*duck,levels.sourceDrums,controls,if(hardStyle)kickGain else 1f)')
 # The hard-dance kick is rendered per genre, not the same oscillator with a different label.
 edit('GenreEngine.kt','private val kicks=DoubleArray(ceil(.36*rate).toInt())','private val kicks=HardKick.curve(style.name,rate)?:DoubleArray(ceil(.36*rate).toInt())')
 p=src/'GenreEngine.kt'
