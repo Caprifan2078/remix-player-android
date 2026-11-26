@@ -16,6 +16,7 @@ internal object GenreKick {
         val raw=name=="Rawstyle"||name=="Krushfunk"
         val hz=base.coerceIn(38.0,68.0)
         val n=ceil(.36*rate).toInt()
+        val harmonics=if(hard) doubleArrayOf(1.0,.38,.27,.14,.09) else doubleArrayOf(1.0,.24,.13,.05)
         return DoubleArray(n){i->
             val t=i.toDouble()/rate
             val sweep=if(hard) 125.0 else 85.0
@@ -23,7 +24,6 @@ internal object GenreKick {
             val phase=2*PI*(hz*t+sweep*tau*(1-exp(-t/tau)))
             val instant=hz+sweep*exp(-t/tau)
             val body=exp(-t/(if(hard) .19 else .115))
-            val harmonics=if(hard) doubleArrayOf(1.0,.38,.27,.14,.09) else doubleArrayOf(1.0,.24,.13,.05)
             var sum=0.0;var weight=0.0
             for(h in harmonics.indices){if(instant*(h+1)>=rate*.42)break;val a=harmonics[h]*(if(raw&&h>0)1.35 else 1.0);sum+=a*sin(phase*(h+1));weight+=a}
             val punch=sin(2*PI*(hz*t+3.2*(1-exp(-t/.009))))*exp(-t/.018)
