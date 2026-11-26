@@ -175,16 +175,22 @@ helper='''    private fun moodPrefs()=getSharedPreferences("mood_discovery_v1",M
                 val name=if(similar)"Ближе по звучанию" else "Разнообразнее"
                 val detail=if(similar)"Близкие акустические характеристики" else "Больше разнообразия исполнителей и звучания"
                 sheetAction(panel,name,detail){
-                    val ids=LocalDiscovery.rank(origin,pool,mode)
-                    dialog.dismiss();moodMixPreview(("Похожие · "+title+" · "+name).take(100),detail,ids)
+                    if(stemBusy){toast("Дождитесь завершения обработки");return@sheetAction}
+                    dialog.dismiss()
+                    stemWork("Поиск похожей музыки…",{LocalDiscovery.rank(origin,pool,mode)}){ids->moodMixPreview(("Похожие · "+title+" · "+name).take(100),detail,ids)}
                 }
             }
             sheetAction(panel,"Продолжить подборку","Похожие песни, которых ещё нет в текущей очереди"){
+                if(stemBusy){toast("Дождитесь завершения обработки");return@sheetAction}
                 val p=controller
                 val existing=if(p==null)emptySet<String>()else (0 until p.mediaItemCount).map{p.getMediaItemAt(it).mediaId}.toSet()
-                val ids=LocalDiscovery.rank(origin,pool,LocalDiscovery.Mode.VARIED,excluded=existing)
-                if(ids.isEmpty()){toast("Новых подходящих песен нет");return@sheetAction}
-                dialog.dismiss();moodMixPreview("Продолжение · "+title,"Похожие песни вне текущей очереди",ids)
+                dialog.dismiss()
+                stemWork("Продолжение подборки…",{LocalDiscovery.rank(origin,pool,LocalDiscovery.Mode.VARIED,excluded=existing)}){ids->
+                    val player=controller
+                    val currentIds=if(player==null)emptySet<String>()else (0 until player.mediaItemCount).map{player.getMediaItemAt(it).mediaId}.toSet()
+                    val live=ids.filter{it !in currentIds}
+                    if(live.isEmpty())toast("Новых подходящих песен нет")else moodMixPreview("Продолжение · "+title,"Похожие песни вне текущей очереди",live)
+                }
             }
             panel.addView(label("Только песни из вашей проанализированной медиатеки.",12,muted))
         }
