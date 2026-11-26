@@ -41,6 +41,15 @@ private class EffectRoom(rate:Int,channels:Int,p:Preset){
         for(line in diffusion[c])wet=line.sample(wet)
         return wet
     }
+    /** Crossfeed only the delayed reflections, never the direct sound. */
+    fun mix(frame:FloatArray,amount:Float){
+        if(frame.size==2){
+            val l=frame[0];val r=frame[1]
+            val wetL=sample(0,l+(r-l)*.18f);val wetR=sample(1,r+(l-r)*.18f)
+            frame[0]=l*(1-.12f*amount)+wetL*amount*.72f
+            frame[1]=r*(1-.12f*amount)+wetR*amount*.72f
+        }else for(c in frame.indices){val x=frame[c];frame[c]=x*(1-.12f*amount)+sample(c,x)*amount*.72f}
+    }
 }
 
 /** First-order antiderivative antialiasing for the heavy tanh waveshaper.
@@ -120,9 +129,9 @@ class Dsp(private val rate:Int,private val channels:Int){
                 low1[c]+=lowAlpha*(v-low1[c]);low2[c]+=lowAlpha*(low1[c]-low2[c]);y+=(low2[c]-y)*colorMix
             }
             if(p.drive>0){val wet=if(antiAlias)smoothDrive.sample(c,y,driveK,driveNorm)else tanh(y*driveK)/driveNorm;y+=(wet-y)*depth*driveMix}
-            room?.let{val amount=p.room*depth;val wet=it.sample(c,y);y=y*(1-.12f*amount)+wet*amount*.72f}
             out[c]=y
         }
+        room?.mix(out,p.room*depth)
         if(channels==2&&p.pan>0){orbit.apply(out,(sin(phase)*p.pan).toFloat());phase+=phaseStep;if(phase>2*PI)phase-=2*PI}
         guard.apply(out)
     }
