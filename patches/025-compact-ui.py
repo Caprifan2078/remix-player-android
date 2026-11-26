@@ -125,6 +125,20 @@ replace('activeLyrics=Lrc.parse(raw);if(activeLyrics.isEmpty()){body.addView(lab
         body.addView(toggle);body.addView(extra);updateTools()
         body.addView(label(''')
 
+# Baseline API 35 screenshot: the idle mini-player wastes space and
+# neighbouring filled button backgrounds touch. Preserve the 48dp hit areas.
+replace('seek.contentDescription="Позиция воспроизведения";bar.addView(seek)',
+        'seek.contentDescription="Позиция воспроизведения";seek.visibility=View.GONE;bar.addView(seek)')
+replace('time=label("0:00 / 0:00",12,muted);bar.addView(time)',
+        'time=label("0:00 / 0:00",12,muted);time.visibility=View.GONE;bar.addView(time)')
+replace('setTextChanged(now,title);setTextChanged(play,if(playing)"Ⅱ" else "▶")',
+'''val transportDetails=if(controller?.currentMediaItem!=null||MixerSession.active)View.VISIBLE else View.GONE
+            if(seek.visibility!=transportDetails)seek.visibility=transportDetails
+            if(time.visibility!=transportDetails)time.visibility=transportDetails
+            setTextChanged(now,title);setTextChanged(play,if(playing)"Ⅱ" else "▶")''')
+replace('background=android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x30FFFFFF),rounded(surface,12),rounded(Color.WHITE,12));setOnClickListener{action()}',
+'''background=android.graphics.drawable.InsetDrawable(android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x30FFFFFF),rounded(surface,12),rounded(Color.WHITE,12)),dp(2));setPadding(dp(8),dp(5),dp(8),dp(5));setOnClickListener{action()}''')
+
 # Fail closed if any legacy top-level duplicate survives.
 versions=s[s.index("    private fun versions(){"):s.index("    private val customPresets=")]
 for duplicate in ('btn("Экспорт WAV в папку…")','btn("Экспорт FLAC без потерь…")','btn("Экспорт MP3…")','btn("Открыть студию эффектов")','listOf("Текст","Микшер","Студия","Очередь")'):
