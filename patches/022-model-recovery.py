@@ -67,6 +67,20 @@ s=s[:a]+'''            return activate(c,tmp)
     }
 '''+s[b:]
 p.write_text(s)
+# Give larger Whisper models a bounded beam search when there is additional free memory.
+replace("WhisperLocal.kt","private external fun recognize(handle:Long,pcm:FloatArray,language:String,threads:Int):ByteArray?","private external fun recognize(handle:Long,pcm:FloatArray,language:String,threads:Int,beam:Int):ByteArray?")
+replace("WhisperLocal.kt","handle=open(model(c).absolutePath);check(handle!=0L)","checkMemory(c,spec);val memory=android.app.ActivityManager.MemoryInfo();(c.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager).getMemoryInfo(memory);val beam=spec.beamSize(memory.availMem,memory.lowMemory);status(if(beam>1)\"Whisper · точный поиск\" else \"Whisper · обычный поиск\");handle=open(model(c).absolutePath);check(handle!=0L)")
+replace("WhisperLocal.kt","availableProcessors().coerceIn(1,4))?:error","availableProcessors().coerceIn(1,4),beam)?:error")
+bridge=Path(sys.argv[1])/'native/whisper/bridge.cpp'
+s=bridge.read_text()
+def native(a,b):
+ global s
+ assert s.count(a)==1,("Whisper JNI",a[:80],s.count(a))
+ s=s.replace(a,b)
+native('starts.size()<2||starts.size()>200','starts.empty()||starts.size()>200')
+native('jstring language,jint threads){','jstring language,jint threads,jint beam){')
+native('auto p=whisper_full_default_params(WHISPER_SAMPLING_GREEDY);','const bool accurate=beam==3;auto p=whisper_full_default_params(accurate?WHISPER_SAMPLING_BEAM_SEARCH:WHISPER_SAMPLING_GREEDY);if(accurate){p.beam_search.beam_size=3;p.greedy.best_of=3;}')
+bridge.write_text(s)
 p=src/'MainActivity.kt';s=p.read_text()
 a=s.index('    private fun whisperModelDialog(){')
 b=s.index('    private fun recognizeWhisper(',a)
