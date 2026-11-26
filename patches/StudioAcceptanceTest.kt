@@ -26,6 +26,31 @@ class StudioAcceptanceTest {
     }
     private fun decode(f:File,dst:File)=StemEngine.decode(c,FileProvider.getUriForFile(c,"app.remix.player.files",f),dst)
     private fun hash(f:File)=MessageDigest.getInstance("SHA-256").digest(f.readBytes()).joinToString(""){"%02x".format(it)}
+    @Test fun waveformFallbackIsVisibleAndTracksPosition(){
+        val inst=InstrumentationRegistry.getInstrumentation()
+        inst.runOnMainSync{
+            val view=WaveSeekBar(c);view.max=1000;view.progress=500
+            val density=c.resources.displayMetrics.density
+            val width=(300*density).toInt();val height=(48*density).toInt()
+            view.measure(android.view.View.MeasureSpec.makeMeasureSpec(width,android.view.View.MeasureSpec.EXACTLY),android.view.View.MeasureSpec.makeMeasureSpec(height,android.view.View.MeasureSpec.EXACTLY))
+            view.layout(0,0,width,height)
+            val bitmap=android.graphics.Bitmap.createBitmap(width,height,android.graphics.Bitmap.Config.ARGB_8888)
+            val canvas=android.graphics.Canvas(bitmap)
+            val left=view.paddingLeft;val right=width-view.paddingRight;val middle=(left+right)/2;val y=(view.paddingTop+height-view.paddingBottom)/2
+            try{
+                canvas.drawColor(0xff101019.toInt());view.draw(canvas)
+                assertEquals("Fallback played track",0xffc0b0ff.toInt(),bitmap.getPixel((left+middle)/2,y))
+                assertEquals("Fallback remaining track",0xff70677e.toInt(),bitmap.getPixel((middle+right)/2,y))
+                assertEquals("Fallback playhead",0xffe8dfff.toInt(),bitmap.getPixel(middle,y))
+                view.setWaveform(FloatArray(160){.5f});canvas.drawColor(0xff101019.toInt());view.draw(canvas)
+                assertEquals("Waveform playhead",0xffe8dfff.toInt(),bitmap.getPixel(middle,y))
+                view.progress=250;canvas.drawColor(0xff101019.toInt());view.draw(canvas)
+                assertEquals("Updated playhead",0xffe8dfff.toInt(),bitmap.getPixel(left+(right-left)/4,y))
+                view.setWaveform(null);view.progress=750;canvas.drawColor(0xff101019.toInt());view.draw(canvas)
+                assertEquals("Fallback after clearing waveform",0xffe8dfff.toInt(),bitmap.getPixel(left+(right-left)*3/4,y))
+            }finally{bitmap.recycle()}
+        }
+    }
     @Test fun allOfflineEffectsAndAndroidDecoder(){
         val dir=folder()
         try{

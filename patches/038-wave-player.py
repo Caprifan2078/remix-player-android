@@ -79,6 +79,7 @@ replace('override fun onStart(){super.onStart();uiStarted=true;','override fun o
 replace('override fun onDestroy(){uiStarted=false;','override fun onDestroy(){cancelWave();waveIo.shutdownNow();waveCache.evictAll();uiStarted=false;')
 replace('setTextChanged(time,"${fmt(pos)} / ${fmt(dur)}")','if(!dragging)setTextChanged(time,"${fmt(pos)} / ${fmt(dur)}");syncWave()')
 replace('override fun onProgressChanged(s:SeekBar,p:Int,user:Boolean){if(user&&!dragging)applySeek(currentSeekTarget(),p)}',r'''override fun onProgressChanged(s:SeekBar,p:Int,user:Boolean){
+                s.invalidate()
                 if(!user)return
                 if(!dragging){applySeek(currentSeekTarget(),p);return}
                 val target=seekTarget;val actual=currentSeekTarget()
@@ -90,6 +91,7 @@ replace('override fun onProgressChanged(s:SeekBar,p:Int,user:Boolean){if(user&&!
                 setTextChanged(time,"${fmt(preview)} / ${fmt(duration)}")
             }''')
 replace('found.onSuccess{list->reports.clear();completeReports.clear();tempoSearchCache.clear();tempos.clear();','found.onSuccess{list->cancelWave();waveCache.evictAll();reports.clear();completeReports.clear();tempoSearchCache.clear();tempos.clear();')
+replace('if(seek.progress!=progress)seek.progress=progress','if(seek.progress!=progress){seek.progress=progress;seek.invalidate()}')
 # Player screen remains compact; the transport waveform is always usable immediately.
 replace('dp(if(resources.configuration.screenHeightDp<500)180 else 270)','dp(if(resources.configuration.screenHeightDp<600)140 else 220)')
 p.write_text(s)
