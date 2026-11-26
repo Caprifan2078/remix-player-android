@@ -135,6 +135,9 @@ class MixerLyricsUiAcceptanceTest {
         fixture {
             click("Музыка")
             await("Library did not start compact"){button("Фильтры и инструменты…")!=null&&button("Инструменты библиотеки…")==null}
+            await("Active track must restore transport seek"){
+                activity()?.window?.decorView?.let{v->views(v).any{it is android.widget.SeekBar&&it.contentDescription=="Позиция воспроизведения"&&it.isShown}}==true
+            }
             capture("compact-library")
             click("Фильтры и инструменты…")
             await("Library tools not reachable"){button("Инструменты библиотеки…")!=null&&button("Добавить найденные песни в очередь…")!=null}
