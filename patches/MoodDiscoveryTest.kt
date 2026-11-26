@@ -54,5 +54,16 @@ fun main(){
  check(MoodDiscovery.journey(emptyList(),start,end).isEmpty())
  check(MoodDiscovery.journey(journeyRows,start,end,30).distinct().size==3)
  check(runCatching{MoodDiscovery.journey(journeyRows,start,end,0)}.isFailure)
- println("PASS: 33 mood, description and journey checks")
+ val minor=MoodDiscovery.Profile("minor","",.2,.2,.4,.4,.2,.4)
+ val free=minor.copy(title="free",energy=.8,activity=.8,valence=null)
+ fun tone(id:String,x:Double,v:Double?)=MoodDiscovery.Entry(id,id,MoodDiscovery.Features(x,x,.4,.4,v,.4))
+ val mixed=listOf(tone("a-major",.2,.8),tone("z-minor",.2,.2),tone("end",.8,null))
+ check(MoodDiscovery.journey(mixed,minor,free,2)==listOf("z-minor","end"))
+ check(MoodDiscovery.journey(mixed,free,minor,2)==listOf("end","z-minor"))
+ check(MoodDiscovery.journey(emptyList(),minor,free).isEmpty())
+ val big=(0 until 10000).map{tone(it.toString(),(it%100)/100.0,if(it%2==0).2 else .8)}
+ val longJourney=MoodDiscovery.journey(big,minor,free,100)
+ check(longJourney.size==100)
+ check(longJourney.distinct().size==100)
+ println("PASS: 38 mood, description and journey checks")
 }
