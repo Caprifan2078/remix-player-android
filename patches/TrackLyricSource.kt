@@ -43,4 +43,28 @@ object TrackLyricSource {
   // Embedded lyrics are a selectable local source, never a reason to suppress internet lookup.
   return (listOfNotNull(stored)+online) to info.seconds
  }
+ /** Shared one-track and whole-library automatic search. Keep a valid saved text on network failure. */
+ fun automatic(c:Context,uri:Uri,title:String,artist:String,current:String,online:Boolean):String?{
+  check(!Thread.currentThread().isInterrupted)
+  fun merge(base:String?,next:String?)=BatchLyricPolicy.merge(base,next,{Lrc.parse(it).isNotEmpty()},LyricDocument::plain)
+  var known=merge(current,embedded(c,uri))
+  if(!online||known?.let{Lrc.parse(it).isNotEmpty()}==true)return known
+  val info=metadata(c,uri,title,artist,null)
+  val identities=listOf(info.title to info.artist,(info.tagTitle?:info.title) to (info.tagArtist?:info.artist)).distinctBy{LyricsMatch.normalize(it.first) to LyricsMatch.normalize(it.second)}
+  for((name,who) in identities){
+   if(!LyricsSearchPlan.artistKnown(who)||name.isBlank()||info.seconds==null)continue
+   try{
+    val matches=LyricsLookup.search(name,who,info.seconds,false)
+    val candidate=BatchLyricPolicy.chooseAutomatic(matches,name,who,info.seconds)
+    known=merge(known,candidate)
+    if(known?.let{Lrc.parse(it).isNotEmpty()}==true)break
+   }catch(e:Exception){
+    if(e is InterruptedException||Thread.currentThread().isInterrupted)throw InterruptedException()
+    if(known==null)throw e
+    break
+   }
+  }
+  check(!Thread.currentThread().isInterrupted)
+  return known
+ }
 }
