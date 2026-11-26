@@ -41,6 +41,7 @@ edit('LiveOverlap.kt','val g=OverlapCore.gains(audible,w.duration);','val g=fade
 edit('LiveOverlap.kt','    private var preview:ExoPlayer?=null','''    private var preview:ExoPlayer?=null
     private val audiblePosition=OverlapHandoff()
     private var lastCorrectionAt=0L
+    private var recoveringHandoff=false
     private fun observeIncoming(){
         val p=preview?:return
         if(started||handing)audiblePosition.observe(p.currentPosition,p.duration,p.volume)
@@ -50,7 +51,7 @@ edit('LiveOverlap.kt','    private var preview:ExoPlayer?=null','''    private v
         try{main.seekTo(to,target)}finally{internalSeek=false}
     }''')
 edit('LiveOverlap.kt','if(reason==Player.DISCONTINUITY_REASON_AUTO_TRANSITION&&started&&newPosition.mediaItemIndex==to){autoPending=true;return}','if(reason==Player.DISCONTINUITY_REASON_AUTO_TRANSITION&&started&&newPosition.mediaItemIndex==to&&queueMatches()){observeIncoming();main.volume=0f;autoPending=true;return}')
-edit('LiveOverlap.kt','fadeWindow=null;fadePlan=null;startedAt=0L','fadeWindow=null;fadePlan=null;audiblePosition.reset();lastCorrectionAt=0L;startedAt=0L')
+edit('LiveOverlap.kt','fadeWindow=null;fadePlan=null;startedAt=0L','fadeWindow=null;fadePlan=null;audiblePosition.reset();lastCorrectionAt=0L;recoveringHandoff=false;startedAt=0L')
 edit('LiveOverlap.kt','''        if(!queueMatches()||p.playbackState!=Player.STATE_READY||!p.isPlaying){abort(true);return}
         handing=true;handoffAt=SystemClock.elapsedRealtime();blendSince=0L;main.volume=0f;p.volume=1f
         handoffTarget=OverlapCore.handoffPosition(p.currentPosition,p.duration);debug("handoff position="+handoffTarget);internalSeek=true;try{main.seekTo(to,handoffTarget)}finally{internalSeek=false}''','''        observeIncoming()
@@ -80,23 +81,36 @@ edit('LiveOverlap.kt','''            if(!queueMatches()||now-handoffAt>1800||p.p
                 }else{blendSince=0L;main.volume=0f;p.volume=1f}
             }else{blendSince=0L;main.volume=0f;p.volume=1f}
             return true''','''            if(!queueMatches()){abort(true);return false}
-            val previewPlaying=p.isPlaying&&p.playbackState==Player.STATE_READY&&p.playerError==null
+            val previewPlaying=!recoveringHandoff&&p.isPlaying&&p.playbackState==Player.STATE_READY&&p.playerError==null
             val aligned=main.currentMediaItemIndex==to&&main.isPlaying&&audiblePosition.aligned(main.currentPosition,p.currentPosition,previewPlaying)
             if(aligned){
                 if(!previewPlaying){abort(false);return false}
                 if(blendSince==0L)blendSince=now
-                val g=OverlapCore.gains(now-blendSince,120);p.volume=g.outgoing;main.volume=g.incoming
+                val blend=((now-blendSince)/120f).coerceIn(0f,1f);p.volume=1f-blend;main.volume=blend
                 if(now-blendSince>=120){abort(false);return false}
             }else{
                 blendSince=0L;main.volume=0f;p.volume=if(previewPlaying)1f else 0f
                 observeIncoming()
                 val target=audiblePosition.target(if(previewPlaying)p.currentPosition else 0L,p.duration)
                 if(now-handoffAt>=3000){
-                    // A bounded recovery seek flushes the stale intro before restoring primary gain.
-                    debug("handoff recovery position="+target)
-                    seekIncoming(target)
-                    abort(false)
-                    return false
+                    // Recovery is two-phase: never expose the stale primary decoder.
+                    if(!recoveringHandoff){
+                        recoveringHandoff=true
+                        observeIncoming()
+                        val recovery=audiblePosition.target(if(previewPlaying)p.currentPosition else 0L,p.duration)
+                        p.volume=0f;p.pause()
+                        debug("handoff recovery position="+recovery)
+                        seekIncoming(recovery);lastCorrectionAt=now
+                    }else if(now-lastCorrectionAt>=1000&&main.currentPosition<audiblePosition.audibleUntil-80){
+                        lastCorrectionAt=now;seekIncoming(audiblePosition.target(0L,p.duration))
+                    }
+                    if(now-handoffAt>=12000){
+                        // A failed decoder must not be allowed to replay an audible intro.
+                        seekIncoming(audiblePosition.target(0L,p.duration))
+                        main.pause()
+                        return false
+                    }
+                    return true
                 }
                 if(now-lastCorrectionAt>=350&&(main.currentMediaItemIndex!=to||main.currentPosition<target-120||main.currentPosition>target+250)){
                     lastCorrectionAt=now;seekIncoming(target)
