@@ -14,10 +14,10 @@ object LocalDiscovery {
   return sum/mass
  }
  private fun artist(e:Entry)=e.artist.trim().lowercase(Locale.ROOT)
- fun rank(seed:Entry,entries:List<Entry>,mode:Mode,limit:Int=50):List<String>{
+ fun rank(seed:Entry,entries:List<Entry>,mode:Mode,limit:Int=50,excluded:Set<String> = emptySet()):List<String>{
   require(limit in 1..100)
   val cutoff=if(mode==Mode.SIMILAR).27 else .39
-  val pool=entries.asSequence().filter{it.id.isNotBlank()&&it.id!=seed.id}.distinctBy{it.id}.map{it to distance(seed,it)}.filter{it.second<=cutoff}.sortedWith(compareBy<Pair<Entry,Double>>{it.second}.thenBy{it.first.id}).toMutableList()
+  val pool=entries.asSequence().filter{it.id.isNotBlank()&&it.id!=seed.id&&it.id !in excluded}.distinctBy{it.id}.map{it to distance(seed,it)}.filter{it.second<=cutoff}.sortedWith(compareBy<Pair<Entry,Double>>{it.second}.thenBy{it.first.id}).toMutableList()
   val result=mutableListOf<String>();val seen=mutableMapOf<String,Int>();var last=artist(seed)
   while(pool.isNotEmpty()&&result.size<limit){
    val best=pool[0].second;val slack=if(mode==Mode.SIMILAR).035 else .12
@@ -27,4 +27,11 @@ object LocalDiscovery {
   return result
  }
  fun append(existing:List<String>,suggestions:List<String>,limit:Int=50):List<String>{require(limit in 1..100);val seen=existing.toHashSet();return suggestions.asSequence().filter{it.isNotBlank()&&seen.add(it)}.take(limit).toList()}
+ data class QueuePlan(val index:Int,val ids:List<String>)
+ /** Next is physical queue order; do not silently disable shuffle. */
+ fun queuePlan(existing:List<String>,current:Int,suggestions:List<String>,next:Boolean,shuffle:Boolean,limit:Int=100):QueuePlan?{
+  if(next&&(shuffle||current !in existing.indices))return null
+  val ids=append(existing,suggestions,limit)
+  return QueuePlan(if(next)current+1 else existing.size,ids)
+ }
 }
