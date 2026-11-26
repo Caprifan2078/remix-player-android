@@ -31,6 +31,7 @@ adb("shell","am","force-stop",pkg)
 adb("shell","am","start","-W","-n",pkg+"/.MainActivity")
 screens=[("01-library","Музыка","Моя музыка"),("02-versions","Версии","Версии песни"),("03-studio","Студия","Remix Studio"),("04-lyrics","Текст","Текст песни"),("05-downloads","Загрузки","Загрузки"),("06-settings","Настройки","Настройки и память")]
 for name,label,heading in screens:
+    if label in ("Версии","Загрузки"): tap("Ещё")
     tap(label)
     capture(name,heading)
 tap("Музыка")
