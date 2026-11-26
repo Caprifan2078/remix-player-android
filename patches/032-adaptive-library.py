@@ -48,7 +48,7 @@ rep('val renderPlan=job.plan.copy(styles=tuned)','val renderPlan=job.plan.copy(s
 rep('val quality:Map<String,RemixQuality.Result>)','val quality:Map<String,RemixQuality.Result>,val separated:Boolean)')
 rep('GenreResult(files,report,bpm,quality)','GenreResult(files,report,bpm,quality,stems!=null)')
 rep('(if(advanced)"" else " · Mix")','(if(result.separated)"" else " · Mix")')
-rep('toast("Сохранено версий: ${versions.size}")','toast("Сохранено версий: ${versions.size}"+if(advanced&&!result.separated)" · без разделения" else "")')
+rep('screen="Версии";if(versions.size==1)start(versions.first());toast("Сохранено версий: ${versions.size}")','screen="Версии";if(versions.size==1)start(versions.first());toast("Сохранено версий: ${versions.size}"+(if(advanced&&!result.separated)" · без разделения" else ""))')
 # Reuse the existing background job/cancel mechanism. No destructive tag writes or silent ASR downloads.
 a=s.index('    private data class BatchLyricsItem')
 b=s.index('    // Shared custom bottom sheet',a)
