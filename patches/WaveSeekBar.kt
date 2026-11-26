@@ -5,9 +5,9 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.drawable.ColorDrawable
-import android.widget.SeekBar
+import androidx.appcompat.widget.AppCompatSeekBar
 /** Native SeekBar keeps accessibility and keyboard controls; only the track is drawn differently. */
-internal class WaveSeekBar(context:Context):SeekBar(context){
+internal class WaveSeekBar(context:Context):AppCompatSeekBar(context){
     private var peaks:FloatArray?=null
     private val normal=progressDrawable
     private val transparent=ColorDrawable(Color.TRANSPARENT)

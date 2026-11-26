@@ -75,6 +75,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/036-tempo-search.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/037-fast-text-search.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/038-wave-player.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/039-handoff-guard.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
           test -f "source/$PROJECT/app/build.gradle.kts"
@@ -196,6 +197,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/036-tempo-search.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/037-fast-text-search.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/038-wave-player.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/039-handoff-guard.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/setup-java@v4
@@ -321,6 +323,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/036-tempo-search.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/037-fast-text-search.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/038-wave-player.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/039-handoff-guard.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/download-artifact@v4
@@ -391,6 +394,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/036-tempo-search.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/037-fast-text-search.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/038-wave-player.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/039-handoff-guard.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/download-artifact@v4
@@ -468,6 +472,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/036-tempo-search.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/037-fast-text-search.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/038-wave-player.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/039-handoff-guard.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/setup-java@v4
