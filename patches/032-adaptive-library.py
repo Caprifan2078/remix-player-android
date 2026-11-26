@@ -88,7 +88,7 @@ s=s[:a]+'''    private data class ScanItem(val uri:String,val title:String,val a
                 try{
                     if(analyze){report=TrackAnalyzer.report(this,uri,full=true)}
                     if(t.before.isBlank()||Lrc.parse(t.before).isEmpty()){
-                        raw=TrackLyricSource.automatic(this,uri,t.title,t.artist,t.before,search)
+                        raw=try{TrackLyricSource.automatic(this,uri,t.title,t.artist,t.before,search)}catch(e:Exception){if(Thread.currentThread().isInterrupted||e is InterruptedException||!local)throw e;TrackLyricSource.automatic(this,uri,t.title,t.artist,t.before,false)}
                         if(search)Thread.sleep(1100)
                         if(raw.isNullOrBlank()&&local&&!scanDraftFile(t.uri).isFile){
                             draft=WhisperLocal.transcribe(this,uri,null,"auto"){updateWork(it)}.takeIf{it.isNotBlank()&&it.length<=256000};status=if(draft!=null)"Черновик Whisper" else "Нет совпадения"
