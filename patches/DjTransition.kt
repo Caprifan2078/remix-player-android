@@ -45,7 +45,8 @@ object DjTransition {
             val n=overlapFrames(first.length()/4,prepared.length()/4,seconds,a,measured)
             val default=minOf(seconds*RATE,first.length()/8,prepared.length()/8)
             notes.add(if(n!=default)"Доли: длина наложения скорректирована на ${((n-default)*1000.0/RATE).roundToLong()} мс" else "Доли: исходная длина наложения сохранена")
-            return Result(TransitionMix.renderFrames(first,prepared,out,n){progress("Сведение: $it%")},n,notes)
+            notes.add("Уровень: плавная коррекция разницы RMS до 6 дБ при достаточном сигнале")
+            return Result(TransitionMix.renderFrames(first,prepared,out,n,levelMatch=true){progress("Сведение: $it%")},n,notes)
         }finally{fitted?.delete()}
     }
 }

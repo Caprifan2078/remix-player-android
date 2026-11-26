@@ -66,6 +66,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/027-mix-quality.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/028-live-recovery.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/029-radio-similarity.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/030-transition-level-cache.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
           test -f "source/$PROJECT/app/build.gradle.kts"
@@ -119,14 +120,14 @@ jobs:
           path: source/RemixPlayer_v0.66/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
           if-no-files-found: error
       - name: Compile real-model test instrumentation separately
-        if: ${{ github.event_name == 'pull_request' && (github.head_ref == 'qa/smart-mix-model-recovery-20261126' || github.head_ref == 'qa/dj-ranking-20261126') }}
+        if: ${{ github.event_name == 'pull_request' && (github.head_ref == 'qa/smart-mix-model-recovery-20261126' || github.head_ref == 'qa/dj-ranking-20261126' || github.head_ref == 'qa/transition-level-cache-20261127') }}
         run: |
           set -euo pipefail
           cp model-qa/RealModelAcceptanceTest.kt model-qa/DirectWhisperDownloadTest.kt "source/$PROJECT/app/src/androidTest/java/app/remix/player/"
           cd "source/$PROJECT"
           gradle --no-daemon :app:assembleDebugAndroidTest --stacktrace
       - uses: actions/upload-artifact@v4
-        if: ${{ github.event_name == 'pull_request' && (github.head_ref == 'qa/smart-mix-model-recovery-20261126' || github.head_ref == 'qa/dj-ranking-20261126') }}
+        if: ${{ github.event_name == 'pull_request' && (github.head_ref == 'qa/smart-mix-model-recovery-20261126' || github.head_ref == 'qa/dj-ranking-20261126' || github.head_ref == 'qa/transition-level-cache-20261127') }}
         with:
           name: Real-model-instrumentation
           path: source/RemixPlayer_v0.66/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
@@ -178,6 +179,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/027-mix-quality.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/028-live-recovery.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/029-radio-similarity.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/030-transition-level-cache.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/setup-java@v4
@@ -288,6 +290,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/027-mix-quality.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/028-live-recovery.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/029-radio-similarity.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/030-transition-level-cache.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/download-artifact@v4
@@ -349,6 +352,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/027-mix-quality.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/028-live-recovery.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/029-radio-similarity.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/030-transition-level-cache.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/download-artifact@v4
@@ -417,6 +421,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/027-mix-quality.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/028-live-recovery.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/029-radio-similarity.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/030-transition-level-cache.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/setup-java@v4
@@ -461,7 +466,7 @@ jobs:
   candidate:
     name: Automated acceptance candidate (manual QA still required)
     needs: [apk, host, native, smoke, lint, real-models]
-    if: ${{ always() && needs.apk.result == 'success' && needs.host.result == 'success' && needs.native.result == 'success' && needs.smoke.result == 'success' && needs.lint.result == 'success' && (needs.real-models.result == 'success' || (needs.real-models.result == 'skipped' && !(github.event_name == 'pull_request' && (github.head_ref == 'qa/smart-mix-model-recovery-20261126' || github.head_ref == 'qa/dj-ranking-20261126')))) }}
+    if: ${{ always() && needs.apk.result == 'success' && needs.host.result == 'success' && needs.native.result == 'success' && needs.smoke.result == 'success' && needs.lint.result == 'success' && (needs.real-models.result == 'success' || (needs.real-models.result == 'skipped' && !(github.event_name == 'pull_request' && (github.head_ref == 'qa/smart-mix-model-recovery-20261126' || github.head_ref == 'qa/dj-ranking-20261126' || github.head_ref == 'qa/transition-level-cache-20261127')))) }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/download-artifact@v4
@@ -472,7 +477,7 @@ jobs:
 
   real-models:
     name: Real models on Android 15 (8 GiB emulator)
-    if: ${{ github.event_name == 'pull_request' && (github.head_ref == 'qa/smart-mix-model-recovery-20261126' || github.head_ref == 'qa/dj-ranking-20261126') }}
+    if: ${{ github.event_name == 'pull_request' && (github.head_ref == 'qa/smart-mix-model-recovery-20261126' || github.head_ref == 'qa/dj-ranking-20261126' || github.head_ref == 'qa/transition-level-cache-20261127') }}
     needs: apk
     runs-on: ubuntu-24.04
     timeout-minutes: 85

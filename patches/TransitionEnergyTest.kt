@@ -40,6 +40,16 @@ fun main(){
  val finalProgress=mutableListOf<Int>()
  TransitionMix.render(a,b,preserved,2){finalProgress.add(it)}
  check(finalProgress.last()==100&&preserved.length()==44+264600L*4)
+ val quiet=signal("quiet.pcm",440.0,2000.0);val louder=signal("louder.pcm",733.0,16000.0)
+ val normal=File(dir,"normal-level.wav");val matched=File(dir,"matched-level.wav")
+ TransitionMix.render(quiet,louder,normal,2)
+ TransitionMix.renderFrames(quiet,louder,matched,88200L,levelMatch=true)
+ fun midpoint(file:File):Double=java.io.RandomAccessFile(file,"r").use{r->r.seek(44L+(132300-2205)*4L);sqrt((0 until 4410*2).sumOf{val v=java.lang.Short.reverseBytes(r.readShort()).toDouble();v*v}/(4410*2))}
+ check(midpoint(matched)<midpoint(normal)*.90&&midpoint(matched)>midpoint(normal)*.65)
+ val m=matched.readBytes();val nrm=normal.readBytes()
+ check(m.copyOfRange(0,44+88200*4).contentEquals(nrm.copyOfRange(0,44+88200*4)))
+ check(m.takeLast(88200*4)==nrm.takeLast(88200*4))
+ println("PASS: real PCM transition level balance, unchanged non-overlap audio")
  println("PASS: independent and identical signals, full-scale protection, opposite phase, stereo endpoints, source integrity, silence and cancellation")
  }finally{dir.deleteRecursively()}
 }
