@@ -46,6 +46,14 @@ helper='''    private fun moodPrefs()=getSharedPreferences("mood_discovery_v1",M
                     dialog.dismiss();relatedMixDialog(seed,indexed,now.title)
                 }
             }
+            sheetAction(panel,"Поиск по описанию","Например: грустная музыка с глубоким басом"){
+                if(indexed.isEmpty()){toast("Сначала просканируйте медиатеку");return@sheetAction}
+                dialog.dismiss();moodDescriptionDialog(indexed)
+            }
+            sheetAction(panel,"Смена настроения","Подборка до 30 песен с постепенным изменением звучания"){
+                if(indexed.isEmpty()){toast("Сначала просканируйте медиатеку");return@sheetAction}
+                dialog.dismiss();moodJourneyDialog(indexed)
+            }
             panel.addView(label("Под настроение",13,muted,true))
             MoodDiscovery.profiles.forEach{profile->
                 val ids=MoodDiscovery.rank(indexed,profile)
@@ -54,6 +62,35 @@ helper='''    private fun moodPrefs()=getSharedPreferences("mood_discovery_v1",M
                 }
             }
             panel.addView(label("Подборка по акустическим признакам, а не по словам песни или настроению слушателя. Оценки приблизительны.",12,muted))
+        }
+    }
+    private fun moodDescriptionDialog(indexed:List<MoodDiscovery.Entry>){
+        actionSheet("Поиск по описанию",310){dialog,panel->
+            panel.addView(label("Офлайн-поиск по ключевым словам: грустная, спокойная, энергичная, тёмная, для тренировки, для учёбы, весёлая, атмосферная. Можно добавить бас.",13,muted))
+            val query=EditText(this).apply{hint="Грустная музыка с басом";setTextColor(PremiumChrome.TEXT);setHintTextColor(muted);setSingleLine(true);filters=arrayOf(android.text.InputFilter.LengthFilter(160))}
+            panel.addView(query,LinearLayout.LayoutParams(-1,dp(52)))
+            panel.addView(btn("Найти"){
+                val p=MoodDiscovery.describe(query.text.toString())
+                if(p==null){toast("Укажите одно настроение или бас");return@btn}
+                val ids=MoodDiscovery.rank(indexed,p)
+                if(ids.isEmpty()){toast("Нет подходящих песен");return@btn}
+                dialog.dismiss();moodMixPreview("Поиск · "+p.title,"Акустический подбор по ключевым словам",ids)
+            })
+        }
+    }
+    private fun moodJourneyDialog(indexed:List<MoodDiscovery.Entry>){
+        val profiles=MoodDiscovery.profiles
+        actionSheet("Смена настроения",420){dialog,panel->
+            panel.addView(label("Порядок песен подбирается по энергии, ритму и другим акустическим признакам. Это не изменение самих аудиофайлов.",13,muted))
+            listOf(1 to 2,2 to 1,0 to 6,5 to 3).forEach{(a,b)->
+                val from=profiles[a];val to=profiles[b]
+                val title=from.title+" → "+to.title
+                sheetAction(panel,title,"До 30 песен без повторов"){
+                    if(stemBusy){toast("Дождитесь завершения обработки");return@sheetAction}
+                    dialog.dismiss()
+                    stemWork("Составление подборки…",{MoodDiscovery.journey(indexed,from,to)}){ids->moodMixPreview(title,"Постепенная смена акустического профиля",ids)}
+                }
+            }
         }
     }
     private fun startMoodScan(songs:List<Track>,known:Set<String>,rescan:Boolean){
