@@ -67,10 +67,10 @@ s=s[:a]+'''    private data class ScanItem(val uri:String,val title:String,val a
                 val raw=runCatching{require(file.length() in 1..262144);file.readText()}.getOrNull()
                 dialog.dismiss()
                 if(raw==null){toast("Черновик недоступен");return@sheetAction}
-                reviewTranscript("Whisper",raw){
+                reviewTranscript("Whisper",raw){accepted->
                     val target=libraryIndex.get(id)
                     if(target==null||target.lyrics!=before||before.isNotBlank()){toast("Текст уже существует или песня изменилась");return@reviewTranscript}
-                    target.lyrics=raw
+                    target.lyrics=accepted
                     if(saveLibrary(true)){file.delete();toast("Черновик принят")}else{target.lyrics=before;reindex();toast("Ошибка сохранения")}
                 }
             }}
