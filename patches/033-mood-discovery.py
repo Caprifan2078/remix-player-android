@@ -159,6 +159,13 @@ helper='''    private fun moodPrefs()=getSharedPreferences("mood_discovery_v1",M
                     dialog.dismiss();moodMixPreview(("Похожие · "+title+" · "+name).take(100),detail,ids)
                 }
             }
+            sheetAction(panel,"Продолжить подборку","Похожие песни, которых ещё нет в текущей очереди"){
+                val p=controller
+                val existing=if(p==null)emptySet<String>()else (0 until p.mediaItemCount).map{p.getMediaItemAt(it).mediaId}.toSet()
+                val ids=LocalDiscovery.rank(origin,pool,LocalDiscovery.Mode.VARIED,excluded=existing)
+                if(ids.isEmpty()){toast("Новых подходящих песен нет");return@sheetAction}
+                dialog.dismiss();moodMixPreview("Продолжение · "+title,"Похожие песни вне текущей очереди",ids)
+            }
             panel.addView(label("Только песни из вашей проанализированной медиатеки.",12,muted))
         }
     }
@@ -168,25 +175,41 @@ helper='''    private fun moodPrefs()=getSharedPreferences("mood_discovery_v1",M
         actionSheet(title,470){dialog,panel->
             panel.addView(label(detail,14,muted))
             sheetAction(panel,"Воспроизвести","Заменит текущую очередь на "+selected.size+" песен"){
+                if(MixerSession.active){toast("Сначала завершите микшер");return@sheetAction}
                 val p=controller
                 if(p==null){toast("Плеер подключается");return@sheetAction}
                 val live=selected.mapNotNull{libraryIndex.get(it.uri)?.takeIf{t->t.uri==t.group}}
                 if(live.isEmpty()){toast("Песни недоступны");return@sheetAction}
                 stopPreview();p.setMediaItems(live.map(::item));p.shuffleModeEnabled=false;p.prepare();p.play();dialog.dismiss();render()
             }
-            sheetAction(panel,"Добавить в очередь","Не прерывает текущую композицию; без повторов"){
+            sheetAction(panel,"Добавить в очередь","Следующими или в конец; без повторов"){
+                if(MixerSession.active){toast("Сначала завершите микшер");return@sheetAction}
                 val p=controller
                 if(p==null||p.mediaItemCount==0){toast("Сначала включите музыку");return@sheetAction}
-                val existing=(0 until p.mediaItemCount).map{p.getMediaItemAt(it).mediaId}
-                val live=selected.mapNotNull{libraryIndex.get(it.uri)?.takeIf{t->t.uri==t.group}}
-                val byId=live.associateBy{it.uri}
-                val additions=LocalDiscovery.append(existing,live.map{it.uri},100).mapNotNull{byId[it]}
-                if(additions.isEmpty()){toast("Все подходящие песни уже в очереди");return@sheetAction}
-                p.addMediaItems(additions.map(::item));dialog.dismiss();toast("Добавлено: "+additions.size)
+                dialog.dismiss()
+                actionSheet("Куда добавить",210){queueDialog,queuePanel->
+                    fun insert(next:Boolean){
+                        if(MixerSession.active){toast("Сначала завершите микшер");return}
+                        val currentPlayer=controller
+                        if(currentPlayer==null||currentPlayer.mediaItemCount==0){toast("Очередь изменилась");return}
+                        val existing=(0 until currentPlayer.mediaItemCount).map{currentPlayer.getMediaItemAt(it).mediaId}
+                        val live=selected.mapNotNull{libraryIndex.get(it.uri)?.takeIf{t->t.uri==t.group}}
+                        val byId=live.associateBy{it.uri}
+                        val plan=LocalDiscovery.queuePlan(existing,currentPlayer.currentMediaItemIndex,live.map{it.uri},next,currentPlayer.shuffleModeEnabled)
+                        if(plan==null){toast("Для добавления следом выключите перемешивание");return}
+                        val additions=plan.ids.mapNotNull{byId[it]}
+                        if(additions.isEmpty()){toast("Нет новых доступных песен");return}
+                        currentPlayer.addMediaItems(plan.index,additions.map(::item))
+                        queueDialog.dismiss();toast("Добавлено: "+additions.size)
+                    }
+                    sheetAction(queuePanel,"Следующими","После текущего трека, без перемешивания"){insert(true)}
+                    sheetAction(queuePanel,"В конец очереди","Не меняет порядок имеющихся песен"){insert(false)}
+                }
             }
             sheetAction(panel,"Сохранить плейлист","Добавить без дубликатов"){
                 val name=title
                 val live=selected.mapNotNull{libraryIndex.get(it.uri)?.takeIf{t->t.uri==t.group}?.uri}
+                if(live.isEmpty()){toast("Песни недоступны");return@sheetAction}
                 val old=playlists[name].orEmpty()
                 playlists[name]=PlaylistOrder.append(old,live).toCollection(linkedSetOf());savePlaylists();dialog.dismiss();toast("Подборка сохранена");render()
             }
