@@ -23,6 +23,14 @@ for test in downloadActivateAndTranscribeOnDevice quantizedBaseSpeech turboSpeec
   log="model-results/$test.txt"
   timeout 720 adb shell am instrument -w -r -e class "app.remix.player.DirectWhisperDownloadTest#$test" app.remix.player.test/androidx.test.runner.AndroidJUnitRunner | tee "$log" || status=1
   python3 model-qa/verify_model_log.py "$log" "$test" || status=1
-  grep '^BENCHMARK Whisper ' "$log" >> model-results/whisper-benchmark.txt || status=1
+  case "$test" in
+    downloadActivateAndTranscribeOnDevice) id=tiny;;
+    quantizedBaseSpeech) id=base-q5_1;;
+    turboSpeech) id=large-v3-turbo-q5_0;;
+    *) exit 1;;
+  esac
+  report="model-results/whisper-$id.json"
+  adb exec-out run-as app.remix.player cat "files/qa-whisper-$id.json" > "$report" || status=1
+  python3 model-qa/verify_benchmark.py "$report" "$id" >> model-results/whisper-benchmark.txt || status=1
 done
 exit "$status"

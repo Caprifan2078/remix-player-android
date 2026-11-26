@@ -26,6 +26,8 @@ class DirectWhisperDownloadTest {
         val file=File(c.filesDir,"mixes/qa-whisper.wav")
         val spec=WhisperModelSpec.models.single{it.id==id}
         val model=WhisperLocal.model(c)
+        val report=File(c.filesDir,"qa-whisper-$id.json")
+        report.delete()
         assertFalse("Fixture must not contain predownloaded weights",model.exists())
         try{
             val progress=mutableListOf<Int>()
@@ -50,6 +52,8 @@ class DirectWhisperDownloadTest {
             println("BENCHMARK Whisper $id modelBytes=${spec.size} downloadMs=$downloadMs inferenceMs=$inferenceMs words=${expected.size} edits=$errors WER=${errors.toDouble()/expected.size} availableRamAfter=${memory.availMem}")
             println("BENCHMARK transcript $id: "+actual.joinToString(" "))
             assertTrue("Recognized speech must contain fixture vocabulary",text.lowercase().contains("music")||text.lowercase().contains("song"))
+            val result=org.json.JSONObject().put("id",id).put("modelBytes",spec.size).put("downloadMs",downloadMs).put("inferenceMs",inferenceMs).put("words",expected.size).put("edits",errors).put("wer",errors.toDouble()/expected.size).put("availableRamAfter",memory.availMem).put("transcript",actual.joinToString(" "))
+            report.writeText(result.toString())
             println("PASS: Android downloaded publisher weights over HTTPS, verified SHA, activated native model, recognized fixture speech")
         }finally{model.delete()}
     }
