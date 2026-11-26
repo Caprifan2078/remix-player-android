@@ -12,3 +12,5 @@ kotlinc "$1/app/src/main/java/app/remix/player/"{AudioCore,LiveEffectSwitch}.kt 
 java -jar "$tmp/switch.jar"
 kotlinc "$1/app/src/main/java/app/remix/player/AudioCore.kt" patches/EffectAliasTest.kt -include-runtime -d "$tmp/alias.jar"
 java -jar "$tmp/alias.jar"
+kotlinc "$1/app/src/main/java/app/remix/player/AudioCore.kt" patches/DspOptimizationTest.kt -include-runtime -d "$tmp/opt.jar"
+java -jar "$tmp/opt.jar"
