@@ -33,17 +33,18 @@ object MoodDiscovery {
   if(p.valence!=null&&f.valence==null)return null
   if(p.valence!=null&&abs(f.valence!!-p.valence)>.45)return null
   val distance=abs(f.energy-p.energy)*.32+abs(f.activity-p.activity)*.26+abs(f.brightness-p.brightness)*.12+abs(f.low-p.low)*.10+abs(f.dynamics-p.dynamics)*.12+(if(p.valence!=null)abs(f.valence!!-p.valence)*.08 else 0.0)
-  return (1-distance).takeIf{it>=.69}
+  val weight=if(p.valence==null).92 else 1.0
+  return (1-distance/weight).coerceIn(0.0,1.0).takeIf{it>=.69}
  }
  data class Entry(val id:String,val artist:String,val features:Features)
  fun rank(entries:List<Entry>,profile:Profile,limit:Int=100):List<String>{
   require(limit in 1..1000)
-  val sorted=entries.distinctBy{it.id}.mapNotNull{e->score(e.features,profile)?.let{e to it}}.sortedWith(compareByDescending<Pair<Entry,Double>>{it.second}.thenBy{it.first.id}).toMutableList()
+  val sorted=entries.filter{it.id.isNotBlank()}.distinctBy{it.id}.mapNotNull{e->score(e.features,profile)?.let{e to it}}.sortedWith(compareByDescending<Pair<Entry,Double>>{it.second}.thenBy{it.first.id}).toMutableList()
   val out=mutableListOf<String>();var last=""
   while(sorted.isNotEmpty()&&out.size<limit){
    val best=sorted.first().second
-   val i=if(last.isBlank())0 else sorted.indexOfFirst{it.second>=best-.055&&it.first.artist.isNotBlank()&&!it.first.artist.equals(last,true)}.takeIf{it>=0}?:0
-   val item=sorted.removeAt(i).first;out.add(item.id);last=item.artist
+   val i=if(last.isBlank())0 else sorted.indexOfFirst{it.second>=best-.055&&it.first.artist.isNotBlank()&&!it.first.artist.trim().equals(last,true)}.takeIf{it>=0}?:0
+   val item=sorted.removeAt(i).first;out.add(item.id);last=item.artist.trim()
   }
   return out
  }
