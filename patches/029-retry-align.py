@@ -6,6 +6,13 @@ root=Path(sys.argv[1]);src=root/'app/src/main/java/app/remix/player'
 def edit(path,a,b):
  s=path.read_text();assert s.count(a)==1,(path.name,a[:100],s.count(a));path.write_text(s.replace(a,b))
 p=src/'LiveOverlap.kt'
+# Russian spelling variants must not destroy measured word timing; reference spelling stays untouched.
+for name in ('LyricAlign.kt','PhraseAlign.kt'):
+    p=src/name
+    old=".lowercase(Locale.ROOT).replace('’',"
+    new=".lowercase(Locale.ROOT).replace('ё','е').replace('’',"
+    edit(p,old,new)
+p=src/'LiveOverlap.kt'
 # A user seek / pause must cancel the current attempt, but must not blacklist the entire song.
 edit(p,'if(preview!=null)abort(true)\n        }','if(preview!=null)abort(false)\n            rejectedId=null\n        }')
 edit(p,'override fun onPlayWhenReadyChanged(playWhenReady:Boolean,reason:Int){if(!playWhenReady)abort(true)}','override fun onPlayWhenReadyChanged(playWhenReady:Boolean,reason:Int){if(!playWhenReady)abort(false);rejectedId=null}')
