@@ -21,10 +21,9 @@ s=s.replace('session(modelFile){','session(context,modelFile){')
 old='private fun <T> session(file:File, block:(OrtSession)->T):T {'
 assert s.count(old)==1
 s=s.replace(old,'''private fun checkModelMemory(context:Context,bytes:Long){
-        if(bytes<=32L*1024*1024)return
         val am=context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
         val info=android.app.ActivityManager.MemoryInfo();am.getMemoryInfo(info)
-        require(ModelMemoryBudget.canStart(bytes,info.availMem,info.lowMemory)){"Недостаточно свободной ОЗУ для разделения дорожек. Освободите память или используйте другое устройство (ориентир: 4 ГиБ доступной ОЗУ)."}
+        require(ModelMemoryBudget.canStart(bytes,info.availMem,info.lowMemory)){"Недостаточно доступной ОЗУ для запуска модели. Освободите память и повторите попытку."}
     }
     private fun <T> session(context:Context,file:File, block:(OrtSession)->T):T {''')
 s=s.replace('require(file.isFile){"Сначала импортируйте модель ONNX"}','require(file.isFile){"Сначала импортируйте модель ONNX"};checkModelMemory(context,file.length())')
