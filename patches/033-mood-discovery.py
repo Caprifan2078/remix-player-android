@@ -7,10 +7,10 @@ def rep(a,b):
  global s
  assert s.count(a)==1,(a[:100],s.count(a))
  s=s.replace(a,b)
-# A first-class entry in library and More, separate from experimental MERT.
+# A first-class discovery entry in the library; organize the remaining More actions by task.
 rep('val tools=row();tools.addView(filter,weight());','if(tracks.isNotEmpty())body.addView(btn("Подборки"){moodDiscoveryDialog()});val tools=row();tools.addView(filter,weight());')
-rep('val names=listOf("Версии","Загрузки","Очередь","История","Эквалайзер","Настройки","Тексты библиотеки")','val names=listOf("Версии","Загрузки","Очередь","История","Эквалайзер","Настройки","Сканирование библиотеки")')
-rep('if(name=="Тексты библиотеки")batchLyrics()else{screen=name;render()}','when(name){"Сканирование библиотеки"->batchLyrics();else->{screen=name;render()}}')
+rep("val names=listOf(\"Версии\",\"Загрузки\",\"Очередь\",\"История\",\"Эквалайзер\",\"Настройки\",\"Тексты библиотеки\")","val groups=listOf(\"Воспроизведение\" to listOf(\"Очередь\",\"История\"),\"Звук\" to listOf(\"Версии\",\"Эквалайзер\"),\"Библиотека\" to listOf(\"Загрузки\",\"Сканирование библиотеки\"),\"Приложение\" to listOf(\"Настройки\"))")
+rep("actionSheet(\"Ещё\",names.size*61){dialog,panel->names.forEach{ name->sheetAction(panel,name){dialog.dismiss();if(name==\"Тексты библиотеки\")batchLyrics()else{screen=name;render()}}}}","actionSheet(\"Ещё\",520){dialog,panel->\n            groups.forEach{(heading,items)->\n                panel.addView(label(heading,13,muted,true))\n                items.forEach{name->sheetAction(panel,name){dialog.dismiss();when(name){\"Сканирование библиотеки\"->batchLyrics();else->{screen=name;render()}}}}\n            }\n        }")
 # Keep cached acoustic summaries from the full-library scan as well.
 rep('private fun scanFacts(uri:String,report:MusicAnalysis.Report){','private fun scanFacts(uri:String,report:MusicAnalysis.Report){\n        libraryIndex.get(uri)?.let{t->MoodDiscovery.from(report)?.let{f->saveMood(t.uri,t.title,t.artist,f)}}')
 anchor='    private fun scanDraftReview(){'
