@@ -15,5 +15,9 @@ fun main(){
  check(LocalDiscovery.append(emptyList(),listOf("1","2"),1)==listOf("1"))
  val many=(0 until 10000).map{e(it.toString(),"Artist "+it%50,.21)}
  check(LocalDiscovery.rank(seed,many,LocalDiscovery.Mode.VARIED).distinct().size==50)
- println("PASS: 11 local discovery and queue checks")
+ val full=(1..100).map{it.toString()}
+ check(LocalDiscovery.append(emptyList(),full,100)==full)
+ check(LocalDiscovery.append(listOf("1","2"),full+"3",100)==full.drop(2))
+ check(LocalDiscovery.append(emptyList(),full+full,100).size==100)
+ println("PASS: 14 local discovery and queue checks")
 }
