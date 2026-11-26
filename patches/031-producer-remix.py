@@ -69,6 +69,12 @@ edit('PlayerExtras.kt','fun sample(x:Float,c:Int):Float {val clean=if(x.isFinite
 edit('PlaybackService.kt','d.frame(a,b,p); for(c in b.indices) out.putShort(((eq?.sample(b[c],c)?:b[c])*32768).roundToInt().coerceIn(-32768,32767).toShort())','d.frame(a,b,p); eq?.frame(b); for(c in b.indices) out.putShort((b[c]*32768).roundToInt().coerceIn(-32768,32767).toShort())')
 edit('EqRender.kt','val eq=GraphicEq(44100,2,levels);val flat=','val eq=GraphicEq(44100,2,levels);val frame=FloatArray(2);val flat=')
 edit('EqRender.kt','for(c in 0..1){val s=StemCore.readShort(r);StemCore.writeShort(w,if(flat)s else StemCore.pcm(eq.sample(s/32768f,c)))}','if(flat){repeat(2){StemCore.writeShort(w,StemCore.readShort(r))}}else{for(c in frame.indices)frame[c]=StemCore.readShort(r)/32768f;eq.frame(frame);for(x in frame)StemCore.writeShort(w,StemCore.pcm(x))}')
+# Exercise the actual assembled EQ in the existing core suite, alongside the offline WAV checks.
+eqtest=Path(sys.argv[1])/'tests/EqRenderTest.kt'
+eqsource=eqtest.read_text()
+assert eqsource.count('fun eqRenderTests(){')==1
+eqsource=eqsource.replace('fun eqRenderTests(){','fun eqRenderTests(){eqHeadroomQualityTests();')
+eqtest.write_text(eqsource+'\n'+(Path(__file__).parent/'EqHeadroomQualityTest.kt').read_text().split('\n',2)[2])
 # Do not reuse a render checkpoint from an older DSP algorithm.
 edit('EffectCheckpoint.kt','dsp-peak-guard-v60','dsp-quality-v4')
 edit('GenreCheckpoint.kt','genre-render-v7','genre-render-v8')
