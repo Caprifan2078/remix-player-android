@@ -117,6 +117,52 @@ class MixerLyricsUiAcceptanceTest {
             capture("mixer-paused")
         }
     }
+    private fun awaitDialogText(expected:String){
+        fun contains(node:android.view.accessibility.AccessibilityNodeInfo?):Boolean {
+            if(node==null)return false
+            if(node.text?.toString()==expected)return true
+            for(i in 0 until node.childCount)if(contains(node.getChild(i)))return true
+            return false
+        }
+        val end=SystemClock.elapsedRealtime()+8000
+        while(SystemClock.elapsedRealtime()<end){
+            if(contains(inst.uiAutomation.rootInActiveWindow))return
+            SystemClock.sleep(100)
+        }
+        fail("Missing dialog text: "+expected)
+    }
+    @Test fun compactVersionsAndStudioKeepActionsReachable(){
+        fixture {
+            click("Версии")
+            await("Compact version actions missing"){button("Экспорт…")!=null&&button("Управление версией…")!=null}
+            main{
+                assertNull(button("Экспорт WAV в папку…"))
+                assertNull(button("Экспорт FLAC без потерь…"))
+                assertNull(button("Экспорт MP3…"))
+                assertNull(button("Открыть студию эффектов"))
+            }
+            capture("compact-versions")
+            click("Экспорт…")
+            awaitDialogText("WAV · в папку")
+            awaitDialogText("FLAC · без потерь")
+            awaitDialogText("MP3")
+            shell("input keyevent 4")
+            click("Управление версией…")
+            awaitDialogText("Сделать основной")
+            awaitDialogText("Редактировать сведения")
+            shell("input keyevent 4")
+            click("Студия")
+            await("Full effect catalogue missing"){button("Все эффекты · 41")!=null}
+            main{
+                val shown=texts().count{it.text.toString() in Presets.all.map{p->p.name}}
+                assertTrue("Too many quick effect labels: "+shown,shown<=7)
+            }
+            capture("compact-studio")
+            click("Все эффекты · 41")
+            awaitDialogText("Все эффекты")
+            shell("input keyevent 4")
+        }
+    }
     @Test fun karaokeActualWordSpansSeekAndFollowToggle(){
         fixture { p->
             click("Текст")
