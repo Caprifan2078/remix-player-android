@@ -14,7 +14,7 @@ import java.util.concurrent.Future
 class WaveSeekBar(context:Context):AppCompatSeekBar(context){
     private val paint=Paint(Paint.ANTI_ALIAS_FLAG)
     private var samples:FloatArray?=null
-    fun setEnvelope(v:FloatArray?){samples=v;tag=if(v!=null)"waveform-ready" else null;invalidate()}
+    fun setEnvelope(v:FloatArray?){samples=v;tag=if(v==null)null else if(v.all{it.isFinite()})"waveform-ready" else "waveform-loading";invalidate()}
     override fun onDraw(canvas:Canvas){
         val bars=samples
         if(bars==null||bars.isEmpty()||layoutDirection==LAYOUT_DIRECTION_RTL){super.onDraw(canvas);return}
@@ -24,8 +24,9 @@ class WaveSeekBar(context:Context):AppCompatSeekBar(context){
         val ratio=progress.toFloat()/max.coerceAtLeast(1)
         val radius=half
         for(i in bars.indices){
-            val x=left+(i+.5f)*step;val h=(height*.38f*bars[i]).coerceAtLeast(resources.displayMetrics.density)
-            paint.color=if((i+.5f)/bars.size<=ratio)0xffc7e8a2.toInt() else 0xff51565d.toInt()
+            val x=left+(i+.5f)*step;val measured=bars[i].isFinite()
+            val h=if(measured)(height*.38f*bars[i]).coerceAtLeast(resources.displayMetrics.density)else resources.displayMetrics.density*.65f
+            paint.color=if(!measured)0xff30343a.toInt() else if((i+.5f)/bars.size<=ratio)0xffc7e8a2.toInt() else 0xff51565d.toInt()
             canvas.drawRoundRect(x-half,center-h,x+half,center+h,radius,radius,paint)
         }
         paint.color=0xffc7e8a2.toInt();paint.strokeWidth=2f*resources.displayMetrics.density
@@ -50,7 +51,9 @@ class WaveformLoader(context:Context){
         deliver(null)
         future=worker.submit{
             android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND)
-            val data=WaveformDecode.scan(app,Uri.parse(uri))
+            val data=WaveformDecode.scan(app,Uri.parse(uri)){part->
+                handler.post{if(!closed&&generation==token&&key==uri)deliver(part)}
+            }
             handler.post{if(!closed&&generation==token&&key==uri){if(data!=null)cache.put(uri,data);deliver(data)}}
         }
     }
