@@ -49,7 +49,7 @@ helper='''    private fun moodPrefs()=getSharedPreferences("mood_discovery_v1",M
             panel.addView(label("Под настроение",13,muted,true))
             MoodDiscovery.profiles.forEach{profile->
                 val ids=MoodDiscovery.rank(indexed,profile)
-                sheetAction(panel,profile.title,ids.size.toString()+" песен · "+profile.detail){
+                sheetAction(panel,profile.title,(if(ids.size==100)"До 100 песен" else ids.size.toString()+" песен")+" · "+profile.detail){
                     dialog.dismiss();moodMixPreview(profile.title,profile.detail,ids)
                 }
             }
@@ -110,7 +110,7 @@ helper='''    private fun moodPrefs()=getSharedPreferences("mood_discovery_v1",M
                 val existing=(0 until p.mediaItemCount).map{p.getMediaItemAt(it).mediaId}
                 val live=selected.mapNotNull{libraryIndex.get(it.uri)?.takeIf{t->t.uri==t.group}}
                 val byId=live.associateBy{it.uri}
-                val additions=LocalDiscovery.append(existing,live.map{it.uri}).mapNotNull{byId[it]}
+                val additions=LocalDiscovery.append(existing,live.map{it.uri},100).mapNotNull{byId[it]}
                 if(additions.isEmpty()){toast("Все подходящие песни уже в очереди");return@sheetAction}
                 p.addMediaItems(additions.map(::item));dialog.dismiss();toast("Добавлено: "+additions.size)
             }
