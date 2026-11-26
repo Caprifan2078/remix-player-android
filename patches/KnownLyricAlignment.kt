@@ -8,7 +8,11 @@ object KnownLyricAlignment {
   if(words?.complete==true)return Result(words.lrc,true)
   check(!Thread.currentThread().isInterrupted)
   val phrases=try{PhraseAlign.align(heard,reference,false)}catch(e:IllegalArgumentException){null}
-  return if(phrases?.complete==true)Result(phrases.lrc,false) else alignGroupedPhrases(heard,reference)?:alignNoisyPhrases(heard,reference)
+  return if(phrases?.complete==true){
+   // PhraseAlign preserves measured word markers on fully timed exact spans.
+   val lines=Lrc.parse(phrases.lrc)
+   Result(phrases.lrc,lines.isNotEmpty()&&lines.all{WordLyrics.parse(it).words.isNotEmpty()})
+  }else alignGroupedPhrases(heard,reference)?:alignNoisyPhrases(heard,reference)
  }
  /** Use only the measured onset of the first segment, preserving original reference words. */
  fun alignGroupedPhrases(heard:String,reference:String):Result?{
