@@ -72,6 +72,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/031-producer-remix.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/032-adaptive-library.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MoodDiscovery.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
+          cp "$GITHUB_WORKSPACE/patches/LocalDiscovery.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
           python3 "$GITHUB_WORKSPACE/patches/033-mood-discovery.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/LyricLineSearch.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
           python3 "$GITHUB_WORKSPACE/patches/034-lyric-reader.py" "source/$PROJECT"
@@ -186,6 +187,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/031-producer-remix.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/032-adaptive-library.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MoodDiscovery.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
+          cp "$GITHUB_WORKSPACE/patches/LocalDiscovery.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
           python3 "$GITHUB_WORKSPACE/patches/033-mood-discovery.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/LyricLineSearch.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
           python3 "$GITHUB_WORKSPACE/patches/034-lyric-reader.py" "source/$PROJECT"
@@ -249,6 +251,10 @@ jobs:
           java -jar /tmp/producer-adapt.jar
       - name: Mood discovery and large library ranking
         run: bash patches/run-mood-discovery.sh "source/$PROJECT"
+      - name: Local similar-track and queue regression
+        run: |
+          kotlinc patches/LocalDiscovery.kt patches/LocalDiscoveryTest.kt -include-runtime -d /tmp/local-discovery.jar
+          java -jar /tmp/local-discovery.jar
       - name: Offline lyric search and bilingual reader regression
         run: |
           kotlinc patches/LyricLineSearch.kt patches/LyricLineSearchTest.kt -include-runtime -d /tmp/lyric-reader.jar
@@ -331,6 +337,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/031-producer-remix.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/032-adaptive-library.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MoodDiscovery.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
+          cp "$GITHUB_WORKSPACE/patches/LocalDiscovery.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
           python3 "$GITHUB_WORKSPACE/patches/033-mood-discovery.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/LyricLineSearch.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
           python3 "$GITHUB_WORKSPACE/patches/034-lyric-reader.py" "source/$PROJECT"
@@ -407,6 +414,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/031-producer-remix.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/032-adaptive-library.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MoodDiscovery.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
+          cp "$GITHUB_WORKSPACE/patches/LocalDiscovery.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
           python3 "$GITHUB_WORKSPACE/patches/033-mood-discovery.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/LyricLineSearch.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
           python3 "$GITHUB_WORKSPACE/patches/034-lyric-reader.py" "source/$PROJECT"
@@ -490,6 +498,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/031-producer-remix.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/032-adaptive-library.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MoodDiscovery.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
+          cp "$GITHUB_WORKSPACE/patches/LocalDiscovery.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
           python3 "$GITHUB_WORKSPACE/patches/033-mood-discovery.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/LyricLineSearch.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
           python3 "$GITHUB_WORKSPACE/patches/034-lyric-reader.py" "source/$PROJECT"

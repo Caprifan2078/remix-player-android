@@ -1,0 +1,30 @@
+package app.remix.player
+import kotlin.math.abs
+import java.util.Locale
+/** Local acoustic similarity, not a streaming recommendation service. */
+object LocalDiscovery {
+ data class Entry(val id:String,val artist:String,val values:List<Double?>){
+  init{require(values.size==6&&values.withIndex().all{(i,v)->if(v==null)i==4 else v.isFinite()&&v in 0.0..1.0})}
+ }
+ enum class Mode { SIMILAR, VARIED }
+ private val weights=listOf(.30,.25,.12,.12,.10,.11)
+ fun distance(a:Entry,b:Entry):Double{
+  var sum=0.0;var mass=0.0
+  for(i in weights.indices){val x=a.values[i]?:continue;val y=b.values[i]?:continue;sum+=weights[i]*abs(x-y);mass+=weights[i]}
+  return sum/mass
+ }
+ private fun artist(e:Entry)=e.artist.trim().lowercase(Locale.ROOT)
+ fun rank(seed:Entry,entries:List<Entry>,mode:Mode,limit:Int=50):List<String>{
+  require(limit in 1..100)
+  val cutoff=if(mode==Mode.SIMILAR).27 else .39
+  val pool=entries.asSequence().filter{it.id.isNotBlank()&&it.id!=seed.id}.distinctBy{it.id}.map{it to distance(seed,it)}.filter{it.second<=cutoff}.sortedWith(compareBy<Pair<Entry,Double>>{it.second}.thenBy{it.first.id}).toMutableList()
+  val result=mutableListOf<String>();val seen=mutableMapOf<String,Int>();var last=artist(seed)
+  while(pool.isNotEmpty()&&result.size<limit){
+   val best=pool[0].second;val slack=if(mode==Mode.SIMILAR).035 else .12
+   val i=pool.indices.asSequence().takeWhile{pool[it].second<=best+slack}.minWithOrNull(compareBy<Int>{val a=artist(pool[it].first);if(a.isNotBlank()&&a==last)1 else 0}.thenBy{if(mode==Mode.VARIED)seen[artist(pool[it].first)]?:0 else 0}.thenBy{pool[it].second}.thenBy{pool[it].first.id})?:0
+   val e=pool.removeAt(i).first;result.add(e.id);last=artist(e);if(last.isNotBlank())seen[last]=(seen[last]?:0)+1
+  }
+  return result
+ }
+ fun append(existing:List<String>,suggestions:List<String>,limit:Int=50):List<String>{require(limit in 1..100);val seen=existing.toHashSet();return suggestions.asSequence().filter{it.isNotBlank()&&seen.add(it)}.take(limit).toList()}
+}

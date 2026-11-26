@@ -8,9 +8,9 @@ def rep(a,b):
  assert s.count(a)==1,(a[:100],s.count(a))
  s=s.replace(a,b)
 # A first-class entry in library and More, separate from experimental MERT.
-rep('val tools=row();tools.addView(filter,weight());','if(tracks.isNotEmpty())body.addView(btn("Под настроение"){moodDiscoveryDialog()});val tools=row();tools.addView(filter,weight());')
-rep('val names=listOf("Версии","Загрузки","Очередь","История","Эквалайзер","Настройки","Тексты библиотеки")','val names=listOf("Под настроение","Версии","Загрузки","Очередь","История","Эквалайзер","Настройки","Сканирование библиотеки")')
-rep('if(name=="Тексты библиотеки")batchLyrics()else{screen=name;render()}','when(name){"Под настроение"->moodDiscoveryDialog();"Сканирование библиотеки"->batchLyrics();else->{screen=name;render()}}')
+rep('val tools=row();tools.addView(filter,weight());','if(tracks.isNotEmpty())body.addView(btn("Подборки"){moodDiscoveryDialog()});val tools=row();tools.addView(filter,weight());')
+rep('val names=listOf("Версии","Загрузки","Очередь","История","Эквалайзер","Настройки","Тексты библиотеки")','val names=listOf("Версии","Загрузки","Очередь","История","Эквалайзер","Настройки","Сканирование библиотеки")')
+rep('if(name=="Тексты библиотеки")batchLyrics()else{screen=name;render()}','when(name){"Сканирование библиотеки"->batchLyrics();else->{screen=name;render()}}')
 # Keep cached acoustic summaries from the full-library scan as well.
 rep('private fun scanFacts(uri:String,report:MusicAnalysis.Report){','private fun scanFacts(uri:String,report:MusicAnalysis.Report){\n        libraryIndex.get(uri)?.let{t->MoodDiscovery.from(report)?.let{f->saveMood(t.uri,t.title,t.artist,f)}}')
 anchor='    private fun scanDraftReview(){'
@@ -33,15 +33,24 @@ helper='''    private fun moodPrefs()=getSharedPreferences("mood_discovery_v1",M
         val songs=tracks.filter{it.uri==it.group}
         if(songs.isEmpty()){toast("Сначала добавьте музыку");return}
         val indexed=moodEntries(songs)
-        actionSheet("Под настроение",510){dialog,panel->
+        actionSheet("Подборки",510){dialog,panel->
             panel.addView(label("Проанализировано: "+indexed.size+" / "+songs.size,15,muted))
             sheetAction(panel,if(indexed.size==songs.size)"Пересканировать музыку" else "Сканировать новые песни","Офлайн · без дополнительных моделей"){
                 dialog.dismiss();startMoodScan(songs,indexed.map{it.id}.toSet(),indexed.size==songs.size)
             }
+            val now=current()
+            val seed=now?.let{t->indexed.firstOrNull{it.id==t.group}}
+            if(now!=null){
+                sheetAction(panel,"Похожие на текущий трек",if(seed!=null)now.title else "Сначала просканируйте оригинал песни"){
+                    if(seed==null){toast("Нужен акустический анализ песни");return@sheetAction}
+                    dialog.dismiss();relatedMixDialog(seed,indexed,now.title)
+                }
+            }
+            panel.addView(label("Под настроение",13,muted,true))
             MoodDiscovery.profiles.forEach{profile->
                 val ids=MoodDiscovery.rank(indexed,profile)
                 sheetAction(panel,profile.title,ids.size.toString()+" песен · "+profile.detail){
-                    dialog.dismiss();moodMixPreview(profile,ids)
+                    dialog.dismiss();moodMixPreview(profile.title,profile.detail,ids)
                 }
             }
             panel.addView(label("Подборка по акустическим признакам, а не по словам песни или настроению слушателя. Оценки приблизительны.",12,muted))
@@ -63,11 +72,31 @@ helper='''    private fun moodPrefs()=getSharedPreferences("mood_discovery_v1",M
             saved to skipped
         }){r->toast("Добавлено: "+r.first+" · недостаточно данных: "+r.second);moodDiscoveryDialog()}
     }
-    private fun moodMixPreview(profile:MoodDiscovery.Profile,ids:List<String>){
+    private fun relatedMixDialog(seed:MoodDiscovery.Entry,indexed:List<MoodDiscovery.Entry>,title:String){
+        fun entry(e:MoodDiscovery.Entry):LocalDiscovery.Entry{
+            val f=e.features
+            return LocalDiscovery.Entry(e.id,e.artist,listOf(f.energy,f.activity,f.brightness,f.low,f.valence,f.dynamics))
+        }
+        val origin=entry(seed);val pool=indexed.map{entry(it)}
+        actionSheet("Похожие песни",280){dialog,panel->
+            panel.addView(label(title,16,PremiumChrome.TEXT,true))
+            LocalDiscovery.Mode.values().forEach{mode->
+                val similar=mode==LocalDiscovery.Mode.SIMILAR
+                val name=if(similar)"Ближе по звучанию" else "Разнообразнее"
+                val detail=if(similar)"Близкие акустические характеристики" else "Больше разнообразия исполнителей и звучания"
+                sheetAction(panel,name,detail){
+                    val ids=LocalDiscovery.rank(origin,pool,mode)
+                    dialog.dismiss();moodMixPreview(("Похожие · "+title+" · "+name).take(100),detail,ids)
+                }
+            }
+            panel.addView(label("Только песни из вашей проанализированной медиатеки.",12,muted))
+        }
+    }
+    private fun moodMixPreview(title:String,detail:String,ids:List<String>){
         val selected=ids.mapNotNull{libraryIndex.get(it)?.takeIf{t->t.uri==t.group}}
         if(selected.isEmpty()){toast("Нет подходящих песен. Просканируйте библиотеку.");return}
-        actionSheet(profile.title,470){dialog,panel->
-            panel.addView(label(profile.detail,14,muted))
+        actionSheet(title,470){dialog,panel->
+            panel.addView(label(detail,14,muted))
             sheetAction(panel,"Воспроизвести","Заменит текущую очередь на "+selected.size+" песен"){
                 val p=controller
                 if(p==null){toast("Плеер подключается");return@sheetAction}
@@ -75,8 +104,18 @@ helper='''    private fun moodPrefs()=getSharedPreferences("mood_discovery_v1",M
                 if(live.isEmpty()){toast("Песни недоступны");return@sheetAction}
                 stopPreview();p.setMediaItems(live.map(::item));p.shuffleModeEnabled=false;p.prepare();p.play();dialog.dismiss();render()
             }
+            sheetAction(panel,"Добавить в очередь","Не прерывает текущую композицию; без повторов"){
+                val p=controller
+                if(p==null||p.mediaItemCount==0){toast("Сначала включите музыку");return@sheetAction}
+                val existing=(0 until p.mediaItemCount).map{p.getMediaItemAt(it).mediaId}
+                val live=selected.mapNotNull{libraryIndex.get(it.uri)?.takeIf{t->t.uri==t.group}}
+                val byId=live.associateBy{it.uri}
+                val additions=LocalDiscovery.append(existing,live.map{it.uri}).mapNotNull{byId[it]}
+                if(additions.isEmpty()){toast("Все подходящие песни уже в очереди");return@sheetAction}
+                p.addMediaItems(additions.map(::item));dialog.dismiss();toast("Добавлено: "+additions.size)
+            }
             sheetAction(panel,"Сохранить плейлист","Добавить без дубликатов"){
-                val name="Настроение · "+profile.title
+                val name=title
                 val live=selected.mapNotNull{libraryIndex.get(it.uri)?.takeIf{t->t.uri==t.group}?.uri}
                 val old=playlists[name].orEmpty()
                 playlists[name]=PlaylistOrder.append(old,live).toCollection(linkedSetOf());savePlaylists();dialog.dismiss();toast("Подборка сохранена");render()

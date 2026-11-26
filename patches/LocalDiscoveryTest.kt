@@ -1,0 +1,19 @@
+package app.remix.player
+fun main(){
+ fun e(id:String,a:String,x:Double,v:Double?=.2)=LocalDiscovery.Entry(id,a,listOf(x,x,x,x,v,x))
+ val seed=e("seed","A",.2);val same=e("1","A",.21);val other=e("2","B",.22);val farther=e("3","C",.55);val far=e("4","D",.99)
+ val rows=listOf(seed,same,other,farther,far,same)
+ check(LocalDiscovery.distance(seed,seed)==0.0)
+ check(LocalDiscovery.rank(seed,rows,LocalDiscovery.Mode.SIMILAR)==listOf("2","1"))
+ check(LocalDiscovery.rank(seed,rows,LocalDiscovery.Mode.VARIED).toSet()==setOf("1","2","3"))
+ check(LocalDiscovery.rank(seed,rows.reversed(),LocalDiscovery.Mode.SIMILAR)==listOf("2","1"))
+ check(LocalDiscovery.rank(seed,rows,LocalDiscovery.Mode.SIMILAR,1)==listOf("2"))
+ check(LocalDiscovery.rank(seed,emptyList(),LocalDiscovery.Mode.VARIED).isEmpty())
+ check(LocalDiscovery.distance(seed,e("x","",.2,null))==0.0)
+ check(runCatching{e("x","",Double.NaN)}.isFailure)
+ check(LocalDiscovery.append(listOf("1","2"),listOf("2","3","3","4",""))==listOf("3","4"))
+ check(LocalDiscovery.append(emptyList(),listOf("1","2"),1)==listOf("1"))
+ val many=(0 until 10000).map{e(it.toString(),"Artist "+it%50,.21)}
+ check(LocalDiscovery.rank(seed,many,LocalDiscovery.Mode.VARIED).distinct().size==50)
+ println("PASS: 11 local discovery and queue checks")
+}
