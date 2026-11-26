@@ -23,7 +23,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.PlaybackParameters
 
 /** No periodic work or service launch. Only UI events and existing playback events. */
-class PulseWidget:AppWidgetProvider(){
+open class PulseWidget:AppWidgetProvider(){
     override fun onUpdate(context:Context,manager:AppWidgetManager,ids:IntArray){ids.forEach{render(context,manager,it)};requestCover(context)}
     override fun onAppWidgetOptionsChanged(context:Context,manager:AppWidgetManager,id:Int,options:Bundle){render(context,manager,id)}
     override fun onReceive(context:Context,intent:Intent){
@@ -37,6 +37,14 @@ class PulseWidget:AppWidgetProvider(){
                 "play"->if(p.mediaItemCount>0){
                     if(p.playWhenReady&&p.playbackState!=Player.STATE_ENDED&&p.playerError==null)p.pause()
                     else{if(p.playbackState==Player.STATE_ENDED)p.seekTo(0);if(p.playbackState==Player.STATE_IDLE)p.prepare();p.play()}
+                }
+                "back10","forward10","quarter","middle","threequarters"->{
+                    TransportPolicy.target(command,p.currentPosition,p.duration,p.isCurrentMediaItemSeekable)?.let{p.seekTo(it)}
+                }
+                "speed80","speed100","speed125","speed150"->{
+                    val speed=TransportPolicy.speeds.getValue(command)
+                    val preset=if(speed==1f)Presets.all.first()else Preset("Скорость ×"+speed,speed,1f)
+                    Presets.active=preset;p.playbackParameters=PlaybackParameters(speed,1f)
                 }
                 else->{
                     val name=WidgetPolicy.selection(command,Presets.active.name)?:return
@@ -53,7 +61,7 @@ class PulseWidget:AppWidgetProvider(){
         const val OPEN="app.remix.player.widget.OPEN"
         const val TRACK="widget_track"
         const val ROUTE="widget_route"
-        private data class State(val id:String?,val title:String,val artist:String,val playing:Boolean,val ready:Boolean,val prev:Boolean,val next:Boolean,val preset:String)
+        private data class State(val id:String?,val title:String,val artist:String,val playing:Boolean,val ready:Boolean,val prev:Boolean,val next:Boolean,val preset:String,val speed:Float=1f,val seekable:Boolean=false)
         private var player:Player?=null
         private var listener:Player.Listener?=null
         private var last:State?=null
@@ -64,7 +72,7 @@ class PulseWidget:AppWidgetProvider(){
         private val covers=ThreadPoolExecutor(0,1,15L,TimeUnit.SECONDS,ArrayBlockingQueue<Runnable>(1),ThreadPoolExecutor.DiscardOldestPolicy())
         private fun requestCover(context:Context){
             val manager=AppWidgetManager.getInstance(context)
-            if(manager.getAppWidgetIds(ComponentName(context,PulseWidget::class.java)).isEmpty())return
+            if(widgetIds(context,manager).isEmpty())return
             val s=state();val id=s.id
             if(id==coverId)return
             coverId=id;cover=null;val generation=++coverGeneration
@@ -90,7 +98,7 @@ class PulseWidget:AppWidgetProvider(){
                 main.post{
                     if(generation==coverGeneration&&state().id==id){
                         cover=bitmap
-                        manager.getAppWidgetIds(ComponentName(app,PulseWidget::class.java)).forEach{render(app,manager,it)}
+                        widgetIds(app,manager).forEach{render(app,manager,it)}
                     }
                 }
             }
@@ -98,7 +106,7 @@ class PulseWidget:AppWidgetProvider(){
         private fun state():State{
             val p=player
             return if(p==null||p.mediaItemCount==0||MixerSession.active)State(null,"Pulse","Откройте плеер",false,false,false,false,"Оригинал")
-            else State(p.currentMediaItem?.mediaId,p.mediaMetadata.title?.toString()?.take(200).orEmpty().ifBlank{"Pulse"},p.mediaMetadata.artist?.toString()?.take(200).orEmpty(),p.playWhenReady&&p.playbackState!=Player.STATE_ENDED,true,p.hasPreviousMediaItem(),p.hasNextMediaItem(),Presets.active.name)
+            else State(p.currentMediaItem?.mediaId,p.mediaMetadata.title?.toString()?.take(200).orEmpty().ifBlank{"Pulse"},p.mediaMetadata.artist?.toString()?.take(200).orEmpty(),p.playWhenReady&&p.playbackState!=Player.STATE_ENDED,true,p.hasPreviousMediaItem(),p.hasNextMediaItem(),Presets.active.name,p.playbackParameters.speed,p.isCurrentMediaItemSeekable&&p.duration>0)
         }
         fun attach(context:Context,p:Player){
             detach(context);player=p
@@ -112,23 +120,29 @@ class PulseWidget:AppWidgetProvider(){
             val s=state();if(last==s)return;last=s
             requestCover(context)
             val manager=AppWidgetManager.getInstance(context)
-            manager.getAppWidgetIds(ComponentName(context,PulseWidget::class.java)).forEach{render(context,manager,it)}
+            widgetIds(context,manager).forEach{render(context,manager,it)}
         }
+        private fun widgetIds(context:Context,manager:AppWidgetManager)=listOf(PulseWidget::class.java,PulseMiniWidget::class.java,PulseSpeedWidget::class.java).flatMap{manager.getAppWidgetIds(ComponentName(context,it)).toList()}.distinct()
         private fun render(context:Context,manager:AppWidgetManager,id:Int){
             val s=state()
+            val provider=manager.getAppWidgetInfo(id)?.provider?.className
+            val mini=provider==PulseMiniWidget::class.java.name
+            val speedOnly=provider==PulseSpeedWidget::class.java.name
             if(Build.VERSION.SDK_INT>=31){
-                manager.updateAppWidget(id,RemoteViews(mapOf(
-                    SizeF(120f,64f) to build(context,s,WidgetPolicy.Size.COMPACT),
-                    SizeF(230f,116f) to build(context,s,WidgetPolicy.Size.MIX),
-                    SizeF(280f,184f) to build(context,s,WidgetPolicy.Size.STUDIO)
-                )))
+                val views=linkedMapOf(SizeF(120f,64f) to build(context,s,WidgetPolicy.Size.COMPACT,false),SizeF(180f,64f) to build(context,s,WidgetPolicy.Size.COMPACT,true))
+                if(!mini)views[SizeF(230f,160f)]=build(context,s,WidgetPolicy.Size.MIX)
+                if(!mini&&!speedOnly)views[SizeF(280f,208f)]=build(context,s,WidgetPolicy.Size.STUDIO)
+                manager.updateAppWidget(id,RemoteViews(views))
             }else{
                 val options=manager.getAppWidgetOptions(id)
-                manager.updateAppWidget(id,build(context,s,WidgetPolicy.size(options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH,230),options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,116))))
+                val width=options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH,230)
+                val size=WidgetPolicy.size(width,options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,160))
+                val selected=if(mini)WidgetPolicy.Size.COMPACT else if(speedOnly&&size==WidgetPolicy.Size.STUDIO)WidgetPolicy.Size.MIX else size
+                manager.updateAppWidget(id,build(context,s,selected,width>=180))
             }
         }
-        internal fun testView(context:Context,width:Int,height:Int):RemoteViews=build(context,State("qa-track","QA Track","QA Artist",true,true,true,true,"Nightcore + Bass"),WidgetPolicy.size(width,height))
-        private fun build(context:Context,s:State,size:WidgetPolicy.Size):RemoteViews{
+        internal fun testView(context:Context,width:Int,height:Int):RemoteViews=build(context,State("qa-track","QA Track","QA Artist",true,true,true,true,"Nightcore + Bass",1.35f,true),WidgetPolicy.size(width,height),width>=180)
+        private fun build(context:Context,s:State,size:WidgetPolicy.Size,compactTransport:Boolean=true):RemoteViews{
             val expanded=size!=WidgetPolicy.Size.COMPACT
             val studio=size==WidgetPolicy.Size.STUDIO
             val v=RemoteViews(context.packageName,R.layout.pulse_widget)
@@ -140,23 +154,32 @@ class PulseWidget:AppWidgetProvider(){
             v.setTextViewText(R.id.widget_title,s.title);v.setTextViewText(R.id.widget_artist,s.artist)
             val art=cover.takeIf{s.id!=null&&coverId==s.id}
             if(art!=null)v.setImageViewBitmap(R.id.widget_art,art)else v.setImageViewResource(R.id.widget_art,android.R.drawable.ic_media_play)
-            v.setOnClickPendingIntent(R.id.widget_search,open("search"))
-            v.setTextViewText(R.id.widget_mode,if(s.preset=="Оригинал")"ORIGINAL" else s.preset)
+            v.setOnClickPendingIntent(R.id.widget_queue,open("queue"))
             v.setImageViewResource(R.id.widget_play,if(s.playing)android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play)
             v.setContentDescription(R.id.widget_play,if(s.playing)"Пауза" else "Воспроизвести")
             visible(R.id.widget_art,expanded);visible(R.id.widget_artist,expanded)
-            visible(R.id.widget_prev,expanded&&s.prev);visible(R.id.widget_next,expanded&&s.next)
-            visible(R.id.widget_effects,expanded&&s.ready);visible(R.id.widget_studio,studio&&s.ready);visible(R.id.widget_detail,studio)
+            visible(R.id.widget_prev,(expanded||compactTransport)&&s.prev);visible(R.id.widget_next,(expanded||compactTransport)&&s.next)
+            visible(R.id.widget_effects,expanded&&s.ready);visible(R.id.widget_studio,studio&&s.ready);visible(R.id.widget_detail,expanded&&s.ready&&s.seekable)
             v.setOnClickPendingIntent(R.id.widget_title,open("player"));v.setOnClickPendingIntent(R.id.widget_artist,open("player"));v.setOnClickPendingIntent(R.id.widget_art,open("player"))
             v.setOnClickPendingIntent(R.id.widget_play,if(s.ready)command("play")else open("player"))
             v.setOnClickPendingIntent(R.id.widget_prev,command("prev"));v.setOnClickPendingIntent(R.id.widget_next,command("next"))
-            for((id,action) in listOf(R.id.widget_fast to "fast",R.id.widget_night to "night",R.id.widget_slow to "slow",R.id.widget_reset to "reset")){
+            for((id,action) in listOf(R.id.widget_back10 to "back10",R.id.widget_forward10 to "forward10",R.id.widget_quarter to "quarter",R.id.widget_middle to "middle",R.id.widget_threequarters to "threequarters"))v.setOnClickPendingIntent(id,command(action))
+            for((id,action) in listOf(R.id.widget_speed80 to "speed80",R.id.widget_speed100 to "speed100",R.id.widget_speed125 to "speed125",R.id.widget_speed150 to "speed150")){
+                val selected=kotlin.math.abs(s.speed-TransportPolicy.speeds.getValue(action))<.001f
+                v.setInt(id,"setBackgroundResource",if(selected)R.drawable.pulse_widget_chip_active else R.drawable.pulse_widget_chip)
+                v.setTextColor(id,if(selected)0xff171126.toInt() else 0xffe9e4ff.toInt())
+                v.setOnClickPendingIntent(id,command(action))
+            }
+            for((id,action) in listOf(R.id.widget_fast to "fast",R.id.widget_night to "night",R.id.widget_slow to "slow")){
                 v.setInt(id,"setBackgroundResource",if(WidgetPolicy.effects[action]==s.preset)R.drawable.pulse_widget_chip_active else R.drawable.pulse_widget_chip)
                 v.setTextColor(id,if(WidgetPolicy.effects[action]==s.preset)0xff171126.toInt() else 0xffe9e4ff.toInt())
                 v.setOnClickPendingIntent(id,command(action))
             }
-            v.setOnClickPendingIntent(R.id.widget_edit,open("edit"));v.setOnClickPendingIntent(R.id.widget_save,open("save"));v.setOnClickPendingIntent(R.id.widget_genres,open("genres"));v.setOnClickPendingIntent(R.id.widget_lyrics,open("lyrics"))
+            v.setOnClickPendingIntent(R.id.widget_edit,open("edit"))
             return v
         }
     }
 }
+
+class PulseMiniWidget:PulseWidget()
+class PulseSpeedWidget:PulseWidget()

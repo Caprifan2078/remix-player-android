@@ -32,17 +32,18 @@ class StudioAcceptanceTest {
             val input=File(dir,"input.pcm");raw(input,22050);val expected=hash(input)
             val inst=InstrumentationRegistry.getInstrumentation()
             inst.runOnMainSync{
-                for((width,height) in listOf(120 to 64,230 to 116,280 to 184)){
+                for((width,height) in listOf(120 to 64,230 to 160,280 to 208)){
                     val view=PulseWidget.testView(c,width,height).apply(c,android.widget.FrameLayout(c))
                     assertEquals("QA Track",view.findViewById<android.widget.TextView>(R.id.widget_title).text.toString())
-                    assertEquals(if(width>=230&&height>=116)android.view.View.VISIBLE else android.view.View.GONE,view.findViewById<android.view.View>(R.id.widget_effects).visibility)
-                    assertEquals(if(width>=280&&height>=184)android.view.View.VISIBLE else android.view.View.GONE,view.findViewById<android.view.View>(R.id.widget_studio).visibility)
+                    assertEquals(if(width>=230&&height>=160)android.view.View.VISIBLE else android.view.View.GONE,view.findViewById<android.view.View>(R.id.widget_effects).visibility)
+                    assertEquals(if(width>=280&&height>=208)android.view.View.VISIBLE else android.view.View.GONE,view.findViewById<android.view.View>(R.id.widget_studio).visibility)
                     val density=c.resources.displayMetrics.density
                     view.measure(android.view.View.MeasureSpec.makeMeasureSpec((width*density).toInt(),android.view.View.MeasureSpec.EXACTLY),android.view.View.MeasureSpec.makeMeasureSpec((height*density).toInt(),android.view.View.MeasureSpec.EXACTLY))
                     view.layout(0,0,view.measuredWidth,view.measuredHeight)
                     assertTrue(view.findViewById<android.view.View>(R.id.widget_play).width>0)
                     assertTrue(view.findViewById<android.view.View>(R.id.widget_art) is android.widget.ImageView)
-                    assertEquals(if(width>=280&&height>=184)android.view.View.VISIBLE else android.view.View.GONE,view.findViewById<android.view.View>(R.id.widget_detail).visibility)
+                    assertEquals(if(width>=230&&height>=160)android.view.View.VISIBLE else android.view.View.GONE,view.findViewById<android.view.View>(R.id.widget_detail).visibility)
+                    assertNotNull(view.findViewById<android.view.View>(R.id.widget_speed125));assertNotNull(view.findViewById<android.view.View>(R.id.widget_middle))
                 }
             }
             println("PASS Android: three actual RemoteViews layout inflations and size visibility")

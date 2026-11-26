@@ -3,9 +3,10 @@ set -euo pipefail
 root="$1"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
-kotlinc "$root/app/src/main/java/app/remix/player/PlaybackCadence.kt" "$root/app/src/main/java/app/remix/player/Mp3Lyrics.kt" patches/PowerCadenceTest.kt patches/Mp3LyricsTest.kt "$root/app/src/main/java/app/remix/player/WidgetPolicy.kt" patches/WidgetPolicyTest.kt -include-runtime -d "$tmp/test.jar"
+kotlinc "$root/app/src/main/java/app/remix/player/PlaybackCadence.kt" "$root/app/src/main/java/app/remix/player/Mp3Lyrics.kt" patches/PowerCadenceTest.kt patches/Mp3LyricsTest.kt "$root/app/src/main/java/app/remix/player/WidgetPolicy.kt" patches/WidgetPolicyTest.kt "$root/app/src/main/java/app/remix/player/TransportPolicy.kt" patches/TransportPolicyTest.kt -include-runtime -d "$tmp/test.jar"
 java -cp "$tmp/test.jar" app.remix.player.PowerCadenceTestKt
 java -cp "$tmp/test.jar" app.remix.player.WidgetPolicyTestKt
+java -cp "$tmp/test.jar" app.remix.player.TransportPolicyTestKt
 for version in 0 3 4; do
   ffmpeg -v error -y -f lavfi -i 'sine=frequency=440:duration=3' -metadata title='Pulse fixture' -metadata artist='QA' -id3v2_version "$version" -write_id3v1 0 -c:a libmp3lame "$tmp/before.mp3"
   java -cp "$tmp/test.jar" app.remix.player.Mp3LyricsTestKt "$tmp/before.mp3" "$tmp/after.mp3"

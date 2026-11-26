@@ -1,10 +1,10 @@
 package app.remix.player
 fun main(){
     check(WidgetPolicy.size(120,64)==WidgetPolicy.Size.COMPACT)
-    check(WidgetPolicy.size(230,116)==WidgetPolicy.Size.MIX)
-    check(WidgetPolicy.size(280,184)==WidgetPolicy.Size.STUDIO)
-    check(WidgetPolicy.size(279,184)==WidgetPolicy.Size.MIX)
-    check(WidgetPolicy.size(280,183)==WidgetPolicy.Size.MIX)
+    check(WidgetPolicy.size(230,160)==WidgetPolicy.Size.MIX)
+    check(WidgetPolicy.size(280,208)==WidgetPolicy.Size.STUDIO)
+    check(WidgetPolicy.size(279,208)==WidgetPolicy.Size.MIX)
+    check(WidgetPolicy.size(280,207)==WidgetPolicy.Size.MIX)
     check(WidgetPolicy.size(500,64)==WidgetPolicy.Size.COMPACT)
     check(WidgetPolicy.selection("fast","Оригинал")=="Sped Up + Bass")
     check(WidgetPolicy.selection("fast","Sped Up + Bass")=="Оригинал")
