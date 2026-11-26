@@ -50,6 +50,7 @@ edit('LiveOverlap.kt','    private var preview:ExoPlayer?=null','''    private v
         handoffTarget=target;internalSeek=true
         try{main.seekTo(to,target)}finally{internalSeek=false}
     }''')
+edit('LiveOverlap.kt','if(internalSeek||(handing&&reason==Player.DISCONTINUITY_REASON_SEEK&&newPosition.mediaItemIndex==to&&kotlin.math.abs(newPosition.positionMs-handoffTarget)<150))return','''if(internalSeek||(handing&&(reason==Player.DISCONTINUITY_REASON_SEEK||reason==Player.DISCONTINUITY_REASON_SEEK_ADJUSTMENT)&&newPosition.mediaItemIndex==to&&kotlin.math.abs(newPosition.positionMs-handoffTarget)<150))return''')
 edit('LiveOverlap.kt','if(reason==Player.DISCONTINUITY_REASON_AUTO_TRANSITION&&started&&newPosition.mediaItemIndex==to){autoPending=true;return}','if(reason==Player.DISCONTINUITY_REASON_AUTO_TRANSITION&&started&&newPosition.mediaItemIndex==to&&queueMatches()){observeIncoming();main.volume=0f;autoPending=true;return}')
 edit('LiveOverlap.kt','fadeWindow=null;fadePlan=null;startedAt=0L','fadeWindow=null;fadePlan=null;audiblePosition.reset();lastCorrectionAt=0L;recoveringHandoff=false;startedAt=0L')
 edit('LiveOverlap.kt','''        if(!queueMatches()||p.playbackState!=Player.STATE_READY||!p.isPlaying){abort(true);return}
