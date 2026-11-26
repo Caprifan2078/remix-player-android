@@ -60,6 +60,10 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/023-model-cdn.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/WhisperDownload.kt" "$GITHUB_WORKSPACE/patches/ModelMemoryBudget.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
           python3 "$GITHUB_WORKSPACE/patches/024-model-recovery.py" "source/$PROJECT"
+          cp "$GITHUB_WORKSPACE/patches/DjTransition.kt" "$GITHUB_WORKSPACE/patches/RemixAdvisor.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
+          python3 "$GITHUB_WORKSPACE/patches/025-smart-dj.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/026-advisor-ui.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/027-mix-quality.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
           test -f "source/$PROJECT/app/build.gradle.kts"
@@ -166,6 +170,10 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/023-model-cdn.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/WhisperDownload.kt" "$GITHUB_WORKSPACE/patches/ModelMemoryBudget.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
           python3 "$GITHUB_WORKSPACE/patches/024-model-recovery.py" "source/$PROJECT"
+          cp "$GITHUB_WORKSPACE/patches/DjTransition.kt" "$GITHUB_WORKSPACE/patches/RemixAdvisor.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
+          python3 "$GITHUB_WORKSPACE/patches/025-smart-dj.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/026-advisor-ui.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/027-mix-quality.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/setup-java@v4
@@ -206,6 +214,8 @@ jobs:
         run: bash patches/run-smart-mix.sh "source/$PROJECT"
       - name: Model recovery and catalogue regression
         run: bash patches/run-model-recovery.sh "source/$PROJECT"
+      - name: Offline DJ and recommendation quality regression
+        run: bash patches/run-smart-dj.sh "source/$PROJECT"
       - name: Full regression
         working-directory: source/RemixPlayer_v0.66
         env:
@@ -266,6 +276,10 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/023-model-cdn.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/WhisperDownload.kt" "$GITHUB_WORKSPACE/patches/ModelMemoryBudget.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
           python3 "$GITHUB_WORKSPACE/patches/024-model-recovery.py" "source/$PROJECT"
+          cp "$GITHUB_WORKSPACE/patches/DjTransition.kt" "$GITHUB_WORKSPACE/patches/RemixAdvisor.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
+          python3 "$GITHUB_WORKSPACE/patches/025-smart-dj.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/026-advisor-ui.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/027-mix-quality.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/download-artifact@v4
@@ -321,6 +335,10 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/023-model-cdn.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/WhisperDownload.kt" "$GITHUB_WORKSPACE/patches/ModelMemoryBudget.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
           python3 "$GITHUB_WORKSPACE/patches/024-model-recovery.py" "source/$PROJECT"
+          cp "$GITHUB_WORKSPACE/patches/DjTransition.kt" "$GITHUB_WORKSPACE/patches/RemixAdvisor.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
+          python3 "$GITHUB_WORKSPACE/patches/025-smart-dj.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/026-advisor-ui.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/027-mix-quality.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/download-artifact@v4
@@ -383,6 +401,10 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/023-model-cdn.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/WhisperDownload.kt" "$GITHUB_WORKSPACE/patches/ModelMemoryBudget.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
           python3 "$GITHUB_WORKSPACE/patches/024-model-recovery.py" "source/$PROJECT"
+          cp "$GITHUB_WORKSPACE/patches/DjTransition.kt" "$GITHUB_WORKSPACE/patches/RemixAdvisor.kt" "source/$PROJECT/app/src/main/java/app/remix/player/"
+          python3 "$GITHUB_WORKSPACE/patches/025-smart-dj.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/026-advisor-ui.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/027-mix-quality.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/setup-java@v4
