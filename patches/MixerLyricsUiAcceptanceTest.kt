@@ -133,6 +133,20 @@ class MixerLyricsUiAcceptanceTest {
             await("Follow preference lost after leaving lyrics"){button("Автопрокрутка: выкл.")!=null}
             click("Автопрокрутка: выкл.")
             await("Follow on not restored"){button("Автопрокрутка: вкл.")!=null}
+            main{
+                val scroll=views(activity()!!.window.decorView).first{it.tag=="karaoke-scroll"}
+                val now=SystemClock.uptimeMillis()
+                fun send(action:Int,x:Float,y:Float,time:Long){
+                    val e=android.view.MotionEvent.obtain(now,time,action,x,y,0)
+                    try{scroll.dispatchTouchEvent(e)}finally{e.recycle()}
+                }
+                send(android.view.MotionEvent.ACTION_DOWN,20f,140f,now)
+                send(android.view.MotionEvent.ACTION_MOVE,20f,40f,now+80)
+                send(android.view.MotionEvent.ACTION_CANCEL,20f,40f,now+100)
+            }
+            await("Manual swipe must pause follow"){button("Автопрокрутка: выкл.")!=null}
+            click("Автопрокрутка: выкл.")
+            await("Resume follow after manual scroll"){button("Автопрокрутка: вкл.")!=null}
             capture("karaoke-seek")
         }
     }
