@@ -90,8 +90,11 @@ s=s[:a]+'''    private data class ScanItem(val uri:String,val title:String,val a
         }
     }
     // Prefer already separated vocals. Do not start an expensive separation job implicitly.
-    private fun scanRecognize(uri:Uri,id:String):String{
-        val stem=getSharedPreferences("stem_cache",MODE_PRIVATE).getString(id,null)?.let{StemEngine.load(this,it)}
+    private fun scanRecognize(uri:Uri,id:String,reference:String?=null):String{
+        val stem=try{getSharedPreferences("stem_cache",MODE_PRIVATE).getString(id,null)?.let{StemEngine.load(this,it)}}catch(e:Exception){
+            if(e is InterruptedException||Thread.currentThread().isInterrupted)throw e
+            null
+        }
         if(stem!=null){
             updateWork("Whisper · выделенный вокал")
             val heard=try{WhisperLocal.transcribe(this,uri,stem,"auto"){updateWork(it)}}catch(e:Exception){
@@ -99,7 +102,7 @@ s=s[:a]+'''    private data class ScanItem(val uri:String,val title:String,val a
                 ""
             }
             check(!Thread.currentThread().isInterrupted)
-            if(heard.isNotBlank())return heard
+            if(heard.isNotBlank()&&(reference==null||KnownLyricAlignment.align(heard,reference)!=null))return heard
         }
         updateWork("Whisper · исходная композиция")
         return WhisperLocal.transcribe(this,uri,null,"auto"){updateWork(it)}
@@ -123,8 +126,9 @@ s=s[:a]+'''    private data class ScanItem(val uri:String,val title:String,val a
                     }
                     val reference=raw?:t.before
                     if(align&&reference.isNotBlank()&&Lrc.parse(reference).isEmpty()){
-                        val heard=scanRecognize(uri,t.uri)
-                        val result=KnownLyricAlignment.align(heard,LyricDocument.plain(reference))
+                        val known=LyricDocument.plain(reference)
+                        val heard=scanRecognize(uri,t.uri,known)
+                        val result=KnownLyricAlignment.align(heard,known)
                         if(result!=null){raw=result.lrc;status="Синхронизировано"}else if(raw==null)status="Нет уверенной синхронизации"
                     }
                 }catch(e:Exception){if(Thread.currentThread().isInterrupted||e is InterruptedException)throw e;status="Ошибка"}
