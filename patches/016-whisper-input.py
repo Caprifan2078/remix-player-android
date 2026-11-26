@@ -14,8 +14,28 @@ new='''    /** Only boost a quiet, non-silent Whisper window. Keep sample count 
             val x=block[i].toDouble();require(x.isFinite()&&abs(x)<=1.0){"Некорректный сигнал Whisper"}
             sum+=x*x;peak=max(peak,abs(x))
         }
-        val rms=sqrt(sum/n)
-        if(rms<=.001)return null
+        var rms=sqrt(sum/n)
+        // Whole-window RMS can hide brief phrases in long pauses. Rescue only
+        // sustained energy, not isolated clicks; leave sample indices untouched.
+        if(rms<=.001){
+            val frame=1280 // 80 ms at Whisper's fixed 16 kHz input rate
+            var previous=0.0;var sustained=0.0
+            var start=0
+            while(start<=n-frame){
+                check(!Thread.currentThread().isInterrupted){"Отменено"}
+                var power=0.0;var occupied=0
+                for(i in start until start+frame){
+                    val x=block[i].toDouble();power+=x*x
+                    if(abs(x)>.001)occupied++
+                }
+                val local=sqrt(power/frame)
+                val active=if(local>.001&&occupied>=frame/8)local else 0.0
+                if(previous>0.0&&active>0.0)sustained=max(sustained,max(previous,active))
+                previous=active;start+=frame
+            }
+            if(sustained==0.0)return null
+            rms=sustained
+        }
         val gain=minOf(4.0,.025/rms,.90/peak).coerceAtLeast(1.0)
         val result=block.copyOf(n)
         if(gain>1.0)for(i in result.indices){
