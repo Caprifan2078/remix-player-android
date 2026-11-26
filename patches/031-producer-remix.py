@@ -15,11 +15,20 @@ edit('AudioCore.kt','private val guard=LinkedPeakGuard(rate)','private val guard
 edit('AudioCore.kt',';guard.reset() }',';guard.reset();adaptiveDepth.reset() }')
 edit('AudioCore.kt','val sweep = if(p.pan>0','val depth=if(processed)adaptiveDepth.frame(input)else 1f\n        val sweep = if(p.pan>0')
 edit('AudioCore.kt','out[c]=y','out[c]=if(processed)x+(y-x)*depth else y')
+# Spatial movement must not be weakened by the adaptive wet/dry blend.
+edit('AudioCore.kt','Preset("8D Audio",pan=.8f,room=.15f)','Preset("8D Audio",pan=.95f,room=.22f)')
+edit('AudioCore.kt','private val adaptiveDepth=AdaptiveEffectEnvelope(rate)','private val adaptiveDepth=AdaptiveEffectEnvelope(rate)\n    private val orbit=StereoOrbit(rate)')
+edit('AudioCore.kt','guard.reset();adaptiveDepth.reset()','guard.reset();adaptiveDepth.reset();orbit.reset()')
+edit('AudioCore.kt','if(channels==2 && p.pan>0) y *= if(c==0) sqrt((1-sweep).coerceAtLeast(0f))*.75f else sqrt((1+sweep).coerceAtLeast(0f))*.75f','// Spatial processing is applied after the channel-linked adaptive mix.')
+edit('AudioCore.kt','if(processed)guard.apply(out)','if(channels==2&&p.pan>0)orbit.apply(out,sweep)\n        if(processed)guard.apply(out)')
+edit('AudioCore.kt','phase += 2*PI*.19/rate','phase += 2*PI*(when(p.name){"Slow Stereo Orbit"->.10;"Fast Stereo Orbit"->.32;else->.19})/rate')
+p=src/'AudioCore.kt'
+p.write_text(p.read_text()+'\n'+(Path(__file__).parent/'StereoOrbit.kt').read_text().split('\n',4)[4])
 p=src/'AudioCore.kt'
 envelope=(Path(__file__).parent/'AdaptiveEffectEnvelope.kt').read_text().splitlines()
 p.write_text(p.read_text()+'\n'+'\n'.join(envelope[5:])+'\n')
 # Do not reuse a render checkpoint from an older DSP algorithm.
-edit('EffectCheckpoint.kt','dsp-peak-guard-v60','dsp-adaptive-depth-v1')
+edit('EffectCheckpoint.kt','dsp-peak-guard-v60','dsp-adaptive-depth-orbit-v2')
 edit('GenreCheckpoint.kt','genre-render-v7','genre-render-v8')
 edit('TransitionMix.kt','    fun renderFrames(first:File,second:File,out:File,overlap:Long,progress:(Int)->Unit={}):Long {','''    fun renderFrames(first:File,second:File,out:File,overlap:Long,progress:(Int)->Unit={}):Long = renderInternal(first,second,out,overlap,false,progress)
     fun renderSmartFrames(first:File,second:File,out:File,overlap:Long,progress:(Int)->Unit={}):Long = renderInternal(first,second,out,overlap,true,progress)
