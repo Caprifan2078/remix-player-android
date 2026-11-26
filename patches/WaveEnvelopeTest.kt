@@ -11,5 +11,16 @@ fun main(){
     val e=WaveEnvelope(duration,24);repeat(19200){e.frame(it*1000000L/rate,Float.NaN)};check(e.finish(rate)==null)
     check(runCatching{WaveEnvelope(900000001)}.isFailure);check(runCatching{WaveEnvelope(duration,0)}.isFailure)
     val h=WaveEnvelope(duration,24);repeat(19200){h.frame(it*1000000L/rate,5f)};check(h.finish(rate)!!.all{it==1f})
-    println("PASS: 9 envelope checks; real samples, time coverage, silence, invalid input")
+    val partial=WaveEnvelope(duration,24)
+    repeat(1600){partial.frame(it*125L,0.25f)}
+    val preview=partial.preview(rate)!!
+    check(preview.size==24&&preview.take(2).all{it==1f}&&preview.drop(2).all{it.isNaN()})
+    check(partial.finish(rate)==null)
+    repeat(17600){partial.frame((it+1600)*125L,1f)}
+    val final=partial.finish(rate)!!
+    check(final.take(2).all{it==.5f}&&final.drop(2).all{it==1f})
+    check(WaveEnvelope(duration,24).preview(rate)==null)
+    val silent=WaveEnvelope(duration,24);repeat(800){silent.frame(it*125L,0f)}
+    check(silent.preview(rate)!!.let{it[0]==0f&&it[1].isNaN()})
+    println("PASS: 14 envelope checks including progressive measured bins and unknown/silent separation")
 }
