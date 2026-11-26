@@ -8,6 +8,14 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.media.MediaMetadataRetriever
+import android.os.Handler
+import android.os.Looper
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.ArrayBlockingQueue
 import android.util.SizeF
 import android.view.View
 import android.widget.RemoteViews
@@ -16,7 +24,7 @@ import androidx.media3.common.PlaybackParameters
 
 /** No periodic work or service launch. Only UI events and existing playback events. */
 class PulseWidget:AppWidgetProvider(){
-    override fun onUpdate(context:Context,manager:AppWidgetManager,ids:IntArray){ids.forEach{render(context,manager,it)}}
+    override fun onUpdate(context:Context,manager:AppWidgetManager,ids:IntArray){ids.forEach{render(context,manager,it)};requestCover(context)}
     override fun onAppWidgetOptionsChanged(context:Context,manager:AppWidgetManager,id:Int,options:Bundle){render(context,manager,id)}
     override fun onReceive(context:Context,intent:Intent){
         if(intent.action==COMMAND){
@@ -49,6 +57,44 @@ class PulseWidget:AppWidgetProvider(){
         private var player:Player?=null
         private var listener:Player.Listener?=null
         private var last:State?=null
+        private var coverId:String?=null
+        private var cover:Bitmap?=null
+        private var coverGeneration=0L
+        private val main=Handler(Looper.getMainLooper())
+        private val covers=ThreadPoolExecutor(0,1,15L,TimeUnit.SECONDS,ArrayBlockingQueue<Runnable>(1),ThreadPoolExecutor.DiscardOldestPolicy())
+        private fun requestCover(context:Context){
+            val manager=AppWidgetManager.getInstance(context)
+            if(manager.getAppWidgetIds(ComponentName(context,PulseWidget::class.java)).isEmpty())return
+            val s=state();val id=s.id
+            if(id==coverId)return
+            coverId=id;cover=null;val generation=++coverGeneration
+            covers.queue.clear()
+            val uri=player?.currentMediaItem?.localConfiguration?.uri
+            if(id==null||uri?.scheme!="content")return
+            val app=context.applicationContext
+            covers.execute{
+                val bitmap=runCatching{
+                    val retriever=MediaMetadataRetriever()
+                    try{
+                        retriever.setDataSource(app,uri)
+                        val bytes=retriever.embeddedPicture?:return@runCatching null
+                        if(bytes.size>8*1024*1024)return@runCatching null
+                        val bounds=BitmapFactory.Options().apply{inJustDecodeBounds=true}
+                        BitmapFactory.decodeByteArray(bytes,0,bytes.size,bounds)
+                        if(bounds.outWidth !in 1..16384||bounds.outHeight !in 1..16384)return@runCatching null
+                        var sample=1
+                        while(maxOf(bounds.outWidth,bounds.outHeight)/sample>256)sample*=2
+                        BitmapFactory.decodeByteArray(bytes,0,bytes.size,BitmapFactory.Options().apply{inSampleSize=sample})
+                    }finally{retriever.release()}
+                }.getOrNull()
+                main.post{
+                    if(generation==coverGeneration&&state().id==id){
+                        cover=bitmap
+                        manager.getAppWidgetIds(ComponentName(app,PulseWidget::class.java)).forEach{render(app,manager,it)}
+                    }
+                }
+            }
+        }
         private fun state():State{
             val p=player
             return if(p==null||p.mediaItemCount==0||MixerSession.active)State(null,"Pulse","Откройте плеер",false,false,false,false,"Оригинал")
@@ -63,6 +109,7 @@ class PulseWidget:AppWidgetProvider(){
         fun detach(context:Context){listener?.let{player?.removeListener(it)};listener=null;player=null;publish(context)}
         fun refresh(context:Context)=publish(context)
         private fun publish(context:Context){
+            requestCover(context)
             val s=state();if(last==s)return;last=s
             val manager=AppWidgetManager.getInstance(context)
             manager.getAppWidgetIds(ComponentName(context,PulseWidget::class.java)).forEach{render(context,manager,it)}
@@ -91,12 +138,15 @@ class PulseWidget:AppWidgetProvider(){
             fun command(action:String)=PendingIntent.getBroadcast(context,91,Intent(context,PulseWidget::class.java).setAction(COMMAND).setData(uri("command",action)).putExtra(TRACK,s.id).putExtra("command",action),flags)
             fun visible(id:Int,on:Boolean){v.setViewVisibility(id,if(on)View.VISIBLE else View.GONE)}
             v.setTextViewText(R.id.widget_title,s.title);v.setTextViewText(R.id.widget_artist,s.artist)
+            val art=cover.takeIf{s.id!=null&&coverId==s.id}
+            if(art!=null)v.setImageViewBitmap(R.id.widget_art,art)else v.setImageViewResource(R.id.widget_art,android.R.drawable.ic_media_play)
+            v.setOnClickPendingIntent(R.id.widget_search,open("search"))
             v.setTextViewText(R.id.widget_mode,if(s.preset=="Оригинал")"ORIGINAL" else s.preset)
             v.setImageViewResource(R.id.widget_play,if(s.playing)android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play)
             v.setContentDescription(R.id.widget_play,if(s.playing)"Пауза" else "Воспроизвести")
             visible(R.id.widget_art,expanded);visible(R.id.widget_artist,expanded)
             visible(R.id.widget_prev,expanded&&s.prev);visible(R.id.widget_next,expanded&&s.next)
-            visible(R.id.widget_effects,expanded&&s.ready);visible(R.id.widget_studio,studio&&s.ready);visible(R.id.widget_mode,studio)
+            visible(R.id.widget_effects,expanded&&s.ready);visible(R.id.widget_studio,studio&&s.ready);visible(R.id.widget_detail,studio)
             v.setOnClickPendingIntent(R.id.widget_title,open("player"));v.setOnClickPendingIntent(R.id.widget_artist,open("player"));v.setOnClickPendingIntent(R.id.widget_art,open("player"))
             v.setOnClickPendingIntent(R.id.widget_play,if(s.ready)command("play")else open("player"))
             v.setOnClickPendingIntent(R.id.widget_prev,command("prev"));v.setOnClickPendingIntent(R.id.widget_next,command("next"))

@@ -41,6 +41,8 @@ class StudioAcceptanceTest {
                     view.measure(android.view.View.MeasureSpec.makeMeasureSpec((width*density).toInt(),android.view.View.MeasureSpec.EXACTLY),android.view.View.MeasureSpec.makeMeasureSpec((height*density).toInt(),android.view.View.MeasureSpec.EXACTLY))
                     view.layout(0,0,view.measuredWidth,view.measuredHeight)
                     assertTrue(view.findViewById<android.view.View>(R.id.widget_play).width>0)
+                    assertTrue(view.findViewById<android.view.View>(R.id.widget_art) is android.widget.ImageView)
+                    assertEquals(if(width>=280&&height>=184)android.view.View.VISIBLE else android.view.View.GONE,view.findViewById<android.view.View>(R.id.widget_detail).visibility)
                 }
             }
             println("PASS Android: three actual RemoteViews layout inflations and size visibility")

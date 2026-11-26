@@ -11,12 +11,10 @@ replace(p,'    private var lyricToolsExpanded=false',r'''    private var pending
     private fun readWidgetRoute(value:Intent){
         if(value.action!=PulseWidget.OPEN)return
         val route=value.getStringExtra(PulseWidget.ROUTE)
-        if(route=="player"){screen="Плеер";pendingWidgetRoute=null;return}
+        if(route=="player"||route=="search"){screen=if(route=="search")"Музыка" else "Плеер";pendingWidgetRoute=null;return}
+        pendingWidgetRoute=null
         val id=value.getStringExtra(PulseWidget.TRACK)
         if(route in WidgetPolicy.routes&&!id.isNullOrBlank())pendingWidgetRoute=route!! to id
-    }
-    override fun onNewIntent(intent:Intent){
-        super.onNewIntent(intent);setIntent(intent);readWidgetRoute(intent);render();consumeWidgetRoute()
     }
     private fun consumeWidgetRoute(){
         val p=controller?:return
@@ -38,6 +36,7 @@ replace(p,'    private var lyricToolsExpanded=false',r'''    private var pending
         }
     }
     private var lyricToolsExpanded=false''')
+replace(p,'    override fun onNewIntent(intent:Intent){super.onNewIntent(intent);if(intent.getBooleanExtra("open_mixer",false)){screen="Микшер";render()}}','''    override fun onNewIntent(intent:Intent){super.onNewIntent(intent);setIntent(intent);if(intent.action==PulseWidget.OPEN){readWidgetRoute(intent);render();consumeWidgetRoute()}else if(intent.getBooleanExtra("open_mixer",false)){screen="Микшер";render()}}''')
 replace(p,'        future=MediaController.Builder(this,SessionToken','        readWidgetRoute(intent)\n        future=MediaController.Builder(this,SessionToken')
 replace(p,'restoreQueue(it)};render()}.onFailure','restoreQueue(it)};render();consumeWidgetRoute()}.onFailure')
 replace(p,'private fun applyPreset(p:Preset){Presets.active=p;controller?.playbackParameters=PlaybackParameters(p.speed,p.pitch)}','private fun applyPreset(p:Preset){Presets.active=p;controller?.playbackParameters=PlaybackParameters(p.speed,p.pitch);PulseWidget.refresh(this)}')
