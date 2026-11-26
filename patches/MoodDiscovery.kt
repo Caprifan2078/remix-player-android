@@ -39,9 +39,13 @@ object MoodDiscovery {
  data class Entry(val id:String,val artist:String,val features:Features)
  fun rank(entries:List<Entry>,profile:Profile,limit:Int=100):List<String>{
   require(limit in 1..1000)
-  val sorted=entries.filter{it.id.isNotBlank()}.distinctBy{it.id}.mapNotNull{e->score(e.features,profile)?.let{e to it}}.sortedWith(compareByDescending<Pair<Entry,Double>>{it.second}.thenBy{it.first.id}).toMutableList()
+  check(!Thread.currentThread().isInterrupted){"Cancelled"}
+  val sorted=entries.asSequence().filter{it.id.isNotBlank()}.distinctBy{it.id}.mapNotNull{e->
+   check(!Thread.currentThread().isInterrupted){"Cancelled"};score(e.features,profile)?.let{e to it}
+  }.sortedWith(compareByDescending<Pair<Entry,Double>>{it.second}.thenBy{it.first.id}).toMutableList()
   val out=mutableListOf<String>();var last=""
   while(sorted.isNotEmpty()&&out.size<limit){
+   check(!Thread.currentThread().isInterrupted){"Cancelled"}
    val best=sorted.first().second
    val i=if(last.isBlank())0 else sorted.indexOfFirst{it.second>=best-.055&&it.first.artist.isNotBlank()&&!it.first.artist.trim().equals(last,true)}.takeIf{it>=0}?:0
    val item=sorted.removeAt(i).first;out.add(item.id);last=item.artist.trim()
