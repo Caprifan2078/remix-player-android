@@ -25,5 +25,15 @@ fun main(){
  check(MoodDiscovery.from(measured.copy(keyConfidence=0.0))!!.valence==null)
  val many=(0 until 10000).map{MoodDiscovery.Entry(it.toString(),"Artist "+it%50,sad)}
  check(MoodDiscovery.rank(many,p.getValue("Меланхолия"),100).distinct().size==100)
- println("PASS: 13 mood ranking checks including 10,000-entry library")
+ val zero=MoodDiscovery.Profile("Test","",0.0,0.0,0.0,0.0,null,0.0)
+ val edge=MoodDiscovery.Features(.94,0.0,0.0,0.0,null,0.0)
+ check(MoodDiscovery.score(edge,zero)==null)
+ check(kotlin.math.abs(MoodDiscovery.score(edge.copy(energy=.5),zero)!!-(1-.16/.92))<1e-9)
+ val perfect=edge.copy(energy=0.0)
+ check(MoodDiscovery.score(perfect,zero)==1.0)
+ check(MoodDiscovery.score(perfect,zero.copy(valence=.2))==null)
+ check(MoodDiscovery.score(perfect.copy(valence=.8),zero.copy(valence=.2))==null)
+ val clean=listOf(MoodDiscovery.Entry("","A",perfect),MoodDiscovery.Entry("1","A",perfect),MoodDiscovery.Entry("2"," a ",perfect),MoodDiscovery.Entry("3","B",perfect),MoodDiscovery.Entry("1","A",perfect))
+ check(MoodDiscovery.rank(clean,zero)==listOf("1","3","2"))
+ println("PASS: 19 mood ranking checks including 10,000-entry library")
 }
