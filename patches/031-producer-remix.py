@@ -32,8 +32,8 @@ p=src/'AudioCore.kt';audio=p.read_text()
 a=audio.index('class Dsp(');b=audio.index('data class Lyric(',a)
 quality=(Path(__file__).parent/'EffectQuality.kt').read_text().split('\n',4)[4]
 bass=(Path(__file__).parent/'BassBand.kt').read_text().split('\n',3)[3]
-p.write_text(audio[:a]+bass+'\n'+quality+'\n'+audio[b:])
-(src/'SourceEffectBalance.kt').write_bytes((Path(__file__).parent/'SourceEffectBalance.kt').read_bytes())
+balance=(Path(__file__).parent/'SourceEffectBalance.kt').read_text().split('\n',2)[2]
+p.write_text(audio[:a]+bass+'\n'+balance+'\n'+quality+'\n'+audio[b:])
 # Live-only effect switching: retain export DSP and its exact original path.
 (src/'LiveEffectSwitch.kt').write_bytes((Path(__file__).parent/'LiveEffectSwitch.kt').read_bytes())
 edit('PlaybackService.kt','private var dsp: Dsp? = null','private var dsp: LiveEffectSwitch? = null')
