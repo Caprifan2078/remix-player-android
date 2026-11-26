@@ -32,7 +32,7 @@ replace('if(w>=0){val word=line.words[w];span.setSpan(android.text.style.Foregro
                     start()
                 }
             }''')
-replace('if(i==lastLine&&w==lastWord)return','if(i==lastLine&&w==lastWord)return\\n        lyricInkAnimation?.cancel();lyricInkAnimation=null')
+replace('if(i==lastLine&&w==lastWord)return','if(i==lastLine&&w==lastWord)return\n        lyricInkAnimation?.cancel();lyricInkAnimation=null')
 replace('body.removeAllViews();activeLyrics=emptyList();','lyricInkAnimation?.cancel();lyricInkAnimation=null;body.removeAllViews();activeLyrics=emptyList();')
 p.write_text(s)
 print("PASS karaoke UI overlay")
