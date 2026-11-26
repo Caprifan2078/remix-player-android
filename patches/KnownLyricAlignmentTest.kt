@@ -37,5 +37,11 @@ fun main(){
  check(!grouped.wordLevel&&LyricDocument.plain(grouped.lrc)==splitRef)
  check(Lrc.parse(grouped.lrc).map{it.ms}==listOf(2000L,8000L))
  check(KnownLyricAlignment.align(split,splitRef)?.lrc==grouped.lrc)
- println("PASS: 24 known lyric alignment cases, including split and noisy phrase recovery")
+ val russian="[00:02.000]<00:02.000>Елка <00:03.200>горит\n[00:07.000]<00:07.000>Все <00:08.500>поют"
+ val russianRef="Ёлка горит\nВсё поют"
+ val ru=KnownLyricAlignment.align(russian,russianRef)!!
+ check(ru.wordLevel&&LyricDocument.plain(ru.lrc)==russianRef)
+ check(Lrc.parse(ru.lrc).map{WordLyrics.parse(it).words.map{w->w.ms}}==listOf(listOf(2000L,3200L),listOf(7000L,8500L)))
+ check(KnownLyricAlignment.align(russian+"\n[00:15.000]<00:15.000>Елка <00:16.000>горит","Ёлка горит")==null)
+ println("PASS: 27 known lyric alignment cases, including Russian spelling and measured word preservation")
 }
