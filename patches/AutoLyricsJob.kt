@@ -165,7 +165,7 @@ class AutoLyricsJob:JobService(){
                     val lang=LocalLyricLanguage.detect(lines)
                     if(lang!=null&&lang!="ru"){
                         val result=LyricTranslation.translate(lines,lang,"ru",true)
-                        if(AutoTranslationPolicy.valid(lines,result))translation=result
+                        check(AutoTranslationPolicy.valid(lines,result)){"Неполный перевод"};translation=result
                     }
                     translationKey=AutoTranslationPolicy.key(id,finalRaw)
                 }catch(e:Exception){
@@ -175,7 +175,7 @@ class AutoLyricsJob:JobService(){
             }
             checkRunning()
             if(!AutoLyrics.write(this,id,JSONObject().put("uri",id).put("revision",rev).put("title",identity.title).put("artist",identity.artist)
-                .put("raw",raw?:JSONObject.NULL).put("draft",draft?:JSONObject.NULL).put("outcome",outcome).put("translationKey",translationKey?:JSONObject.NULL).put("translation",translation?.let{JSONArray(it)}?:JSONObject.NULL)))return
+                .put("raw",raw?:JSONObject.NULL).put("draft",draft?:JSONObject.NULL).put("outcome",outcome).put("translationOnly",lyricsDone).put("translationKey",translationKey?:JSONObject.NULL).put("translation",translation?.let{JSONArray(it)}?:JSONObject.NULL)))return
             Thread.sleep(1100)
         }
     }
