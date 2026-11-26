@@ -175,4 +175,39 @@ class MixerLyricsUiAcceptanceTest {
         }
     }
 
+    @Test fun proModeDefaultsOffAndPersistsWithoutRemovingPlayback(){
+        val prefs=c.getSharedPreferences("interface_mode",0)
+        val existed=prefs.contains("pro");val before=prefs.getBoolean("pro",false)
+        check(prefs.edit().remove("pro").commit())
+        try{fixture{p->
+            click("Студия")
+            fun visible(title:String)=texts().any{it.isShown&&it.text.toString()==title}
+            await("Core studio not shown"){visible("Remix Studio")}
+            main{assertFalse(visible("Инструментал"));assertFalse(visible("Сведение"));assertNull(button("Пакет эффектов…"))}
+            fun settings(){
+                click("Ещё")
+                val deadline=SystemClock.elapsedRealtime()+5000
+                var selected=false
+                while(SystemClock.elapsedRealtime()<deadline&&!selected){
+                    val nodes=inst.uiAutomation.rootInActiveWindow?.findAccessibilityNodeInfosByText("Настройки").orEmpty()
+                    val node=nodes.firstOrNull{it.text?.toString()=="Настройки"}
+                    var target=node
+                    while(target!=null&&!target.isClickable)target=target.parent
+                    selected=target?.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)==true
+                    if(!selected)SystemClock.sleep(100)
+                }
+                assertTrue("Settings menu action missing",selected)
+            }
+            settings();click("PRO-инструменты: выкл.")
+            await("PRO toggle not persisted"){prefs.getBoolean("pro",false)&&button("PRO-инструменты: вкл.")!=null}
+            click("Студия")
+            await("Expert tools unavailable after enabling"){visible("Инструментал")&&visible("Сведение")}
+            settings();click("PRO-инструменты: вкл.")
+            await("PRO toggle not disabled"){!prefs.getBoolean("pro",true)&&button("PRO-инструменты: выкл.")!=null}
+            click("Студия")
+            main{assertFalse(visible("Инструментал"));assertFalse(visible("Сведение"));assertNotNull(p.currentMediaItem)}
+            capture("simple-studio")
+        }}finally{prefs.edit().apply{if(existed)putBoolean("pro",before)else remove("pro")}.commit()}
+    }
+
 }
