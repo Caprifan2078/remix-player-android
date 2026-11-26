@@ -30,7 +30,24 @@ class StudioAcceptanceTest {
         val dir=folder()
         try{
             val input=File(dir,"input.pcm");raw(input,22050);val expected=hash(input)
-            assertEquals(41,Presets.all.size)
+            val inst=InstrumentationRegistry.getInstrumentation()
+            inst.runOnMainSync{
+                for((width,height) in listOf(120 to 64,230 to 160,280 to 208)){
+                    val view=PulseWidget.testView(c,width,height).apply(c,android.widget.FrameLayout(c))
+                    assertEquals("QA Track",view.findViewById<android.widget.TextView>(R.id.widget_title).text.toString())
+                    assertEquals(if(width>=230&&height>=160)android.view.View.VISIBLE else android.view.View.GONE,view.findViewById<android.view.View>(R.id.widget_effects).visibility)
+                    assertEquals(if(width>=280&&height>=208)android.view.View.VISIBLE else android.view.View.GONE,view.findViewById<android.view.View>(R.id.widget_studio).visibility)
+                    val density=c.resources.displayMetrics.density
+                    view.measure(android.view.View.MeasureSpec.makeMeasureSpec((width*density).toInt(),android.view.View.MeasureSpec.EXACTLY),android.view.View.MeasureSpec.makeMeasureSpec((height*density).toInt(),android.view.View.MeasureSpec.EXACTLY))
+                    view.layout(0,0,view.measuredWidth,view.measuredHeight)
+                    assertTrue(view.findViewById<android.view.View>(R.id.widget_play).width>0)
+                    assertTrue(view.findViewById<android.view.View>(R.id.widget_art) is android.widget.ImageView)
+                    assertEquals(if(width>=230&&height>=160)android.view.View.VISIBLE else android.view.View.GONE,view.findViewById<android.view.View>(R.id.widget_detail).visibility)
+                    assertNotNull(view.findViewById<android.view.View>(R.id.widget_speed125));assertNotNull(view.findViewById<android.view.View>(R.id.widget_middle))
+                }
+            }
+            println("PASS Android: three actual RemoteViews layout inflations and size visibility")
+            assertEquals(44,Presets.all.size)
             for((i,preset) in Presets.all.withIndex()){
                 val out=File(dir,"effect.wav");val pcm=File(dir,"decoded.pcm")
                 EffectRender.render(input,out,preset)
@@ -42,7 +59,7 @@ class StudioAcceptanceTest {
             }
             assertEquals(expected,hash(input))
             assertTrue(dir.listFiles()!!.none{it.name.startsWith("pitch-")||it.name.startsWith("stretch-")})
-            println("PASS Android: 41 effect exports + independent MediaCodec WAV decode")
+            println("PASS Android: 44 effect exports + independent MediaCodec WAV decode")
         }finally{dir.deleteRecursively()}
     }
     @Test fun thirtyGenresDistinctDecodableAndNonSilent(){
@@ -50,7 +67,7 @@ class StudioAcceptanceTest {
         try{
             val input=File(dir,"input.pcm");raw(input,88200)
             val before=hash(input);val hashes=mutableSetOf<String>()
-            assertEquals(30,GenreEngine.styles.size)
+            assertEquals(32,GenreEngine.styles.size)
             for(style in GenreEngine.styles){
                 val out=File(dir,"genre.wav");val pcm=File(dir,"decoded.pcm")
                 GenreEngine.renderFromMix(input,out,style,120.0,0.0,emptyList(),listOf(.1))
@@ -59,8 +76,8 @@ class StudioAcceptanceTest {
                 assertTrue("Duplicate output: "+style.name,hashes.add(hash(pcm)))
                 out.delete();pcm.delete()
             }
-            assertEquals(before,hash(input));assertEquals(30,hashes.size)
-            println("PASS Android: 30 distinct procedural genre WAV outputs")
+            assertEquals(before,hash(input));assertEquals(32,hashes.size)
+            println("PASS Android: 32 distinct procedural genre WAV outputs")
         }finally{dir.deleteRecursively()}
     }
     @Test fun flacRoundTripAndTenBandEqualizer(){
