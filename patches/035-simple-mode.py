@@ -454,8 +454,13 @@ s=s[:a]+'''                transcriptChoices(t,raw,lyricRevision(t))
 rep('if(tracks.isNotEmpty())body.addView(btn("Настроение и подборки"){moodDiscoveryDialog()});val tools=row();tools.addView(filter,weight());','if(tracks.isNotEmpty()){val quick=row();quick.addView(btn("Подборки"){moodDiscoveryDialog()},weight());quick.addView(btn("Тексты"){batchLyrics()},weight());body.addView(quick)};val tools=row();tools.addView(filter,weight());')
 # System-managed automatic scan. The active library remains owned by the Activity.
 import re
-for filename in ('AutoLyricsJob.kt','TrackIdentityFix.kt'):
+for filename in ('AutoLyricsJob.kt','TrackIdentityFix.kt','AutoTranslationPolicy.kt','LocalLyricLanguage.kt'):
     (p.parent/filename).write_bytes((Path(__file__).parent/filename).read_bytes())
+gradle=Path(sys.argv[1])/'app/build.gradle.kts'
+g=gradle.read_text()
+anchor='implementation("com.google.mlkit:translate:17.0.3")'
+assert g.count(anchor)==1
+gradle.write_text(g.replace(anchor,anchor+'\n    implementation("com.google.mlkit:language-id:17.0.6")'))
 manifest=Path(sys.argv[1])/'app/src/main/AndroidManifest.xml'
 xml=manifest.read_text()
 assert xml.count('</application>')==1
@@ -470,7 +475,7 @@ anchor='fun transcribe(c:Context,uri:Uri,stem:StemEngine.Bundle?,language:String
 assert w.count(anchor)==1
 whisper.write_text(w.replace(anchor,'@Synchronized '+anchor+'\n        check(!Thread.currentThread().isInterrupted)'))
 rep('    private fun lyricAttempt(t:Track):String? {',r'''    private fun mergeAutomaticLyrics():Boolean{
-        if(stemBusy||lyricsBusy)return false
+        if(stemBusy||lyricsBusy||translationBusy)return false
         data class Pending(val file:java.io.File,val entry:JSONObject,val index:Int,val before:Track,val after:Track)
         val pending=mutableListOf<Pending>()
         for(file in AutoLyrics.staged(this)){
@@ -489,6 +494,7 @@ rep('    private fun lyricAttempt(t:Track):String? {',r'''    private fun mergeA
         }
         if(pending.isEmpty())return false
         val changed=pending.any{it.before!=it.after}
+        var translationChanged=false
         if(changed){
             pending.forEach{tracks[it.index]=it.after}
             if(!saveLibrary(true)){pending.forEach{tracks[it.index]=it.before};reindex();return false}
@@ -498,16 +504,23 @@ rep('    private fun lyricAttempt(t:Track):String? {',r'''    private fun mergeA
             val draft=result.optString("draft").takeIf{!result.isNull("draft")&&it.isNotBlank()}
             val stored=draft==null||saveScanDraft(t.uri,draft)
             if(!stored){recordLyricAttempt(t,"error");continue}
+            val trKey=result.optString("translationKey").takeIf{!result.isNull("translationKey")}
+            if(trKey!=null&&AutoLyrics.translateEnabled(this)&&trKey==AutoTranslationPolicy.key(t.uri,t.lyrics)){
+                val prefs=getSharedPreferences("translations",MODE_PRIVATE)
+                val values=result.optJSONArray("translation")?.let{a->(0 until a.length()).map{a.optString(it)}}
+                val ready=values==null||prefs.contains(trKey)||AutoTranslationPolicy.valid(LocalLyricLanguage.lines(t.lyrics),values)&&prefs.edit().putString(trKey,JSONArray(values).toString()).commit().also{if(it)translationChanged=true}
+                if(!ready||!AutoLyrics.markTranslation(this,trKey))continue
+            }
             val outcome=result.optString("outcome")
-            if(outcome!="waiting")recordLyricAttempt(t,if(outcome=="error")"error" else "done")
+            if(!result.optBoolean("translationOnly")&&outcome!="waiting")recordLyricAttempt(t,if(outcome=="error")"error" else "done")
             val rev=AutoLyrics.revision(t.uri,t.title,t.artist,t.lyrics)
-            if(AutoLyrics.mark(this,t.uri,rev,outcome)&&AutoLyrics.read(entry.file)?.optString("revision")==result.optString("revision"))entry.file.delete()
+            if((result.optBoolean("translationOnly")||AutoLyrics.mark(this,t.uri,rev,outcome))&&AutoLyrics.read(entry.file)?.optString("revision")==result.optString("revision"))entry.file.delete()
         }
-        return changed
+        return changed||translationChanged
     }
     private fun automaticLyricsSettings(){
         val enabled=AutoLyrics.enabled(this)
-        actionSheet("Автоматические тексты",330){dialog,panel->
+        actionSheet("Автоматические тексты",390){dialog,panel->
             panel.addView(label(if(enabled)"Автоматическая обработка включена" else "Автоматическая обработка выключена",16,PremiumChrome.TEXT,true))
             panel.addView(label("Android запускает задачи при зарядке, достаточной памяти и неметрируемой сети. Экран может быть выключен. Готовые тексты и подтверждённые данные сохраняются отдельно, спорные — в журнале. Аудио остаётся на телефоне.",14,muted))
             sheetAction(panel,if(enabled)"Выключить автосканирование" else "Включить автосканирование"){
@@ -516,6 +529,7 @@ rep('    private fun lyricAttempt(t:Track):String? {',r'''    private fun mergeA
                 toast(if(enabled)"Автосканирование выключено" else "Автосканирование включено")
                 batchLyrics()
             }
+            sheetAction(panel,if(AutoLyrics.translateEnabled(this))"Перевод на русский: вкл." else "Перевод на русский: выкл.","Определение языка и загрузка моделей по Wi-Fi"){dialog.dismiss();if(!AutoLyrics.setTranslate(this,!AutoLyrics.translateEnabled(this)))toast("Не удалось сохранить режим");automaticLyricsSettings()}
             if(!enabled&&(!WhisperLocal.available||WhisperLocal.installed(this)==null))sheetAction(panel,"Установить Whisper","Для локальной синхронизации"){dialog.dismiss();whisperModelDialog()}
         }
     }
@@ -548,7 +562,11 @@ s=s[:a]+'''    private fun translateLyrics(t:Track,raw:String,source:String,targ
         val id=t.uri;val revision=lyricRevision(t)
         translationBusy=true;render()
         io.execute{
-            val result=runCatching{LyricTranslation.translate(reference,source,target,download)}
+            val result=runCatching{
+                val language=if(source=="auto")LocalLyricLanguage.detect(reference)?:error("Язык не определён уверенно. Выберите его вручную.")else source
+                require(language!=target){"Текст уже на выбранном языке"}
+                LyricTranslation.translate(reference,language,target,download)
+            }
             runOnUiThread{
                 if(!isDestroyed){
                     translationBusy=false
