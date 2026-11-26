@@ -80,7 +80,7 @@ s=s[:a]+'''    private data class ScanItem(val uri:String,val title:String,val a
         val target=scanDraftFile(uri);val dir=requireNotNull(target.parentFile)
         check(dir.isDirectory||dir.mkdirs())
         // Bound the entire draft store; do not delete anyone's unreviewed results.
-        require(dir.listFiles().orEmpty().sumOf{it.length()}+bytes.size<=64L*1024*1024)
+        require(dir.listFiles().orEmpty().sumOf{it.length()}-target.length()+bytes.size<=64L*1024*1024)
         val tmp=java.io.File.createTempFile("draft-",".tmp",dir)
         try{tmp.outputStream().use{it.write(bytes)};check(tmp.renameTo(target));true}finally{tmp.delete()}
     }.getOrDefault(false)
@@ -147,7 +147,7 @@ s=s[:a]+'''    private data class ScanItem(val uri:String,val title:String,val a
         }
         return original
     }
-    private fun scanLibrary(pending:List<ScanItem>,search:Boolean,analyze:Boolean,local:Boolean,align:Boolean){
+    private fun scanLibrary(pending:List<ScanItem>,search:Boolean,analyze:Boolean,local:Boolean,align:Boolean,smart:Boolean=false){
         var completed=0;var saved=0;var unresolved=0;var errors=0;var analyzed=0;var drafts=0
         // Commit each verified track individually on the UI thread. A cancellation keeps completed tracks.
         stemWork("Сканирование библиотеки…",{
@@ -160,8 +160,28 @@ s=s[:a]+'''    private data class ScanItem(val uri:String,val title:String,val a
                     if(t.before.isBlank()||Lrc.parse(t.before).isEmpty()){
                         raw=try{TrackLyricSource.automatic(this,uri,t.title,t.artist,t.before,search)}catch(e:Exception){if(Thread.currentThread().isInterrupted||e is InterruptedException||!local)throw e;TrackLyricSource.automatic(this,uri,t.title,t.artist,t.before,false)}
                         if(search)Thread.sleep(1100)
-                        if(raw.isNullOrBlank()&&local&&!scanDraftFile(t.uri).isFile){
-                            draft=scanRecognize(uri,t.uri).takeIf{it.isNotBlank()&&it.length<=256000};status=if(draft!=null)"Черновик Whisper" else "Нет совпадения"
+                        if(raw.isNullOrBlank()&&local){
+                            val stored=scanDraftFile(t.uri)
+                            val heard=runCatching{require(stored.length() in 1..262144);stored.readText()}.getOrNull()
+                                ?:scanRecognize(uri,t.uri)
+                            draft=heard.takeIf{it.isNotBlank()&&it.toByteArray(Charsets.UTF_8).size<=262144}
+                            if(smart&&search&&draft!=null){
+                                val recognized=LyricDocument.plain(heard)
+                                val candidates=try{TrackLyricSource.search(this,uri,t.title,t.artist,null).first}catch(e:Exception){
+                                    if(e is InterruptedException||Thread.currentThread().isInterrupted)throw e
+                                    emptyList()
+                                }
+                                val verified=candidates.mapNotNull{candidate->
+                                    val words=LyricDocument.plain(candidate.plain?:candidate.synced?:return@mapNotNull null).trim()
+                                    val score=TranscriptMatch.score(recognized,words)
+                                    if(score.matching<5||score.fraction<.55)return@mapNotNull null
+                                    val aligned=KnownLyricAlignment.align(heard,words)
+                                    LyricScanState.Match(words,score.matching,score.total,aligned?.lrc)
+                                }
+                                raw=LyricScanState.choose(verified)
+                                if(raw!=null){draft=null;status="Подтверждено по вокалу"}
+                            }
+                            if(raw==null)status=if(draft!=null)"Черновик Whisper" else "Нет совпадения"
                         }else status=when{raw.isNullOrBlank()->"Нет совпадения";Lrc.parse(raw).isEmpty()->"Только слова";raw==t.before->"Пропущено";else->"Текст найден"}
                     }
                     val reference=raw?:t.before
@@ -189,10 +209,11 @@ s=s[:a]+'''    private data class ScanItem(val uri:String,val title:String,val a
                                 val text=update.raw
                                 if(text!=null&&text!=target.lyrics){
                                     val previous=target.lyrics;target.lyrics=text
-                                    if(saveLibrary(true))saved++ else{target.lyrics=previous;reindex();errors++}
-                                }else if(update.draft!=null){if(saveScanDraft(target.uri,update.draft))drafts++ else errors++}
+                                    if(saveLibrary(true)){saved++;if(smart&&Lrc.parse(text).isNotEmpty())scanDraftFile(target.uri).delete()} else{target.lyrics=previous;reindex();errors++;if(smart)recordLyricAttempt(target,"error");return@runOnUiThread}
+                                }else if(update.draft!=null){if(saveScanDraft(target.uri,update.draft))drafts++ else{errors++;if(smart)recordLyricAttempt(target,"error");return@runOnUiThread}}
                                 else if(update.status=="Ошибка")errors++
                                 else if(update.status!="Пропущено")unresolved++
+                                if(smart)recordLyricAttempt(target,if(update.status=="Ошибка")"error" else "done")
                             }
                             completed++
                         }
@@ -202,9 +223,10 @@ s=s[:a]+'''    private data class ScanItem(val uri:String,val title:String,val a
             }
             Unit
         }){
-            actionSheet("Сканирование завершено",290){dialog,panel->
+            actionSheet("Сканирование завершено",350){dialog,panel->
                 panel.addView(label("Проверено: "+completed+" / "+pending.size,20,PremiumChrome.TEXT,true))
                 panel.addView(label("Сохранены тексты: "+saved+"\\nПолный анализ: "+analyzed+"\\nНужна проверка: "+unresolved+"\\nЧерновики Whisper: "+drafts+"\\nОшибки: "+errors,16,muted))
+                if(smart)sheetAction(panel,"Журнал текстов","Проверить спорные песни"){dialog.dismiss();lyricScanLog()}
                 sheetAction(panel,"Готово"){dialog.dismiss();render()}
             }
         }
