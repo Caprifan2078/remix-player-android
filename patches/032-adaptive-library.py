@@ -26,6 +26,27 @@ rep('val files=GenreCheckpoint.render(raw,inputs,dir,job.plan,bpm,','''val pitch
                 }
                 val renderPlan=job.plan.copy(styles=tuned)
                 val files=GenreCheckpoint.render(raw,inputs,dir,renderPlan,bpm,''')
+# A model that is installed but unusable must not prevent a procedural genre render.
+# Persist the chosen fallback so a resumed job uses the same inputs; never relabel a mixed result as separated.
+rep('val stems=if(advanced)prefs.getString(source.uri,null)?.let{StemEngine.load(this,it)}?.takeIf{StemEngine.matchesSource(it,raw)}?:StemEngine.separateDecoded(this,Uri.parse(source.uri),raw,::status).also{prefs.edit().putString(source.uri,it.dir.name).apply()} else null', '''val stems=if(advanced)try{
+                    prefs.getString(source.uri,null)?.let{StemEngine.load(this,it)}?.takeIf{StemEngine.matchesSource(it,raw)}
+                        ?:StemEngine.separateDecoded(this,Uri.parse(source.uri),raw,::status).also{prefs.edit().putString(source.uri,it.dir.name).apply()}
+                }catch(e:Exception){
+                    if(e is InterruptedException||Thread.currentThread().isInterrupted)throw e
+                    // A pre-existing completed render may depend on the original stems; do not invalidate it.
+                    if(dir.listFiles().orEmpty().any{it.name.startsWith("version-")&&it.extension=="wav"})throw e
+                    val saved=JSONObject(genrePrefs().getString("plan",null)?:throw e)
+                    require(saved.getString("id")==job.id)
+                    saved.put("advanced",false)
+                    check(genrePrefs().edit().putString("plan",saved.toString()).commit()){"Не удалось сохранить безопасный режим"}
+                    status("Разделение недоступно · создание из исходного микса")
+                    null
+                }else null''')
+rep('val renderPlan=job.plan.copy(styles=tuned)','val renderPlan=job.plan.copy(styles=tuned,separated=stems!=null)')
+rep('val quality:Map<String,RemixQuality.Result>)','val quality:Map<String,RemixQuality.Result>,val separated:Boolean)')
+rep('GenreResult(files,report,bpm,quality)','GenreResult(files,report,bpm,quality,stems!=null)')
+rep('(if(advanced)"" else " · Mix")','(if(result.separated)"" else " · Mix")')
+rep('toast("Сохранено версий: ${versions.size}")','toast("Сохранено версий: ${versions.size}"+if(advanced&&!result.separated)" · без разделения" else "")')
 # Reuse the existing background job/cancel mechanism. No destructive tag writes or silent ASR downloads.
 a=s.index('    private data class BatchLyricsItem')
 b=s.index('    // Shared custom bottom sheet',a)
