@@ -459,7 +459,7 @@ for filename in ('AutoLyricsJob.kt','TrackIdentityFix.kt'):
 manifest=Path(sys.argv[1])/'app/src/main/AndroidManifest.xml'
 xml=manifest.read_text()
 assert xml.count('</application>')==1
-xml=xml.replace('</application>','    <service android:name=".AutoLyricsJob" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="true"/>\n    </application>')
+xml=xml.replace('</application>','    <service android:name=".AutoLyricsJob" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="false"/>\n    </application>')
 if 'android.permission.RECEIVE_BOOT_COMPLETED' not in xml:
     xml=xml.replace('<application ','<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />\n    <application ',1)
 manifest.write_text(xml)
