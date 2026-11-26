@@ -38,6 +38,37 @@ edit('PlaybackService.kt','private var dsp: Dsp? = null','private var dsp: LiveE
 edit('PlaybackService.kt','dsp=Dsp(inputAudioFormat.sampleRate,a.size)','dsp=LiveEffectSwitch(inputAudioFormat.sampleRate,a.size)')
 edit('PlaybackService.kt','if(lastPreset!==p){lastPreset=p;dsp=if(a.isNotEmpty())Dsp(inputAudioFormat.sampleRate,a.size) else null}','if(lastPreset!==p)lastPreset=p')
 edit('PlaybackService.kt','(p==Presets.all.first() && levels.all{it==0f}) || d==null','(p==Presets.all.first() && levels.all{it==0f} && d?.canBypass(p)==true) || d==null')
+# EQ gain is a cascade: overlapping boosts may exceed the largest slider by several dB.
+edit('PlayerExtras.kt','private val headroom=10.0.pow(-levels.maxOrNull()!!.coerceAtLeast(0f)/20.0)', '''// Estimate the combined cascade response, not just the highest individual slider.
+    private val headroom=if(filters.isEmpty()||levels.none{it>0f})1.0 else run{
+        var peak=1.0
+        fun evaluate(hz:Double){
+            val w=2*PI*hz/rate;val c=cos(w);val s=sin(w);val c2=cos(2*w);val s2=sin(2*w)
+            var power=1.0
+            for(f in filters){
+                val nr=f.b0+f.b1*c+f.b2*c2;val ni=f.b1*s+f.b2*s2
+                val dr=1+f.a1*c+f.a2*c2;val di=f.a1*s+f.a2*s2
+                power*=(nr*nr+ni*ni)/(dr*dr+di*di).coerceAtLeast(1e-24)
+            }
+            peak=max(peak,sqrt(power))
+        }
+        // Log-spaced coverage resolves low-frequency peaks even at high sample rates.
+        val upper=rate*.5
+        for(i in 0..1024)evaluate(exp(ln(upper)*i/1024.0))
+        EqualizerSettings.frequencies.filter{it<upper}.forEach{evaluate(it.toDouble())}
+        .97/peak
+    }''')
+edit('PlayerExtras.kt','fun sample(x:Float,c:Int):Float {val clean=if(x.isFinite())x else 0f;if(filters.isEmpty())return clean;var y=clean*headroom;for(f in filters)y=f.next(y,c);return y.coerceIn(-1.0,1.0).toFloat()}', '''private val guard=LinkedPeakGuard(rate)
+    private fun raw(x:Float,c:Int):Float {val clean=if(x.isFinite())x else 0f;if(filters.isEmpty())return clean;var y=clean*headroom;for(f in filters)y=f.next(y,c);return if(y.isFinite())y.toFloat()else 0f}
+    fun sample(x:Float,c:Int):Float=raw(x,c).coerceIn(-1f,1f)
+    fun frame(values:FloatArray){
+        require(values.size==channels)
+        for(c in values.indices)values[c]=raw(values[c],c)
+        if(filters.isNotEmpty())guard.apply(values)
+    }''')
+edit('PlaybackService.kt','d.frame(a,b,p); for(c in b.indices) out.putShort(((eq?.sample(b[c],c)?:b[c])*32768).roundToInt().coerceIn(-32768,32767).toShort())','d.frame(a,b,p); eq?.frame(b); for(c in b.indices) out.putShort((b[c]*32768).roundToInt().coerceIn(-32768,32767).toShort())')
+edit('EqRender.kt','val eq=GraphicEq(44100,2,levels);val flat=','val eq=GraphicEq(44100,2,levels);val frame=FloatArray(2);val flat=')
+edit('EqRender.kt','for(c in 0..1){val s=StemCore.readShort(r);StemCore.writeShort(w,if(flat)s else StemCore.pcm(eq.sample(s/32768f,c)))}','if(flat){repeat(2){StemCore.writeShort(w,StemCore.readShort(r))}}else{for(c in frame.indices)frame[c]=StemCore.readShort(r)/32768f;eq.frame(frame);for(x in frame)StemCore.writeShort(w,StemCore.pcm(x))}')
 # Do not reuse a render checkpoint from an older DSP algorithm.
 edit('EffectCheckpoint.kt','dsp-peak-guard-v60','dsp-quality-v4')
 edit('GenreCheckpoint.kt','genre-render-v7','genre-render-v8')
