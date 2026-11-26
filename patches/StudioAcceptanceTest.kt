@@ -223,4 +223,13 @@ class StudioAcceptanceTest {
             assertEquals(-.3,e.sample(0,.75,-.3,1.0,0.0,1.0,1.0),0.0)
         }finally{dir.deleteRecursively()}
     }
+    @Test fun basicPitchRunsRealBundledOnnxOnAndroid(){
+        val probabilities=BasicPitchModel.probe(c)
+        assertEquals(BasicPitchHint.FRAMES*BasicPitchHint.NOTES,probabilities.size)
+        assertTrue(probabilities.all{it.isFinite()&&it in 0f..1f})
+        assertTrue("Model output must respond to synthetic audio",(probabilities.maxOrNull()?:0f)-(probabilities.minOrNull()?:0f)>.0001f)
+        assertTrue(c.assets.open("basic-pitch/LICENSE").bufferedReader().use{it.readText()}.contains("Apache License"))
+        println("PASS Android: real pinned Basic Pitch ONNX inference and finite note probabilities")
+    }
+
 }
