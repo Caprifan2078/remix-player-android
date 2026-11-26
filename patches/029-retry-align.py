@@ -40,10 +40,10 @@ helper='''    private fun alignKnownLyrics(t:Track,raw:String){
         val stem=getSharedPreferences("stem_cache",MODE_PRIVATE).getString(id,null)?.let{StemEngine.load(this,it)}
         actionSheet("Уточнить по вокалу",245){dialog,panel->
             panel.addView(label("Слова останутся прежними. Whisper определит их время на текущем аудиофайле. При неоднозначном результате ничего не изменится.",14,muted))
-            sheetAction(panel,"Начать","Локально · "+if(stem==null)"исходная песня" else "выделенный вокал"){
+            sheetAction(panel,"Начать","Локально · "+if(stem==null)"исходная песня" else "выделенный вокал · при необходимости оригинал"){
                 dialog.dismiss()
                 stemWork("Синхронизация по вокалу…",{
-                    val heard=WhisperLocal.transcribe(this,Uri.parse(id),stem,"auto"){updateWork(it)}
+                    val heard=scanRecognize(Uri.parse(id),id,reference)
                     KnownLyricAlignment.align(heard,reference)
                 }){result->
                     if(result==null){toast("Надёжных совпадений недостаточно. Исходный текст сохранён.")}
