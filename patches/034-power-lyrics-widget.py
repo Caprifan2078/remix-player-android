@@ -7,7 +7,7 @@ for name in ['PlaybackCadence.kt','Mp3Lyrics.kt','PulseWidget.kt']:shutil.copyfi
 for name,folder in [('pulse_widget.xml','layout'),('pulse_widget_info.xml','xml'),('pulse_widget_bg.xml','drawable')]:
     (res/folder).mkdir(exist_ok=True);shutil.copyfile(patch/name,res/folder/name)
 p=root/'app/src/main/AndroidManifest.xml'
-replace(p,'    </application>','''        <receiver android:name=".PulseWidget" android:exported="false" android:label="Pulse">
+replace(p,'    </application>','''        <receiver android:name=".PulseWidget" android:exported="false" android:label="Pulse Studio">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/pulse_widget_info"/>
         </receiver>

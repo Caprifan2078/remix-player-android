@@ -72,7 +72,9 @@ open class PulseWidget:AppWidgetProvider(){
         private val covers=ThreadPoolExecutor(0,1,15L,TimeUnit.SECONDS,ArrayBlockingQueue<Runnable>(1),ThreadPoolExecutor.DiscardOldestPolicy())
         private fun requestCover(context:Context){
             val manager=AppWidgetManager.getInstance(context)
-            if(widgetIds(context,manager).isEmpty())return
+            val artworkWidgets=manager.getAppWidgetIds(ComponentName(context,PulseWidget::class.java)).isNotEmpty()||
+                manager.getAppWidgetIds(ComponentName(context,PulseSpeedWidget::class.java)).isNotEmpty()
+            if(!artworkWidgets){if(coverId!=null){coverId=null;cover=null;coverGeneration++;covers.queue.clear()};return}
             val s=state();val id=s.id
             if(id==coverId)return
             coverId=id;cover=null;val generation=++coverGeneration
@@ -152,7 +154,7 @@ open class PulseWidget:AppWidgetProvider(){
             fun command(action:String)=PendingIntent.getBroadcast(context,91,Intent(context,PulseWidget::class.java).setAction(COMMAND).setData(uri("command",action)).putExtra(TRACK,s.id).putExtra("command",action),flags)
             fun visible(id:Int,on:Boolean){v.setViewVisibility(id,if(on)View.VISIBLE else View.GONE)}
             v.setTextViewText(R.id.widget_title,s.title);v.setTextViewText(R.id.widget_artist,s.artist)
-            val art=cover.takeIf{s.id!=null&&coverId==s.id}
+            val art=cover.takeIf{expanded&&s.id!=null&&coverId==s.id}
             if(art!=null)v.setImageViewBitmap(R.id.widget_art,art)else v.setImageViewResource(R.id.widget_art,android.R.drawable.ic_media_play)
             v.setOnClickPendingIntent(R.id.widget_queue,open("queue"))
             v.setImageViewResource(R.id.widget_play,if(s.playing)android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play)
