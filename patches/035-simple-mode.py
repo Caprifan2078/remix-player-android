@@ -44,6 +44,6 @@ rep('val useLocal=local.isEnabled&&local.isChecked;val useAlign=align.isEnabled&
 # Hide advanced controls in the library without disabling importing, playlists, or local discovery.
 rep('val libraryTools=bodyChildren().filter','val libraryTools=bodyChildren().filter') if False else None
 # Omit an empty disclosure when all of its actual controls are hidden by simple mode.
-rep('if(views.isEmpty())return','if(views.isEmpty())return\\n        if(views.all{it.visibility==View.GONE}){views.forEach{v->(v.parent as? ViewGroup)?.removeView(v)};return}')
+rep('if(views.isEmpty())return','if(views.isEmpty())return\n        if(views.all{it.visibility==View.GONE}){views.forEach{v->(v.parent as? ViewGroup)?.removeView(v)};return}')
 p.write_text(s)
 print("PASS: persistent default-off PRO controls; core player unchanged")
