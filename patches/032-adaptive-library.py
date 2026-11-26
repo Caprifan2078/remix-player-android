@@ -3,7 +3,7 @@ from pathlib import Path
 import sys
 src=Path(sys.argv[1])/'app/src/main/java/app/remix/player'
 p=src/'GenreMix.kt';p.write_text(p.read_text()+'\n'+(Path(__file__).parent/'ProducerAdaptation.kt').read_text().split('\n',1)[1])
-p=src/'GenreCheckpoint.kt';s=p.read_text();assert s.count('genre-render-v8')==1;p.write_text(s.replace('genre-render-v8','genre-render-v11'))
+p=src/'GenreCheckpoint.kt';s=p.read_text();assert s.count('genre-render-v8')==1;p.write_text(s.replace('genre-render-v8','genre-render-v12'))
 p=src/'MainActivity.kt';s=p.read_text()
 def rep(a,b):
  global s
@@ -37,6 +37,8 @@ rep('val stems=if(advanced)prefs.getString(source.uri,null)?.let{StemEngine.load
                     if(dir.listFiles().orEmpty().any{it.name.startsWith("version-")&&it.extension=="wav"})throw e
                     val saved=JSONObject(genrePrefs().getString("plan",null)?:throw e)
                     require(saved.getString("id")==job.id)
+                    val fingerprint=java.io.File(dir,"source.sha256")
+                    if(fingerprint.exists())check(fingerprint.delete()){"Не удалось сбросить незавершённую контрольную точку"}
                     saved.put("advanced",false)
                     check(genrePrefs().edit().putString("plan",saved.toString()).commit()){"Не удалось сохранить безопасный режим"}
                     status("Разделение недоступно · создание из исходного микса")
