@@ -102,7 +102,11 @@ class AutoLyricsJob:JobService(){
             try{
                 val info=TrackLyricSource.metadata(this,uri,oldTitle,oldArtist,null)
                 identity=TrackIdentityFix.fromTags(identity,info.tagTitle,info.tagArtist)
-                raw=TrackLyricSource.automatic(this,uri,identity.title,identity.artist,old,true)
+                raw=try{TrackLyricSource.automatic(this,uri,identity.title,identity.artist,old,true)}catch(e:Exception){
+                    if(e is InterruptedException||Thread.currentThread().isInterrupted)throw InterruptedException()
+                    outcome="error"
+                    TrackLyricSource.automatic(this,uri,identity.title,identity.artist,old,false)
+                }
                 checkRunning()
                 val reference=raw?:old
                 val timed=Lrc.parse(reference)
@@ -113,7 +117,10 @@ class AutoLyricsJob:JobService(){
                 val wantArtist=!TrackIdentityFix.knownArtist(identity.artist)
                 if((needs||wantArtist)&&modelReady){
                     val stem=runCatching{getSharedPreferences("stem_cache",MODE_PRIVATE).getString(id,null)?.let{StemEngine.load(this,it)}}.getOrNull()
-                    val heard=WhisperLocal.transcribe(this,uri,stem,"auto"){checkRunning()}
+                    val heard=try{WhisperLocal.transcribe(this,uri,stem,"auto"){checkRunning()}}catch(e:Exception){
+                        if(e is InterruptedException||Thread.currentThread().isInterrupted||stem==null)throw e
+                        WhisperLocal.transcribe(this,uri,null,"auto"){checkRunning()}
+                    }
                     checkRunning()
                     if(reference.isNotBlank()&&needs){
                         val result=KnownLyricAlignment.align(heard,LyricDocument.plain(reference))
@@ -131,7 +138,7 @@ class AutoLyricsJob:JobService(){
                         }
                         val chosen=LyricScanState.choose(matches.map{it.second})
                         if(chosen!=null){
-                            if(missing)raw=chosen
+                            if(missing){raw=chosen;outcome="done"}
                             identity=identity.copy(artist=TrackIdentityFix.verifiedArtist(identity.artist,matches.filter{it.second.aligned==chosen&&it.first.id>=0}.map{it.first.artist}))
                         }else if(missing)draft=heard.takeIf{it.toByteArray(Charsets.UTF_8).size<=262144}
                     }
