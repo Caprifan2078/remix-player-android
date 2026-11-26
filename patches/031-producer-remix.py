@@ -33,8 +33,8 @@ rep('GenreEngine.styles.forEach{style->card(style.name,"Цель: ${style.target
 rep('val styles=GenreEngine.styles;val selected=BooleanArray(styles.size)','val styles=ProducerStyles.all;val selected=BooleanArray(styles.size)')
 rep('.setNeutralButton("Все 30"){_,_->confirmBatch(source,styles)}','.setNeutralButton("30 основных"){_,_->confirmBatch(source,GenreEngine.styles)}')
 rep('if(chosen.isEmpty())toast("Выберите хотя бы один жанр") else confirmBatch(source,chosen)','if(chosen.isEmpty())toast("Выберите хотя бы один жанр") else if(chosen.size>30)toast("Не более 30 версий за пакет") else confirmBatch(source,chosen)')
-rep('sheetAction(panel,"⋮  Все эффекты","Остальные режимы и настройки"){dialog.dismiss();effectCatalog()}','''sheetAction(panel,"⋮  Все эффекты","Остальные режимы и настройки"){dialog.dismiss();effectCatalog()}
-            sheetAction(panel,"Жанровые ремиксы","Hardstyle, Phonk, Techno · 40 направлений"){dialog.dismiss();screen="Жанры";render()}''')
+rep('panel.addView(label("Быстрые режимы",12,muted,true))','''sheetAction(panel,"Hardstyle и жанровые ремиксы","Создать новую версию с новыми ударными и басом"){dialog.dismiss();screen="Жанры";render()}
+            panel.addView(label("Моментальные эффекты",12,muted,true))''')
 rep('popular.size*61+65','popular.size*61+130')
 p.write_text(s)
 print("PASS: 40 procedural genres, refined quick effects, offline DJ bass exchange")
