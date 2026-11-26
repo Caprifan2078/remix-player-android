@@ -18,8 +18,26 @@ object LocalDiscovery {
   require(limit in 1..100)
   val cutoff=if(mode==Mode.SIMILAR).27 else .39
   val pool=entries.asSequence().filter{it.id.isNotBlank()&&it.id!=seed.id&&it.id !in excluded}.distinctBy{it.id}.map{it to distance(seed,it)}.filter{it.second<=cutoff}.sortedWith(compareBy<Pair<Entry,Double>>{it.second}.thenBy{it.first.id}).toMutableList()
-  val result=mutableListOf<String>();val seen=mutableMapOf<String,Int>();var last=artist(seed)
+  return choose(pool,mode,limit,artist(seed))
+ }
+ /** Discover against individual liked songs, not an average that erases different tastes. */
+ fun favorites(entries:List<Entry>,liked:Set<String>,mode:Mode=Mode.VARIED,limit:Int=50):List<String>{
+  require(limit in 1..100)
+  val unique=entries.filter{it.id.isNotBlank()}.distinctBy{it.id}
+  val known=unique.filter{it.id in liked}.sortedBy{it.id}
+  if(known.isEmpty())return emptyList()
+  val seeds=if(known.size<=32)known else List(32){i->known[(i.toLong()*(known.size-1)/31).toInt()]}
+  val cutoff=if(mode==Mode.SIMILAR).27 else .39
+  val pool=unique.asSequence().filter{it.id !in liked}.map{e->
+   check(!Thread.currentThread().isInterrupted){"Cancelled"}
+   e to seeds.minOf{distance(it,e)}
+  }.filter{it.second<=cutoff}.sortedWith(compareBy<Pair<Entry,Double>>{it.second}.thenBy{it.first.id}).toMutableList()
+  return choose(pool,mode,limit,"")
+ }
+ private fun choose(pool:MutableList<Pair<Entry,Double>>,mode:Mode,limit:Int,initialArtist:String):List<String>{
+  val result=mutableListOf<String>();val seen=mutableMapOf<String,Int>();var last=initialArtist
   while(pool.isNotEmpty()&&result.size<limit){
+   check(!Thread.currentThread().isInterrupted){"Cancelled"}
    val best=pool[0].second;val slack=if(mode==Mode.SIMILAR).035 else .12
    val i=pool.indices.asSequence().takeWhile{pool[it].second<=best+slack}.minWithOrNull(compareBy<Int>{val a=artist(pool[it].first);if(a.isNotBlank()&&a==last)1 else 0}.thenBy{if(mode==Mode.VARIED)seen[artist(pool[it].first)]?:0 else 0}.thenBy{pool[it].second}.thenBy{pool[it].first.id})?:0
    val e=pool.removeAt(i).first;result.add(e.id);last=artist(e);if(last.isNotBlank())seen[last]=(seen[last]?:0)+1
