@@ -28,6 +28,19 @@ internal object LyricsMatch {
         val pairs=latin.zip(ru.toList()).filter{it.first.isNotEmpty()}.distinctBy{it.first}.sortedByDescending{it.first.length}
         return buildString{var i=0;while(i<text.length){val pair=pairs.firstOrNull{text.startsWith(it.first,i)};if(pair==null){append(text[i]);i++}else{append(pair.second);i+=pair.first.length}}}
     }
+    /** Loose key for discovery only, never sufficient to attach timed lyrics. */
+    fun searchKey(s:String)=roman(s).replace("shch","sch").replace("kh","h").replace("ia","ya").replace("iu","yu").replace("yo","e").replace("iy","i").replace("ii","i").replace("y","i")
+    fun layoutVariants(s:String):List<String>{
+        val en="`qwertyuiop[]asdfghjkl;'zxcvbnm,.";val cy="ёйцукенгшщзхъфывапролджэячсмитьбю"
+        fun flip(word:String):String{
+            val w=word.lowercase(Locale.ROOT);val letters=w.filter{it.isLetter()}
+            if(letters.length<2)return word
+            val from=when{letters.all{it in en}->en;letters.all{it in cy}->cy;else->return word};val to=if(from==en)cy else en
+            return w.map{c->val i=from.indexOf(c);if(i<0)c else to[i]}.joinToString("")
+        }
+        val words=s.trim().split(Regex("\\s+"));val changed=words.map(::flip)
+        return (listOf(changed.joinToString(" "))+words.indices.take(8).map{i->words.mapIndexed{j,w->if(i==j)changed[j]else w}.joinToString(" ")}).filter{it!=s}.distinct()
+    }
     private fun artistKey(s:String):String{
         val k=key(s)
         return if(k.replace(" ","") in setOf("tatu","тату"))"tatu" else k
@@ -37,7 +50,7 @@ internal object LyricsMatch {
         val alias=if(artistKey(q.artist)=="tatu")if(key(q.artist).any{it in ru})"t.A.T.u." else "Тату" else q.artist
         fun other(s:String)=if(key(s).any{it in ru})roman(s) else cyrillic(s)
         val alternate=Query(other(q.title),if(alias!=q.artist)alias else other(q.artist))
-        return listOf(q,Query(q.title,alias),alternate,Query(alternate.title,if(alias!=q.artist)q.artist else alternate.artist)).filter{it.title.isNotBlank()}.distinctBy{key(it.title) to key(it.artist)}.take(4)
+        return listOf(q,Query(q.title,if(alias!=q.artist)alias else other(q.artist)),Query(alternate.title,q.artist),alternate).filter{it.title.isNotBlank()}.distinctBy{key(it.title) to key(it.artist)}.take(4)
     }
     data class Candidate(val title:String,val artist:String,val seconds:Long,val synced:Boolean)
     fun choose(q:Query,seconds:Long?,rows:List<Candidate>):Int?{
