@@ -38,7 +38,7 @@ internal class WaveBins(private val durationUs:Long,private val rate:Int,private
     }
     /** Only advertise complete prefix bins, never present unknown data as silence. */
     fun preview():Pair<FloatArray,Int>?{
-        if(!ordered||covered<end-total/100)return null
+        if(!ordered||covered!=end)return null
         val ready=(end*bins/total).toInt().coerceIn(0,bins)
         return if(ready>0)peaks.copyOf() to ready else null
     }
