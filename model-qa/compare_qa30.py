@@ -2,6 +2,7 @@
 import json
 import pathlib
 import sys
+from verify_benchmark import verify
 
 BASELINE = {
     "tiny": 9, "base-q5_1": 6, "base": 5, "small-q5_1": 3,
@@ -23,6 +24,7 @@ def compare(directory):
                 assert type(edits) is int and edits >= 0
                 # Existing accuracy gate remains 3 errors; do not regress a
                 # previously passing model on the exact same fixed fixture.
+                verify(report, model, lang)  # independently recompute WER, sizes and RAM evidence
                 passed = edits <= min(3, before)
                 print(f"{model} {lang}: {before} -> {edits}; "
                       f"{'PASS' if passed else 'FAIL'}; inference={report['inferenceMs']} ms")
