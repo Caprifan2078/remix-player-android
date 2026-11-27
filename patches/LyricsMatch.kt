@@ -20,15 +20,39 @@ internal object LyricsMatch {
         return Query(t,a)
     }
     fun key(s:String)=clean(s).lowercase(Locale.ROOT).replace('ё','е').replace(Regex("[^\\p{L}\\p{N}]+")," ").trim()
+    private val ru="абвгдежзийклмнопрстуфхцчшщъыьэюя"
+    private val latin=listOf("a","b","v","g","d","e","zh","z","i","y","k","l","m","n","o","p","r","s","t","u","f","kh","ts","ch","sh","shch","","y","","e","yu","ya")
+    private fun roman(s:String)=buildString{for(c in key(s)){val i=ru.indexOf(c);append(if(i<0)c.toString() else latin[i])}}
+    private fun cyrillic(s:String):String{
+        val text=key(s);if(text.any{it in ru})return text
+        val pairs=latin.zip(ru.toList()).filter{it.first.isNotEmpty()}.distinctBy{it.first}.sortedByDescending{it.first.length}
+        return buildString{var i=0;while(i<text.length){val pair=pairs.firstOrNull{text.startsWith(it.first,i)};if(pair==null){append(text[i]);i++}else{append(pair.second);i+=pair.first.length}}}
+    }
+    private fun artistKey(s:String):String{
+        val k=key(s)
+        return if(k.replace(" ","") in setOf("tatu","тату"))"tatu" else k
+    }
+    private fun cross(a:String,b:String)=a.isNotBlank()&&b.isNotBlank()&&((a.any{it in ru}&&b.none{it in ru})||(b.any{it in ru}&&a.none{it in ru}))&&roman(a)==roman(b)
+    fun variants(q:Query):List<Query>{
+        val alias=if(artistKey(q.artist)=="tatu")if(key(q.artist).any{it in ru})"t.A.T.u." else "Тату" else q.artist
+        fun other(s:String)=if(key(s).any{it in ru})roman(s) else cyrillic(s)
+        val alternate=Query(other(q.title),if(alias!=q.artist)alias else other(q.artist))
+        return listOf(q,Query(q.title,alias),alternate,Query(alternate.title,if(alias!=q.artist)q.artist else alternate.artist)).filter{it.title.isNotBlank()}.distinctBy{key(it.title) to key(it.artist)}.take(4)
+    }
     data class Candidate(val title:String,val artist:String,val seconds:Long,val synced:Boolean)
     fun choose(q:Query,seconds:Long?,rows:List<Candidate>):Int?{
-        val title=key(q.title);val artist=key(q.artist)
+        val title=key(q.title);val artist=artistKey(q.artist);val timed=seconds!=null&&seconds>0
         if(title.isBlank())return null
-        val found=rows.indices.filter{i->val r=rows[i];r.synced&&key(r.title)==title&&(artist.isBlank()||key(r.artist)==artist)&&(seconds==null||seconds<=0||kotlin.math.abs(r.seconds-seconds)<=3)}
+        val found=rows.indices.filter{i->
+            val r=rows[i];val rt=key(r.title);val ra=artistKey(r.artist)
+            val titleOk=rt==title||(timed&&artist.isNotBlank()&&cross(title,rt))
+            val artistOk=artist.isBlank()||artist==ra||(timed&&cross(artist,ra))
+            r.synced&&titleOk&&artistOk&&(!timed||kotlin.math.abs(r.seconds-seconds!!)<=3)
+        }
         if(found.isEmpty())return null
-        if(artist.isBlank()&&(seconds==null||seconds<=0||found.map{key(rows[it].artist)}.distinct().size!=1))return null
-        if(seconds==null||seconds<=0)return found.singleOrNull()
-        val ranked=found.sortedBy{kotlin.math.abs(rows[it].seconds-seconds)}
-        return if(ranked.size>1&&kotlin.math.abs(rows[ranked[0]].seconds-seconds)==kotlin.math.abs(rows[ranked[1]].seconds-seconds))null else ranked.first()
+        if(artist.isBlank()&&(!timed||found.map{artistKey(rows[it].artist)}.distinct().size!=1))return null
+        if(!timed)return found.singleOrNull()
+        val ranked=found.sortedBy{kotlin.math.abs(rows[it].seconds-seconds!!)}
+        return if(ranked.size>1&&kotlin.math.abs(rows[ranked[0]].seconds-seconds!!)==kotlin.math.abs(rows[ranked[1]].seconds-seconds!!))null else ranked.first()
     }
 }
