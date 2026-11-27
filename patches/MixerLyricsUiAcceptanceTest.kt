@@ -48,7 +48,13 @@ class MixerLyricsUiAcceptanceTest {
     }
     private fun texts():List<TextView> = activity()?.window?.decorView?.let{views(it).filterIsInstance<TextView>().toList()}.orEmpty()
     private fun button(text:String):Button?=texts().filterIsInstance<Button>().firstOrNull{it.text.toString()==text&&it.isShown&&it.isEnabled}
-    private fun click(text:String){await("Missing enabled UI button: "+text){button(text)!=null};main{assertTrue(button(text)!!.performClick())}}
+    private fun click(text:String){
+        main{if(button(text)==null&&text in listOf("Музыка","Версии","Студия","Текст","Загрузки")){
+            val menu=activity()?.window?.decorView?.let{views(it).firstOrNull{v->v.isShown&&v.contentDescription=="Меню навигации"}}
+            if(menu!=null)assertTrue(menu.performClick())
+        }}
+        await("Missing enabled UI button: "+text){button(text)!=null};main{assertTrue(button(text)!!.performClick())}
+    }
     private fun capture(name:String){val bitmap=inst.uiAutomation.takeScreenshot()?:error("Screenshot unavailable");try{File(c.filesDir,"qa-"+name+".png").outputStream().use{assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it))}}finally{bitmap.recycle()}}
     private fun fixture(block:(MediaController)->Unit){
         val uid=java.util.UUID.randomUUID().toString()
@@ -126,7 +132,7 @@ class MixerLyricsUiAcceptanceTest {
             main{
                 assertNull("Full transport must not be visible on library",shown().filterIsInstance<WaveSeekBar>().firstOrNull())
                 assertTrue("Library action wall is still visible",texts().none{it.isShown&&it.text.toString() in listOf("Инструменты библиотеки…","Темп / скорость…","Добавить найденные песни в очередь…")})
-                assertNotNull(control("Фильтры и инструменты"))
+                assertNotNull(control("Фильтры и инструменты"));assertNotNull(control("Меню навигации"));assertNull("Old bottom studio navigation still visible",button("Студия"))
             }
             capture("compact-library")
             main{assertTrue(control("Открыть экран воспроизведения")!!.performClick())}
