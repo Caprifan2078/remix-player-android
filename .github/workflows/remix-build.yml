@@ -120,6 +120,28 @@ jobs:
           name: RemixPlayer-v0.66-debug-UNVERIFIED
           path: source/RemixPlayer_v0.66/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+      - name: Package and verify ARM64-only debug APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          tools="$sdk/build-tools/35.0.0"
+          source_apk="source/$PROJECT/app/build/outputs/apk/debug/app-debug.apk"
+          mkdir -p arm64
+          python3 patches/arm64-apk.py filter "$source_apk" "$RUNNER_TEMP/arm64-unsigned.apk"
+          "$tools/zipalign" -P 16 -f 4 "$RUNNER_TEMP/arm64-unsigned.apk" "$RUNNER_TEMP/arm64-aligned.apk"
+          "$tools/apksigner" sign --ks "$HOME/.android/debug.keystore" --ks-key-alias androiddebugkey --ks-pass pass:android --key-pass pass:android --out arm64/RemixPlayer-v0.66-arm64.apk "$RUNNER_TEMP/arm64-aligned.apk"
+          "$tools/zipalign" -c -P 16 4 arm64/RemixPlayer-v0.66-arm64.apk
+          "$tools/apksigner" verify --print-certs "$source_apk" > "$RUNNER_TEMP/universal-certs.txt"
+          "$tools/apksigner" verify --print-certs arm64/RemixPlayer-v0.66-arm64.apk > "$RUNNER_TEMP/arm64-certs.txt"
+          diff <(grep 'certificate SHA-256 digest:' "$RUNNER_TEMP/universal-certs.txt") <(grep 'certificate SHA-256 digest:' "$RUNNER_TEMP/arm64-certs.txt")
+          python3 patches/arm64-apk.py verify "$source_apk" arm64/RemixPlayer-v0.66-arm64.apk
+          (cd arm64 && sha256sum RemixPlayer-v0.66-arm64.apk > apk.sha256)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RemixPlayer-v0.66-arm64-UNVERIFIED
+          path: arm64/
+          if-no-files-found: error
       - name: Compile instrumentation tests
         working-directory: source/RemixPlayer_v0.66
         run: |
@@ -524,6 +546,11 @@ jobs:
       - uses: actions/download-artifact@v4
         with: {name: RemixPlayer-v0.66-debug-UNVERIFIED, path: candidate}
       - run: sha256sum candidate/app-debug.apk > candidate/apk.sha256
+      - uses: actions/download-artifact@v4
+        with: {name: RemixPlayer-v0.66-arm64-UNVERIFIED, path: arm64}
+      - run: (cd arm64 && sha256sum -c apk.sha256)
+      - uses: actions/upload-artifact@v4
+        with: {name: RemixPlayer-v0.66-arm64-QA-candidate, path: arm64/, if-no-files-found: error}
       - uses: actions/upload-artifact@v4
         with: {name: RemixPlayer-v0.66-automated-QA-candidate, path: candidate/, if-no-files-found: error}
 
