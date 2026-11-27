@@ -6,7 +6,7 @@ def edit(name,a,b):
 shutil.copyfile(Path(__file__).parent/'SmartCrossfade.kt',src/'SmartCrossfade.kt')
 # Missing preference means fresh/default settings. Explicit off stays off, including upgrades.
 edit('PlaybackService.kt','getLong("overlap_ms",0).takeIf{it in 1000..8000}?:0L','getLong("overlap_ms",SmartCrossfade.DEFAULT_MS).takeIf{it in 1000..8000}?:0L')
-edit('PlaybackService.kt','overlap?.tick(PlaybackOptions.overlapMs,eligible)','overlap?.tick(PlaybackOptions.overlapMs,eligible,SmartCrossfade.enabled(getSharedPreferences("play_options",MODE_PRIVATE)))')
+edit('PlaybackService.kt','overlap?.tick(PlaybackOptions.overlapMs,eligible)','overlap?.tick(PlaybackOptions.overlapMs,eligible,getSharedPreferences("play_options",MODE_PRIVATE).let{prefs->SmartCrossfade.enabled(if(prefs.contains("smart_overlap"))prefs.getBoolean("smart_overlap",false)else null,prefs.contains("overlap_ms"))})')
 edit('LiveOverlap.kt','fun tick(requested:Long,eligible:Boolean):Boolean','fun tick(requested:Long,eligible:Boolean,smart:Boolean=false):Boolean')
 edit('LiveOverlap.kt','val planned=OverlapCore.window(duration,p.duration,requested)','val effective=if(smart)SmartCrossfade.duration(duration,p.duration,requested) else requested\n        val planned=OverlapCore.window(duration,p.duration,effective)')
 # No additional permanent buttons: smart/normal/off are one menu.
@@ -17,7 +17,7 @@ s=s[:a]+r'''    private fun liveTransitionMenu(){
         val overlaps=listOf(1000L,2000L,3000L,5000L,8000L)
         val prefs=getSharedPreferences("play_options",MODE_PRIVATE)
         fun display(v:Long)=if(v==0L)"выкл." else (v/1000).toString()+" с"
-        val smart=SmartCrossfade.enabled(prefs)
+        val smart=SmartCrossfade.enabled(if(prefs.contains("smart_overlap"))prefs.getBoolean("smart_overlap",false)else null,prefs.contains("overlap_ms"))
         val mode=if(PlaybackOptions.overlapMs==0L)"выкл." else if(smart)"авто" else display(PlaybackOptions.overlapMs)
         fun select(ms:Long,automatic:Boolean){
             PlaybackOptions.overlapMs=ms
