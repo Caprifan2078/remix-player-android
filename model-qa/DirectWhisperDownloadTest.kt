@@ -38,9 +38,37 @@ class DirectWhisperDownloadTest {
             assertEquals(spec.size,model.length());assertTrue(VerifiedDownload.matches(model,spec.sha))
             assertTrue(progress.isNotEmpty()&&progress.last()==100&&progress.zipWithNext().all{it.first<=it.second})
             val uri=FileProvider.getUriForFile(c,"app.remix.player.files",file)
+            val am=c.getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            var peakPssKiB=0L
+            var minAvailableRam=Long.MAX_VALUE
+            var pssSamples=0
+            fun sampleMemory(){
+                val info=android.app.ActivityManager.MemoryInfo()
+                am.getMemoryInfo(info)
+                minAvailableRam=minOf(minAvailableRam,info.availMem)
+                peakPssKiB=maxOf(peakPssKiB,android.os.Debug.getPss())
+                pssSamples++
+            }
+            sampleMemory()
+            val stop=java.util.concurrent.CountDownLatch(1)
+            val samplingError=java.util.concurrent.atomic.AtomicReference<Throwable?>()
+            val sampler=Thread({
+                try{
+                    while(!stop.await(500,java.util.concurrent.TimeUnit.MILLISECONDS))sampleMemory()
+                }catch(e:Throwable){samplingError.set(e)}
+            },"qa-whisper-memory")
+            sampler.start()
             val start=android.os.SystemClock.elapsedRealtime()
-            val text=WhisperLocal.transcribe(c,uri,null,"en"){println(it)}
-            val inferenceMs=android.os.SystemClock.elapsedRealtime()-start
+            var inferenceMs=0L
+            val text=try{
+                WhisperLocal.transcribe(c,uri,null,"en"){println(it)}
+            }finally{
+                inferenceMs=android.os.SystemClock.elapsedRealtime()-start
+                stop.countDown();sampler.join()
+            }
+            samplingError.get()?.let{throw AssertionError("Memory sampling failed",it)}
+            sampleMemory()
+            assertTrue("Missing sampled process PSS",peakPssKiB>0&&pssSamples>=2)
             val parsed=Lrc.parse(text)
             assertTrue(parsed.isNotEmpty())
             assertTrue(parsed.all{it.ms>=0&&it.ms<20000}&&parsed.zipWithNext().all{(a,b)->a.ms<=b.ms})
@@ -52,7 +80,7 @@ class DirectWhisperDownloadTest {
             println("BENCHMARK Whisper $id modelBytes=${spec.size} downloadMs=$downloadMs inferenceMs=$inferenceMs words=${expected.size} edits=$errors WER=${errors.toDouble()/expected.size} availableRamAfter=${memory.availMem}")
             println("BENCHMARK transcript $id: "+actual.joinToString(" "))
             assertTrue("Recognized speech must contain fixture vocabulary",text.lowercase().contains("music")||text.lowercase().contains("song"))
-            val result=org.json.JSONObject().put("id",id).put("modelBytes",spec.size).put("downloadMs",downloadMs).put("inferenceMs",inferenceMs).put("words",expected.size).put("edits",errors).put("wer",errors.toDouble()/expected.size).put("availableRamAfter",memory.availMem).put("transcript",actual.joinToString(" "))
+            val result=org.json.JSONObject().put("id",id).put("modelBytes",spec.size).put("downloadMs",downloadMs).put("inferenceMs",inferenceMs).put("words",expected.size).put("edits",errors).put("wer",errors.toDouble()/expected.size).put("availableRamAfter",memory.availMem).put("transcript",actual.joinToString(" ")).put("peakPssKiB",peakPssKiB).put("pssSamples",pssSamples).put("minAvailableRam",minAvailableRam)
             report.writeText(result.toString())
             println("PASS: Android downloaded publisher weights over HTTPS, verified SHA, activated native model, recognized fixture speech")
         }finally{model.delete()}
