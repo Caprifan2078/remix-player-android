@@ -8,7 +8,7 @@ import java.security.MessageDigest
 
 /** Exact peaks only. Reuse across process starts only when provider supplies a size and modification stamp. */
 internal object WaveDiskCache {
-    private const val VERSION=1
+    private const val VERSION=2
     private fun fingerprint(c:Context,u:Uri):String?{
         fun probe(modified:String):Pair<Long,Long>?=runCatching{
             c.contentResolver.query(u,arrayOf("_size",modified),null,null,null)?.use{cursor->
