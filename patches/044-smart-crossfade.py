@@ -50,9 +50,49 @@ assert part.count('if(current()!=null&&!MixerSession.active){applyPreset(preset)
 part=part.replace('val names=listOf(','val trackId=current()?.uri\n        val names=listOf(',1).replace('val entries=(Presets.all+customPresets)','val trackId=current()?.uri\n        val entries=(Presets.all+customPresets)',1)
 part=part.replace('if(current()!=null&&!MixerSession.active){applyPreset(preset);render()};Unit','if(trackId!=null&&current()?.uri==trackId&&!MixerSession.active){applyPreset(preset);syncWave()}else toast("Композиция изменилась");Unit')
 s=s[:a]+part+s[b:]
-# Compact settings groups retain the existing views and listeners, rather than duplicating actions.
-a=s.index('    private fun settingsScreen(){')
-s=s[:a]+s[a:].replace('    private fun settingsScreen(){','    private fun settingsScreen(){',1)
-# No speculative changes to settings controls before device validation.
+# Group existing settings views and retain each listener/state. Busy controls remain visible.
+assert s.count('"Настройки"->settingsScreen()')==1
+s=s.replace('"Настройки"->settingsScreen()','"Настройки"->{settingsScreen();groupSettings()}')
+anchor='    private fun settingsScreen(){'
+assert s.count(anchor)==1
+s=s.replace(anchor,r'''    private val expandedSettings=mutableSetOf<String>()
+    private fun groupSettings(){
+        if(stemBusy)return
+        val views=(0 until body.childCount).map{body.getChildAt(it)}
+        fun text(v:View)= (v as? TextView)?.text?.toString().orEmpty()
+        val backup=views.indexOfFirst{it===backupStatus}
+        val models=views.indexOfFirst{text(it)=="Модели на устройстве"}
+        val storage=views.indexOfFirst{text(it).startsWith("Найти неиспользуемые WAV")}
+        if(backup<0||models<=backup||storage<=models)return
+        val tail=views.indexOfFirst{text(it)=="← Музыка"}.takeIf{it>storage}?:views.size
+        val groups=listOf(
+            Triple("Резервные копии","Создание и восстановление архива",views.subList(backup,models)),
+            Triple("Модели и нейросети","Whisper, Vosk, AST, Demucs и MERT",views.subList(models,storage)),
+            Triple("Хранилище и кеш","Файлы, объём и очистка",views.subList(storage,tail))
+        )
+        for(i in views.lastIndex downTo backup)body.removeView(views[i])
+        for((name,summary,children) in groups){
+            val panel=column()
+            for(view in children)panel.addView(view)
+            panel.visibility=if(name in expandedSettings)View.VISIBLE else View.GONE
+            val toggle=row().apply{
+                background=rounded(surface,14);minimumHeight=dp(64);gravity=Gravity.CENTER_VERTICAL
+                setPadding(dp(14),dp(8),dp(12),dp(8));isClickable=true;isFocusable=true
+            }
+            val titles=column();titles.addView(label(name,16,Color.WHITE,true));titles.addView(label(summary,12,muted))
+            toggle.addView(titles,weight())
+            val glyph=ImageView(this).apply{setImageResource(R.drawable.remix_chevron);setColorFilter(muted);rotation=if(name in expandedSettings)90f else 0f;importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO}
+            toggle.addView(glyph,LinearLayout.LayoutParams(dp(24),dp(24)))
+            fun state(){toggle.contentDescription=name+if(name in expandedSettings)", раскрыто" else ", свернуто"}
+            state();toggle.setOnClickListener{
+                if(!expandedSettings.add(name))expandedSettings.remove(name)
+                panel.visibility=if(name in expandedSettings)View.VISIBLE else View.GONE
+                glyph.rotation=if(name in expandedSettings)90f else 0f;state()
+            }
+            body.addView(toggle,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=dp(8)})
+            body.addView(panel)
+        }
+    }
+    private fun settingsScreen(){''',1)
 p.write_text(s)
 print("PASS: default-on adaptive overlap, explicit off preserved, themed legacy dialogs and quick presets")
