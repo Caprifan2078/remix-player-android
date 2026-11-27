@@ -1,0 +1,32 @@
+package app.remix.player
+fun main(){
+    fun r(title:String,artist:String,sec:Long=200,synced:Boolean=true)=LyricsMatch.Candidate(title,artist,sec,synced)
+    val q=LyricsMatch.query("t.A.T.u. - Нас не догонят [muzfone.com].mp3","Неизвестный исполнитель")
+    check(q.title=="Нас не догонят"&&q.artist=="t.A.T.u."){q}
+    check(LyricsMatch.query("-- Song_www_lightaudio_ru.mp3","Unknown artist").title=="Song")
+    check(LyricsMatch.choose(q,200,listOf(r("Нас не догонят","t.A.T.u."),r("Нас не догонят","Другой артист")))==0)
+    check(LyricsMatch.choose(q,200,listOf(r("Нас не догонят (remix)","t.A.T.u.")))==null)
+    check(LyricsMatch.choose(q,200,listOf(r("Нас не догонят","t.A.T.u.",220)))==null)
+    check(LyricsMatch.choose(q,200,listOf(r("Нас не догонят","t.A.T.u.",200,false)))==null)
+    val unknown=LyricsMatch.Query("Нас не догонят","")
+    check(LyricsMatch.choose(unknown,200,listOf(r("Нас не догонят","t.A.T.u."),r("Нас не догонят","Другой артист")))==null)
+    check(LyricsMatch.choose(unknown,null,listOf(r("Нас не догонят","t.A.T.u.")))==null)
+    check(LyricsMatch.choose(q,200,listOf(r("Нас не догонят","t.A.T.u.",199),r("Нас не догонят","t.A.T.u.",201)))==null)
+    check(LyricsMatch.choose(q,200,listOf(r("Нас не догонят","Тату")))==0){"Russian artist alias not found"}
+    check(LyricsMatch.choose(LyricsMatch.Query("Nas ne dogonyat","Tatu"),200,listOf(r("Нас не догонят","Тату")))==0)
+    check(LyricsMatch.choose(LyricsMatch.Query("Нас не догонят","Тату"),200,listOf(r("Nas ne dogonyat","t.A.T.u.")))==0)
+    check(LyricsMatch.choose(q,200,listOf(r("Not Gonna Get Us","t.A.T.u.")))==null)
+    check(LyricsMatch.choose(q,200,listOf(r("Нас не догонят (remix)","Тату")))==null)
+    check(LyricsMatch.choose(q,200,listOf(r("Нас не догонят","Тату",220)))==null)
+    check(LyricsMatch.choose(q,200,listOf(r("Нас не догонят","Тату",200,false)))==null)
+    check(LyricsMatch.choose(q,200,listOf(r("Нас не догонят","Тату",199),r("Нас не догонят","t.A.T.u.",201)))==null)
+    check(LyricsMatch.choose(LyricsMatch.Query("Нас не догонят",""),200,listOf(r("Nas ne dogonyat","Tatu")))==null)
+    check(LyricsMatch.choose(q,null,listOf(r("Nas ne dogonyat","Тату")))==null)
+    check(LyricsMatch.choose(LyricsMatch.Query("Bohemian Rhapsody","Queen"),355,listOf(r("Bohemian Rhapsody","Queen",355)))==0)
+    check(LyricsMatch.choose(LyricsMatch.Query("Кукушка","Кино"),200,listOf(r("Kukushka","Kino")))==0)
+    check(LyricsMatch.choose(LyricsMatch.Query("Кукушка","Кино"),200,listOf(r("Kukushka","Другой")))==null)
+    check(LyricsMatch.variants(q).any{it.title=="nas ne dogonyat"})
+    check(LyricsMatch.variants(LyricsMatch.Query("Nas ne dogonyat","Tatu")).any{it.title=="нас не догонят"&&it.artist=="Тату"})
+    check(LyricsMatch.variants(q).size<=4)
+    println("PASS: filenames, bilingual aliases, transliteration, alternate search and safe recording matching")
+}
