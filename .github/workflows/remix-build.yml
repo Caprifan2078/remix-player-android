@@ -81,6 +81,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/040-clean-player.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/041-player-polish.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/042-ui-refinement.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/043-player-gestures.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
           test -f "source/$PROJECT/app/build.gradle.kts"
@@ -230,6 +231,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/040-clean-player.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/041-player-polish.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/042-ui-refinement.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/043-player-gestures.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/setup-java@v4
@@ -368,6 +370,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/040-clean-player.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/041-player-polish.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/042-ui-refinement.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/043-player-gestures.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/download-artifact@v4
@@ -442,6 +445,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/040-clean-player.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/041-player-polish.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/042-ui-refinement.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/043-player-gestures.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/download-artifact@v4
@@ -523,6 +527,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/040-clean-player.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/041-player-polish.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/042-ui-refinement.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/043-player-gestures.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/setup-java@v4
@@ -585,7 +590,7 @@ jobs:
     name: Real models on Android 15 (8 GiB emulator)
     needs: apk
     runs-on: ubuntu-24.04
-    timeout-minutes: 100
+    timeout-minutes: 210
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -599,6 +604,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y espeak-ng
           espeak-ng -v en-us -s 135 -w model-fixtures/qa-whisper.wav 'The music is playing. Listen to the song today. This is a test.'
+          espeak-ng -v ru -s 135 -w model-fixtures/qa-whisper-ru.wav 'Музыка играет. Послушай песню сегодня. Это тест.'
           curl --fail --location --retry 2 --max-time 240 --proto '=https' --proto-redir '=https' --max-filesize 80000000 -o model-fixtures/qa-whisper-tiny.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
           printf '%s  %s\n' be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21 model-fixtures/qa-whisper-tiny.bin | sha256sum -c -
           test "$(stat -c %s model-fixtures/qa-whisper-tiny.bin)" = 77691713
