@@ -55,13 +55,15 @@ class MixerLyricsUiAcceptanceTest {
         }}
         await("Missing enabled UI button: "+text){button(text)!=null};main{assertTrue(button(text)!!.performClick())}
     }
-    private fun capture(name:String){val bitmap=inst.uiAutomation.takeScreenshot()?:error("Screenshot unavailable");try{File(c.filesDir,"qa-"+name+".png").outputStream().use{assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it))}}finally{bitmap.recycle()}}
-    private fun fixture(block:(MediaController)->Unit){
+    private fun capture(name:String){inst.waitForIdleSync();SystemClock.sleep(450);val bitmap=inst.uiAutomation.takeScreenshot()?:error("Screenshot unavailable");try{File(c.filesDir,"qa-"+name+".png").outputStream().use{assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it))}}finally{bitmap.recycle()}}
+    private fun fixture(twoTracks:Boolean=false,block:(MediaController)->Unit){
         val uid=java.util.UUID.randomUUID().toString()
         val dir=File(File(c.filesDir,"stems").apply{mkdirs()},uid).apply{check(mkdirs())}
         val wav=File(File(c.filesDir,"mixes").apply{mkdirs()},"qa-ui-"+uid+".wav")
         val frames=44100L*30
         val uri=FileProvider.getUriForFile(c,"app.remix.player.files",wav)
+        val second=File(wav.parentFile,"qa-ui-second-"+uid+".wav")
+        val secondUri=FileProvider.getUriForFile(c,"app.remix.player.files",second)
         val lib=c.getSharedPreferences("library",0);val old=lib.getString("tracks",null)
         val cache=c.getSharedPreferences("stem_cache",0)
         val mixer=c.getSharedPreferences("mixer",0);val asked=mixer.contains("asked_notifications");val oldAsked=mixer.getBoolean("asked_notifications",false)
@@ -77,6 +79,7 @@ class MixerLyricsUiAcceptanceTest {
             val song=org.json.JSONObject().put("uri",uri.toString()).put("group",uri.toString()).put("title","QA UI synthetic").put("artist","QA")
                 .put("lyrics","[00:01.000]<00:01.000>Первое <00:02.000>второе <00:03.000>третье\n[00:08.000]Следующая строка")
             val arr=org.json.JSONArray(old?:"[]").put(song)
+            if(twoTracks){wav.copyTo(second);arr.put(org.json.JSONObject().put("uri",secondUri.toString()).put("group",secondUri.toString()).put("title","QA second song").put("artist","QA"))}
             check(lib.edit().putString("tracks",arr.toString()).commit())
             check(cache.edit().putString(uri.toString(),uid).commit())
             check(mixer.edit().putBoolean("asked_notifications",true).commit())
@@ -84,7 +87,7 @@ class MixerLyricsUiAcceptanceTest {
             main{future=MediaController.Builder(c,SessionToken(c,ComponentName(c,PlaybackService::class.java))).buildAsync()}
             val p=future!!.get(15,TimeUnit.SECONDS);controller=p
             val item=MediaItem.Builder().setMediaId(uri.toString()).setUri(uri).setRequestMetadata(MediaItem.RequestMetadata.Builder().setMediaUri(uri).build()).build()
-            main{MixerSession.stop(c);p.pause();p.setMediaItems(listOf(item));p.prepare()}
+            main{MixerSession.stop(c);p.pause();p.setMediaItems(if(twoTracks)listOf(item,item.buildUpon().setMediaId(secondUri.toString()).setUri(secondUri).setRequestMetadata(MediaItem.RequestMetadata.Builder().setMediaUri(secondUri).build()).build())else listOf(item));p.prepare()}
             await("Fixture queue not loaded"){p.currentMediaItem?.mediaId==uri.toString()&&p.duration in 29900L..30100L}
             inst.startActivitySync(Intent(c,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra("open_mixer",true))
             await("Mixer screen not ready"){button("▶ Слушать микс")!=null}
@@ -97,7 +100,7 @@ class MixerLyricsUiAcceptanceTest {
             cache.edit().remove(uri.toString()).commit()
             mixer.edit().apply{if(asked)putBoolean("asked_notifications",oldAsked)else remove("asked_notifications")}.commit()
             lyricsUi.edit().apply{if(follow)putBoolean("follow",oldFollow)else remove("follow")}.commit()
-            wav.delete();dir.deleteRecursively()
+            wav.delete();second.delete();dir.deleteRecursively()
         }
     }
     @Test fun mixerActualButtonsBackgroundResumeAndPause(){
@@ -189,6 +192,50 @@ class MixerLyricsUiAcceptanceTest {
             main{assertTrue(control("Текст песни")!!.performClick())}
             await("Lyrics screen lacks synchronized content"){texts().any{it.isShown&&it.text.toString().startsWith("Первое второе третье")}}
             capture("lyrics-clean")
+        }
+    }
+    @Test fun artworkSwipeBothDirectionsAndTransitionDiscovery(){
+        fixture(twoTracks=true){p->
+            click("Музыка")
+            fun control(desc:String)=activity()?.window?.decorView?.let{views(it).firstOrNull{v->v.isShown&&v.contentDescription==desc}}
+            await("Drawer did not close after navigation"){control("Открыть экран воспроизведения")!=null&&control("Закрыть меню")==null}
+            main{assertTrue(control("Открыть экран воспроизведения")!!.performClick())}
+            await("Player artwork missing"){control("Обложка композиции")?.width?.let{it>100}==true}
+            fun swipe(direction:Int,vertical:Boolean=false){
+                val rect=android.graphics.Rect()
+                main{assertTrue(control("Обложка композиции")!!.getGlobalVisibleRect(rect))}
+                val x=rect.centerX();val y=rect.centerY();val d=rect.width()/3
+                if(vertical)shell("input swipe $x ${y-d} $x ${y+d} 300")
+                else shell("input swipe ${x-direction*d} $y ${x+direction*d} $y 300")
+            }
+            main{assertEquals(0,p.currentMediaItemIndex);p.pause()}
+            swipe(-1)
+            await("Left swipe did not advance queue"){p.currentMediaItemIndex==1&&texts().any{it.isShown&&it.text.toString()=="QA second song"}}
+            swipe(1)
+            await("Right swipe did not return to previous track"){p.currentMediaItemIndex==0&&texts().any{it.isShown&&it.text.toString()=="QA UI synthetic"}}
+            swipe(1,true)
+            main{assertEquals("Vertical scroll changed track",0,p.currentMediaItemIndex);assertFalse("Swipe unexpectedly started paused playback",p.playWhenReady)}
+            await("Player tools missing after swipe"){control("Ещё")!=null}
+            main{assertTrue(control("Ещё")!!.performClick())}
+            clickSheetText("Переходы между песнями")
+            val deadline=SystemClock.elapsedRealtime()+8000
+            var visible=false
+            while(SystemClock.elapsedRealtime()<deadline&&!visible){
+                visible=inst.uiAutomation.rootInActiveWindow?.findAccessibilityNodeInfosByText("Умный DJ-переход · BPM и тональность")?.any{it.isVisibleToUser}==true
+                if(!visible)SystemClock.sleep(100)
+            }
+            assertTrue("Smart DJ transition is not discoverable",visible)
+            capture("transitions")
+            clickSheetText("Плавное затухание и Crossfade")
+            val liveDeadline=SystemClock.elapsedRealtime()+8000
+            var live=false
+            while(SystemClock.elapsedRealtime()<liveDeadline&&!live){
+                live=inst.uiAutomation.rootInActiveWindow?.findAccessibilityNodeInfosByText("Плавные переходы")?.any{it.isVisibleToUser}==true
+                if(!live)SystemClock.sleep(100)
+            }
+            assertTrue("Live transition settings not visible",live)
+            capture("live-transitions")
+            shell("input keyevent 4")
         }
     }
     @Test fun karaokeActualWordSpansSeekAndFollowToggle(){
