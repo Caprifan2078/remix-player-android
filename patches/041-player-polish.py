@@ -110,7 +110,12 @@ section('    private fun whisperModelDialog(){','    private fun recognizeWhispe
         sheet("Распознавание вокала","Установлена: "+active,actions+listOf("Импорт файла" to {whisperPicker.launch(arrayOf("*/*"))}))
     }
 ''')
-replace('runCatching{WaveReader.read(app,Uri.parse(uri))}','runCatching{WaveDiskCache.readOrDecode(app,Uri.parse(uri))}')
+replace('runCatching{WaveReader.read(app,Uri.parse(uri))}',r'''runCatching{WaveDiskCache.readOrDecode(app,Uri.parse(uri)){values,ready->
+                if(!Thread.currentThread().isInterrupted)runOnUiThread{
+                    if(!isDestroyed&&generation==waveEpoch&&uiStarted&&current()?.uri==uri&&!MixerSession.active)bar.setWaveformPreview(values,ready)
+                }
+            }}''')
+replace('if(result!=null){waveCache.put(uri,result);bar.setWaveform(result)}','if(result!=null){waveCache.put(uri,result);bar.setWaveform(result)}else bar.setWaveform(null)')
 p.write_text(s)
 for name in ['LyricsLookup.kt','LyricsMatch.kt','WaveDiskCache.kt']:shutil.copyfile(Path(__file__).parent/name,src/name)
 styles=res/'values/styles.xml';xml=styles.read_text()
