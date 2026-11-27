@@ -37,18 +37,18 @@ replace('    private fun nowPlaying(){',r'''    private fun transitionMenu(){
         fun reset(){horizontal=false;valid=false;image.translationX=0f;image.alpha=1f;image.parent?.requestDisallowInterceptTouchEvent(false)}
         image.setOnTouchListener{_,e->
             when(e.actionMasked){
-                android.view.MotionEvent.ACTION_DOWN->{x=e.x;y=e.y;horizontal=false;valid=true;startIndex=controller?.currentMediaItemIndex?:-1;true}
+                android.view.MotionEvent.ACTION_DOWN->{x=e.rawX;y=e.rawY;horizontal=false;valid=true;startIndex=controller?.currentMediaItemIndex?:-1;true}
                 android.view.MotionEvent.ACTION_POINTER_DOWN,android.view.MotionEvent.ACTION_CANCEL->{reset();true}
                 android.view.MotionEvent.ACTION_MOVE->{
                     if(!valid)return@setOnTouchListener true
-                    val dx=e.x-x+image.translationX;val dy=e.y-y
+                    val dx=e.rawX-x;val dy=e.rawY-y
                     if(!horizontal&&kotlin.math.abs(dy)>slop&&kotlin.math.abs(dy)>kotlin.math.abs(dx)){reset();return@setOnTouchListener false}
                     if(!horizontal&&kotlin.math.abs(dx)>slop&&kotlin.math.abs(dx)>1.5f*kotlin.math.abs(dy)){horizontal=true;image.parent?.requestDisallowInterceptTouchEvent(true)}
                     if(horizontal){image.translationX=dx.coerceIn(-image.width*.33f,image.width*.33f);image.alpha=1f-kotlin.math.abs(image.translationX)/image.width.coerceAtLeast(1)*.45f}
                     true
                 }
                 android.view.MotionEvent.ACTION_UP->{
-                    val dx=e.x-x+image.translationX;val dy=e.y-y
+                    val dx=e.rawX-x;val dy=e.rawY-y
                     val player=controller
                     val direction=if(valid&&horizontal&&kotlin.math.abs(dx)>=maxOf(dp(48).toFloat(),image.width*.18f)&&kotlin.math.abs(dx)>1.5f*kotlin.math.abs(dy))if(dx<0)1 else -1 else 0
                     reset()
@@ -67,5 +67,7 @@ replace('val token=++coverToken','bindArtworkSwipe(image,t.uri);val token=++cove
 replace('"Таймер сна и переходы" to {playbackOptionsDialog()},','"Переходы между песнями" to {transitionMenu()},\n                "Таймер сна" to {sleepMenu()},')
 replace('sheet("Эффекты",actions=choices+listOf("Все эффекты" to {allEffectsSheet()}))','sheet("Эффекты",actions=choices+listOf("Все эффекты" to {allEffectsSheet()},"Переходы между песнями" to {transitionMenu()}))')
 replace('body.addView(btn("Таймер сна и переходы"){playbackOptionsDialog()})','body.addView(btn("Переходы и таймер сна"){transitionMenu()})')
+# render() applies old navigation colors; restore the selected drawer style once after each render.
+replace('syncWave();val targetScreen=screen','lastNavStyle="";syncWave();val targetScreen=screen')
 p.write_text(s)
 print("PASS: swipe artwork, live crossfade and DJ transition entry points, no added permanent player controls")
