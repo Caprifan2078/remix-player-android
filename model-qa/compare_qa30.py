@@ -25,7 +25,7 @@ def compare(directory):
                 # Existing accuracy gate remains 3 errors; do not regress a
                 # previously passing model on the exact same fixed fixture.
                 verify(report, model, lang)  # independently recompute WER, sizes and RAM evidence
-                passed = edits <= min(3, before)
+                passed = edits <= min(3, before, 2 if model == "small" and lang == "ru" else 3)
                 print(f"{model} {lang}: {before} -> {edits}; "
                       f"{'PASS' if passed else 'FAIL'}; inference={report['inferenceMs']} ms")
                 ok = ok and passed
