@@ -131,7 +131,11 @@ jobs:
           mkdir -p arm64
           python3 patches/arm64-apk.py filter "$source_apk" "$RUNNER_TEMP/arm64-unsigned.apk"
           "$tools/zipalign" -P 16 -f 4 "$RUNNER_TEMP/arm64-unsigned.apk" "$RUNNER_TEMP/arm64-aligned.apk"
-          "$tools/apksigner" sign --ks "$HOME/.android/debug.keystore" --ks-key-alias androiddebugkey --ks-pass pass:android --key-pass pass:android --out arm64/RemixPlayer-v0.66-arm64.apk "$RUNNER_TEMP/arm64-aligned.apk"
+          (cd "source/$PROJECT" && gradle --no-daemon :app:signingReport) > "$RUNNER_TEMP/signing-report.txt"
+          store="$(awk '/^Variant: debug$/{active=1;next} /^Variant:/{active=0} active&&/^Store: /{sub(/^Store: /,"");print;exit}' "$RUNNER_TEMP/signing-report.txt")"
+          alias="$(awk '/^Variant: debug$/{active=1;next} /^Variant:/{active=0} active&&/^Alias: /{sub(/^Alias: /,"");print;exit}' "$RUNNER_TEMP/signing-report.txt")"
+          test -n "$store" && test -f "$store" && test -n "$alias"
+          "$tools/apksigner" sign --ks "$store" --ks-key-alias "$alias" --ks-pass pass:android --key-pass pass:android --out arm64/RemixPlayer-v0.66-arm64.apk "$RUNNER_TEMP/arm64-aligned.apk"
           "$tools/zipalign" -c -P 16 4 arm64/RemixPlayer-v0.66-arm64.apk
           "$tools/apksigner" verify --print-certs "$source_apk" > "$RUNNER_TEMP/universal-certs.txt"
           "$tools/apksigner" verify --print-certs arm64/RemixPlayer-v0.66-arm64.apk > "$RUNNER_TEMP/arm64-certs.txt"
