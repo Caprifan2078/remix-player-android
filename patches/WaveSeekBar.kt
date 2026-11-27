@@ -34,6 +34,7 @@ internal class WaveSeekBar(context:Context):AppCompatSeekBar(context){
         val step=w/count;val y=paddingTop+h/2
         for(i in 0 until count){
             val a=i*values.size/count;val b=(i+1)*values.size/count;var peak=0f
+            if((a until b).any{!values[it].isFinite()})continue
             for(j in a until b)peak=maxOf(peak,values[j])
             val height=(h*.38f*peak.coerceIn(0f,1f)).coerceAtLeast(1f)
             val x=paddingLeft+(i+.5f)*step
@@ -53,7 +54,11 @@ internal class WaveSeekBar(context:Context):AppCompatSeekBar(context){
         if(values!=null&&values.isNotEmpty()){
             if(geometryDirty||lastWidth!=width||lastHeight!=height||lastLeft!=paddingLeft||lastRight!=paddingRight||lastTop!=paddingTop||lastBottom!=paddingBottom)rebuild(values,w,h)
             val coveredRight=left+w*readyBins.toFloat()/values.size
-            if(readyBins<values.size){val radius=2*density;canvas.drawRoundRect(left,y-radius,right,y+radius,radius,radius,paint)}
+            if(readyBins<values.size||values.any{!it.isFinite()}){
+                val radius=2*density;canvas.drawRoundRect(left,y-radius,right,y+radius,radius,radius,paint)
+                paint.color=0xffc0b0ff.toInt();if(x>left)canvas.drawRoundRect(left,y-radius,x,y+radius,radius,radius,paint)
+                paint.color=0xff70677e.toInt()
+            }
             val known=canvas.save();canvas.clipRect(left,top,coveredRight,bottom);canvas.drawPath(geometry,paint)
             val save=canvas.save()
             canvas.clipRect(left,top,x,bottom)
