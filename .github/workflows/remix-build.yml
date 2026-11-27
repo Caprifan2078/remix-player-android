@@ -285,6 +285,8 @@ jobs:
           trap 'rm -rf "$tmp"' EXIT
           kotlinc patches/LyricsMatch.kt patches/LyricsMatchTest.kt -include-runtime -d "$tmp/lyrics.jar"
           java -jar "$tmp/lyrics.jar"
+          kotlinc patches/LyricsMatch.kt patches/LibrarySearch.kt patches/BilingualLibraryTest.kt -include-runtime -d "$tmp/bilingual-library.jar"
+          java -jar "$tmp/bilingual-library.jar"
       - name: Full regression
         working-directory: source/RemixPlayer_v0.66
         env:
