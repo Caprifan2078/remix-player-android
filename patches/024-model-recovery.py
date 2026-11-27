@@ -89,7 +89,8 @@ replace("WhisperLocal.kt","availableProcessors().coerceIn(1,4))?:error","availab
 # Keep native speech transients for the small Russian models, without changing
 # English or the heavy Russian path that passed QA30. Separate vocal stems
 # retain their existing conditioning.
-replace("WhisperLocal.kt","block[n++]=filter.sample(it)/32768f","block[n++]=(if(stem==null&&language==\"ru\"&&spec.id in listOf(\"tiny\",\"base-q5_1\",\"base\",\"small-q5_1\",\"small\"))it else filter.sample(it))/32768f")
+replace("WhisperLocal.kt","source.inputStream().buffered(65536).use{input->SubtitleCore.mono16k","val preserveInput=stem==null&&language==\"ru\"&&spec.id in listOf(\"tiny\",\"base-q5_1\",\"base\",\"small-q5_1\",\"small\");source.inputStream().buffered(65536).use{input->SubtitleCore.mono16k")
+replace("WhisperLocal.kt","block[n++]=filter.sample(it)/32768f","block[n++]=if(preserveInput)it.toFloat()/32768f else filter.sample(it)/32768f")
 bridge=Path(sys.argv[1])/'native/whisper/bridge.cpp'
 s=bridge.read_text()
 def native(a,b):
