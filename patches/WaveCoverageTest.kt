@@ -8,6 +8,9 @@ fun main(){
  val overlap=WaveBins(1000000,8000);add(overlap,0,4100);add(overlap,4000,4000);check(overlap.finish()!=null)
  val near=WaveBins(1000000,8000);add(near,0,7800);check(near.finish()!=null)
  val reversed=WaveBins(1000000,8000);add(reversed,4000,4000);add(reversed,0,4000);check(reversed.finish()==null)
+ val progressive=WaveBins(1000000,8000,160);add(progressive,0,2000);check(progressive.preview()?.second==40);check(progressive.finish()==null)
+ val missing=WaveBins(1000000,8000,160);add(missing,4000,2000);check(missing.preview()==null)
+ add(progressive,2000,6000);check(progressive.preview()?.second==160);check(progressive.finish()!=null)
  val random=kotlin.random.Random(42)
  repeat(5000){val w=WaveBins(1000000,8000);var last=0;var covered=0;repeat(8){val start=(last+random.nextInt(0,900)).coerceAtMost(8000);val end=(start+random.nextInt(1,1700)).coerceAtMost(8000);if(end>start){add(w,start,end-start);covered+=end-start};last=end};check((w.finish()!=null)==(covered>=7600))}
  println("PASS: 5000 randomized gaps, overlaps, duplicates, tail-only data and reversed chunks")
