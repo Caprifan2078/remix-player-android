@@ -78,6 +78,11 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/037-fast-text-search.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/038-wave-player.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/039-handoff-guard.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/040-clean-player.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/041-player-polish.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/042-ui-refinement.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/043-player-gestures.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/044-smart-crossfade.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
           test -f "source/$PROJECT/app/build.gradle.kts"
@@ -119,6 +124,32 @@ jobs:
         with:
           name: RemixPlayer-v0.66-debug-UNVERIFIED
           path: source/RemixPlayer_v0.66/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+      - name: Package and verify ARM64-only debug APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          tools="$sdk/build-tools/35.0.0"
+          source_apk="source/$PROJECT/app/build/outputs/apk/debug/app-debug.apk"
+          mkdir -p arm64
+          python3 patches/arm64-apk.py filter "$source_apk" "$RUNNER_TEMP/arm64-unsigned.apk"
+          "$tools/zipalign" -P 16 -f 4 "$RUNNER_TEMP/arm64-unsigned.apk" "$RUNNER_TEMP/arm64-aligned.apk"
+          (cd "source/$PROJECT" && gradle --no-daemon :app:signingReport) > "$RUNNER_TEMP/signing-report.txt"
+          store="$(awk '/^Variant: debug$/{active=1;next} /^Variant:/{active=0} active&&/^Store: /{sub(/^Store: /,"");print;exit}' "$RUNNER_TEMP/signing-report.txt")"
+          alias="$(awk '/^Variant: debug$/{active=1;next} /^Variant:/{active=0} active&&/^Alias: /{sub(/^Alias: /,"");print;exit}' "$RUNNER_TEMP/signing-report.txt")"
+          test -n "$store" && test -f "$store" && test -n "$alias"
+          "$tools/apksigner" sign --ks "$store" --ks-key-alias "$alias" --ks-pass pass:android --key-pass pass:android --out arm64/RemixPlayer-v0.66-arm64.apk "$RUNNER_TEMP/arm64-aligned.apk"
+          "$tools/zipalign" -c -P 16 4 arm64/RemixPlayer-v0.66-arm64.apk
+          "$tools/apksigner" verify --print-certs "$source_apk" > "$RUNNER_TEMP/universal-certs.txt"
+          "$tools/apksigner" verify --print-certs arm64/RemixPlayer-v0.66-arm64.apk > "$RUNNER_TEMP/arm64-certs.txt"
+          diff <(grep 'certificate SHA-256 digest:' "$RUNNER_TEMP/universal-certs.txt") <(grep 'certificate SHA-256 digest:' "$RUNNER_TEMP/arm64-certs.txt")
+          python3 patches/arm64-apk.py verify "$source_apk" arm64/RemixPlayer-v0.66-arm64.apk
+          (cd arm64 && sha256sum RemixPlayer-v0.66-arm64.apk > apk.sha256)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RemixPlayer-v0.66-arm64-UNVERIFIED
+          path: arm64/
           if-no-files-found: error
       - name: Compile instrumentation tests
         working-directory: source/RemixPlayer_v0.66
@@ -198,6 +229,11 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/037-fast-text-search.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/038-wave-player.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/039-handoff-guard.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/040-clean-player.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/041-player-polish.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/042-ui-refinement.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/043-player-gestures.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/044-smart-crossfade.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/setup-java@v4
@@ -217,6 +253,7 @@ jobs:
           python3 patches/quality-audit.py "source/$PROJECT"
           python3 patches/check-test-identities.py --selftest
           python3 model-qa/test_verify_benchmark.py
+          python3 model-qa/test_compare_qa30.py
       - name: Studio sound regression
         run: bash patches/run-studio-upgrade.sh "source/$PROJECT"
       - name: Karaoke and adaptive overlap regression
@@ -249,6 +286,16 @@ jobs:
         run: bash patches/run-tempo-search.sh "source/$PROJECT"
       - name: Waveform exact PCM regression
         run: bash patches/run-wave-player.sh "source/$PROJECT"
+      - name: Lyrics match regression
+        run: |
+          tmp=$(mktemp -d)
+          trap 'rm -rf "$tmp"' EXIT
+          kotlinc patches/LyricsMatch.kt patches/LyricsMatchTest.kt -include-runtime -d "$tmp/lyrics.jar"
+          java -jar "$tmp/lyrics.jar"
+          kotlinc patches/LyricsMatch.kt patches/LibrarySearch.kt patches/BilingualLibraryTest.kt -include-runtime -d "$tmp/bilingual-library.jar"
+          java -jar "$tmp/bilingual-library.jar"
+          kotlinc patches/SmartCrossfade.kt patches/SmartCrossfadeTest.kt -include-runtime -d "$tmp/smart-crossfade.jar"
+          java -jar "$tmp/smart-crossfade.jar"
       - name: Full regression
         working-directory: source/RemixPlayer_v0.66
         env:
@@ -325,6 +372,11 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/037-fast-text-search.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/038-wave-player.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/039-handoff-guard.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/040-clean-player.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/041-player-polish.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/042-ui-refinement.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/043-player-gestures.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/044-smart-crossfade.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/download-artifact@v4
@@ -396,6 +448,11 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/037-fast-text-search.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/038-wave-player.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/039-handoff-guard.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/040-clean-player.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/041-player-polish.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/042-ui-refinement.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/043-player-gestures.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/044-smart-crossfade.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/download-artifact@v4
@@ -474,6 +531,11 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/037-fast-text-search.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/038-wave-player.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/039-handoff-guard.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/040-clean-player.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/041-player-polish.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/042-ui-refinement.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/043-player-gestures.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/044-smart-crossfade.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/setup-java@v4
@@ -524,6 +586,11 @@ jobs:
       - uses: actions/download-artifact@v4
         with: {name: RemixPlayer-v0.66-debug-UNVERIFIED, path: candidate}
       - run: sha256sum candidate/app-debug.apk > candidate/apk.sha256
+      - uses: actions/download-artifact@v4
+        with: {name: RemixPlayer-v0.66-arm64-UNVERIFIED, path: arm64}
+      - run: (cd arm64 && sha256sum -c apk.sha256)
+      - uses: actions/upload-artifact@v4
+        with: {name: RemixPlayer-v0.66-arm64-QA-candidate, path: arm64/, if-no-files-found: error}
       - uses: actions/upload-artifact@v4
         with: {name: RemixPlayer-v0.66-automated-QA-candidate, path: candidate/, if-no-files-found: error}
 
@@ -531,7 +598,7 @@ jobs:
     name: Real models on Android 15 (8 GiB emulator)
     needs: apk
     runs-on: ubuntu-24.04
-    timeout-minutes: 100
+    timeout-minutes: 210
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -545,6 +612,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y espeak-ng
           espeak-ng -v en-us -s 135 -w model-fixtures/qa-whisper.wav 'The music is playing. Listen to the song today. This is a test.'
+          espeak-ng -v ru -s 135 -w model-fixtures/qa-whisper-ru.wav 'Музыка играет. Послушай песню сегодня. Это тест.'
           curl --fail --location --retry 2 --max-time 240 --proto '=https' --proto-redir '=https' --max-filesize 80000000 -o model-fixtures/qa-whisper-tiny.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
           printf '%s  %s\n' be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21 model-fixtures/qa-whisper-tiny.bin | sha256sum -c -
           test "$(stat -c %s model-fixtures/qa-whisper-tiny.bin)" = 77691713

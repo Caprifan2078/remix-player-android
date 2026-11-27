@@ -10,7 +10,11 @@ def tree():
     return adb("exec-out","cat","/sdcard/remix-nav.xml")
 def tap(label):
     nodes=list(ET.fromstring(tree()).iter("node"))
-    matches=[n for n in nodes if n.get("package")==pkg and n.get("clickable")=="true" and n.get("text")==label]
+    matches=[n for n in nodes if n.get("package")==pkg and n.get("clickable")=="true" and (n.get("text")==label or n.get("content-desc")==label)]
+    if not matches and label in {"Музыка","Версии","Студия","Текст","Загрузки"}:
+        tap("Меню навигации")
+        nodes=list(ET.fromstring(tree()).iter("node"))
+        matches=[n for n in nodes if n.get("package")==pkg and n.get("clickable")=="true" and n.get("text")==label]
     assert len(matches)==1,f"{label}: expected one clickable node, got {len(matches)}"
     x,y,X,Y=map(int,re.findall(r"-?\d+",matches[0].get("bounds")))
     assert X>x and Y>y,label
