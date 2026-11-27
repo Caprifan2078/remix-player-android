@@ -47,6 +47,33 @@ t=t.replace(old,'check(models.map{it.size}.distinct().size==models.size&&models.
 old='check(WhisperModelSpec.maxBytes==487601967L)'
 assert t.count(old)==1
 t=t.replace(old,'check(WhisperModelSpec.maxBytes==1081140203L)')
+# Keep the English path and memory guards; test every catalog model.
+t=t.replace('    println("PASS:', '''    val mib=1024L*1024
+    for(m in models){
+        check(m.beamSize(m.minFreeRam,true,"ru")==1)
+        check(m.beamSize(m.minFreeRam+511*mib,false,"ru")==1)
+        val light=m.id in listOf("tiny","base-q5_1","base","small-q5_1","small")
+        check(m.beamSize(m.minFreeRam+512*mib,false,"ru")==3)
+        check(m.beamSize(m.minFreeRam+1024*mib,false,"ru")==if(light)5 else 3)
+        check(m.beamSize(m.minFreeRam+1024*mib,false,"auto")==if(light)5 else 3)
+        check(m.beamSize(m.minFreeRam+1024*mib,false,"en")==if(m.id=="tiny")1 else 3)
+    }
+    val turbo=models.single{it.id=="large-v3-turbo-q5_0"}
+    val base=models.single{it.id=="base"}
+    val smallQ=models.single{it.id=="small-q5_1"}
+    check(WhisperModelSpec.recommend(8L*1024*mib,false,8L*1024*mib,null)==turbo)
+    check(WhisperModelSpec.recommend(2L*1024*mib,false,8L*1024*mib,null)==smallQ)
+    check(WhisperModelSpec.recommend(8L*1024*mib,true,8L*1024*mib,null)==null)
+    check(WhisperModelSpec.recommend(0L,false,8L*1024*mib,null)==null)
+    check(WhisperModelSpec.recommend(8L*1024*mib,false,0L,null)==null)
+    check(WhisperModelSpec.recommend(8L*1024*mib,false,0L,"base")==base)
+    for(m in models){
+        check(WhisperModelSpec.fit(m,m.minFreeRam-1,false,Long.MAX_VALUE,null)==WhisperModelSpec.Fit.LOW_RAM)
+        check(WhisperModelSpec.fit(m,m.minFreeRam,false,m.size+32*mib,null)==WhisperModelSpec.Fit.LOW_STORAGE)
+        check(WhisperModelSpec.fit(m,m.minFreeRam,false,m.size+32*mib+1,null)==WhisperModelSpec.Fit.READY)
+        check(WhisperModelSpec.fit(m,m.minFreeRam,false,0L,m.id)==WhisperModelSpec.Fit.READY)
+    }
+    println("PASS:''',1)
 test.write_text(t)
 # Direct Whisper download, sharing the same checked activation as local import.
 p=src/'WhisperLocal.kt';s=p.read_text()
@@ -72,8 +99,13 @@ s=s[:a]+'''            return activate(c,tmp)
 p.write_text(s)
 # Give larger Whisper models a bounded beam search when there is additional free memory.
 replace("WhisperLocal.kt","private external fun recognize(handle:Long,pcm:FloatArray,language:String,threads:Int):ByteArray?","private external fun recognize(handle:Long,pcm:FloatArray,language:String,threads:Int,beam:Int):ByteArray?")
-replace("WhisperLocal.kt","handle=open(model(c).absolutePath);check(handle!=0L)","checkMemory(c,spec);val memory=android.app.ActivityManager.MemoryInfo();(c.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager).getMemoryInfo(memory);val beam=spec.beamSize(memory.availMem,memory.lowMemory);status(if(beam>1)\"Whisper · точный поиск\" else \"Whisper · обычный поиск\");handle=open(model(c).absolutePath);check(handle!=0L)")
+replace("WhisperLocal.kt","handle=open(model(c).absolutePath);check(handle!=0L)","checkMemory(c,spec);val memory=android.app.ActivityManager.MemoryInfo();(c.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager).getMemoryInfo(memory);val beam=spec.beamSize(memory.availMem,memory.lowMemory,language);status(if(beam>1)\"Whisper · точный поиск\" else \"Whisper · обычный поиск\");handle=open(model(c).absolutePath);check(handle!=0L)")
 replace("WhisperLocal.kt","availableProcessors().coerceIn(1,4))?:error","availableProcessors().coerceIn(1,4),beam)?:error")
+# Keep native speech transients for the small Russian models, without changing
+# English or the heavy Russian path that passed QA30. Separate vocal stems
+# retain their existing conditioning.
+replace("WhisperLocal.kt","source.inputStream().buffered(65536).use{input->SubtitleCore.mono16k","val preserveInput=stem==null&&language==\"ru\"&&spec.id in listOf(\"tiny\",\"base-q5_1\",\"base\",\"small-q5_1\",\"small\");source.inputStream().buffered(65536).use{input->SubtitleCore.mono16k")
+replace("WhisperLocal.kt","block[n++]=filter.sample(it)/32768f","block[n++]=if(preserveInput)it.toFloat()/32768f else filter.sample(it)/32768f")
 bridge=Path(sys.argv[1])/'native/whisper/bridge.cpp'
 s=bridge.read_text()
 def native(a,b):
@@ -82,7 +114,7 @@ def native(a,b):
  s=s.replace(a,b)
 native('starts.size()<2||starts.size()>200','starts.empty()||starts.size()>200')
 native('jstring language,jint threads){','jstring language,jint threads,jint beam){')
-native('auto p=whisper_full_default_params(WHISPER_SAMPLING_GREEDY);','const bool accurate=beam==3;auto p=whisper_full_default_params(accurate?WHISPER_SAMPLING_BEAM_SEARCH:WHISPER_SAMPLING_GREEDY);if(accurate){p.beam_search.beam_size=3;p.greedy.best_of=3;}')
+native('auto p=whisper_full_default_params(WHISPER_SAMPLING_GREEDY);','const int width=std::clamp(int(beam),1,5);const bool accurate=width>1;auto p=whisper_full_default_params(accurate?WHISPER_SAMPLING_BEAM_SEARCH:WHISPER_SAMPLING_GREEDY);if(accurate){p.beam_search.beam_size=width;p.greedy.best_of=width;}')
 bridge.write_text(s)
 p=src/'MainActivity.kt';s=p.read_text()
 a=s.index('    private fun whisperModelDialog(){')

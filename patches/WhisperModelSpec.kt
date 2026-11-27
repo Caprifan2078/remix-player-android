@@ -3,9 +3,26 @@ package app.remix.player
 /** Pinned multilingual GGML artifacts. Memory thresholds are conservative heuristics, not benchmarks. */
 object WhisperModelSpec {
     data class Model(val id:String,val size:Long,val sha:String,val minFreeRam:Long,val revision:String="main"){
-        /** Extra memory margin for three competing decoder hypotheses; not a measured peak. */
-        fun beamSize(available:Long,lowMemory:Boolean):Int=
-            if(id!="tiny"&&!lowMemory&&available>=minFreeRam+512L*1024*1024)3 else 1
+        /** Conservative extra memory margins; not a measured peak. */
+        fun beamSize(available:Long,lowMemory:Boolean,language:String="en"):Int {
+            if(lowMemory||available<minFreeRam)return 1
+            val extra=available-minFreeRam
+            val lightweight=id in listOf("tiny","base-q5_1","base","small-q5_1","small")
+            // Russian and automatic detection benefit from more hypotheses on smaller models.
+            // Keep heavy-model latency and previous English settings unchanged.
+            if(language in listOf("ru","auto")&&lightweight){
+                if(extra>=1024L*1024*1024)return 5
+                if(extra>=512L*1024*1024)return 3
+            }
+            return if(id!="tiny"&&extra>=512L*1024*1024)3 else 1
+        }
+        val russianAdvice get()=when(id){
+            "tiny","base-q5_1","base"->"Русский: низкая точность в QA30; для быстрого черновика"
+            "small-q5_1","small"->"Русский: промежуточный вариант, требуются правки"
+            "medium-q5_0"->"Русский: 1 ошибка из 7 слов в QA30"
+            "large-v3-turbo-q5_0","large-v3-q5_0"->"Русский: 0 ошибок из 7 слов в QA30"
+            else->"Точность русского не измерена"
+        }
         val description get()=when(id){
             "tiny"->"Быстрая проверка · на пении часто пропускает слова"
             "base-q5_1"->"Экономная Base · сжатые веса"
@@ -30,6 +47,17 @@ object WhisperModelSpec {
         Model("large-v3-turbo-q5_0",574041195L,"394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2",3072L*1024*1024,"0b364b566045a405be7225ee1e415a073e04da77"),
         Model("large-v3-q5_0",1081140203L,"d75795ecff3f83b5faa89d1900604ad8c780abd5739fae406de19f23ecd98ad1",4096L*1024*1024,"fb5ed9369c26eaf08392504d8446da431e0fffb9")
     )
+    enum class Fit { READY, LOW_RAM, LOW_STORAGE }
+    /** Evaluate the same temporary-file and free-memory limits as activation.
+     * The currently installed model does not require a new download. */
+    fun fit(model:Model,availableRam:Long,lowMemory:Boolean,freeStorage:Long,installedId:String?):Fit {
+        if(lowMemory||availableRam<model.minFreeRam)return Fit.LOW_RAM
+        if(model.id!=installedId&&freeStorage<=model.size+32L*1024*1024)return Fit.LOW_STORAGE
+        return Fit.READY
+    }
+    private val russianOrder=listOf("large-v3-turbo-q5_0","medium-q5_0","large-v3-q5_0","small-q5_1","small","base","base-q5_1","tiny")
+    fun recommend(availableRam:Long,lowMemory:Boolean,freeStorage:Long,installedId:String?):Model? =
+        russianOrder.mapNotNull{id->models.firstOrNull{it.id==id}}.firstOrNull{fit(it,availableRam,lowMemory,freeStorage,installedId)==Fit.READY}
     val maxBytes get()=models.maxOf{it.size}
     fun bySize(size:Long)=models.singleOrNull{it.size==size}
     fun matches(size:Long,sha:String)=bySize(size)?.sha?.equals(sha,true)==true
