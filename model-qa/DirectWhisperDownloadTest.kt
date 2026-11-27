@@ -107,7 +107,7 @@ class DirectWhisperDownloadTest {
                     try{
                         val raw=WhisperLocal.transcribeProfile(c,uri,null,"ru",profile){println(it)}
                         val parsed=Lrc.parse(raw)
-                        assertTrue(parsed.isNotEmpty()&&parsed.all{it.ms in 0..19999})
+                        assertTrue(parsed.isNotEmpty()&&parsed.all{it.ms in 0L..19999L})
                         val actual=tokens(parsed.joinToString(" "){WordLyrics.parse(it).text})
                         val errors=edits(expected,actual)
                         row.put("transcript",actual.joinToString(" ")).put("edits",errors).put("wer",errors.toDouble()/expected.size)
