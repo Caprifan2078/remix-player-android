@@ -19,8 +19,8 @@ internal object WaveDiskCache {
         val bytes=MessageDigest.getInstance("SHA-256").digest(("$VERSION|$u|"+meta.first+"|"+meta.second).toByteArray(Charsets.UTF_8))
         return bytes.joinToString(""){"%02x".format(it.toInt() and 255)}
     }
-    fun readOrDecode(c:Context,u:Uri):FloatArray?{
-        val key=fingerprint(c,u)?:return WaveReader.read(c,u)
+    fun readOrDecode(c:Context,u:Uri,onPreview:((FloatArray,Int)->Unit)?=null):FloatArray?{
+        val key=fingerprint(c,u)?:return WaveReader.read(c,u,onPreview)
         val dir=File(c.cacheDir,"wave-v1").apply{mkdirs()}
         val file=File(dir,key)
         if(file.isFile){
@@ -31,7 +31,7 @@ internal object WaveDiskCache {
             if(cached!=null){file.setLastModified(System.currentTimeMillis());return cached}
             file.delete()
         }
-        val value=WaveReader.read(c,u)?:return null
+        val value=WaveReader.read(c,u,onPreview)?:return null
         if(Thread.currentThread().isInterrupted||value.size!=160||fingerprint(c,u)!=key)return value
         runCatching{
             val tmp=File.createTempFile("wave-",".tmp",dir)
