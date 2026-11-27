@@ -43,5 +43,16 @@ s=s.replace('android.app.AlertDialog.Builder(this)','android.app.AlertDialog.Bui
 old='val names=listOf("Оригинал","Sped Up","Sped Up + Reverb","Nightcore","Nightcore Reverb","Slowed + Reverb")'
 assert s.count(old)==1
 s=s.replace(old,'val names=listOf("Оригинал","Sped Up","Nightcore","Slowed + Reverb","Sped Up + Reverb","Nightcore Reverb","8D","Echo")')
+# Real-time presets must not reconstruct the player view or restart the queue.
+a=s.index('    private fun quickPresetSheet(){');b=s.index('    private fun transitionMenu(){',a)
+part=s[a:b]
+assert part.count('if(current()!=null&&!MixerSession.active){applyPreset(preset);render()};Unit')==2
+part=part.replace('val names=listOf(','val trackId=current()?.uri\n        val names=listOf(',1).replace('val entries=(Presets.all+customPresets)','val trackId=current()?.uri\n        val entries=(Presets.all+customPresets)',1)
+part=part.replace('if(current()!=null&&!MixerSession.active){applyPreset(preset);render()};Unit','if(trackId!=null&&current()?.uri==trackId&&!MixerSession.active){applyPreset(preset);syncWave()}else toast("Композиция изменилась");Unit')
+s=s[:a]+part+s[b:]
+# Compact settings groups retain the existing views and listeners, rather than duplicating actions.
+a=s.index('    private fun settingsScreen(){')
+s=s[:a]+s[a:].replace('    private fun settingsScreen(){','    private fun settingsScreen(){',1)
+# No speculative changes to settings controls before device validation.
 p.write_text(s)
 print("PASS: default-on adaptive overlap, explicit off preserved, themed legacy dialogs and quick presets")
