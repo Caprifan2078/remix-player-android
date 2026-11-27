@@ -7,18 +7,16 @@ object WhisperModelSpec {
         fun beamSize(available:Long,lowMemory:Boolean,language:String="en"):Int {
             if(lowMemory||available<minFreeRam)return 1
             val extra=available-minFreeRam
-            val lightweight=id in listOf("tiny","base-q5_1","base","small-q5_1","small")
-            // Russian and automatic detection benefit from more hypotheses on smaller models.
-            // Keep heavy-model latency and previous English settings unchanged.
-            if(language in listOf("ru","auto")&&lightweight){
-                if(extra>=1024L*1024*1024)return 5
-                if(extra>=512L*1024*1024)return 3
-            }
+            // QA32 improved only full Small. Retain its explicit Russian path;
+            // restore QA30 for Tiny, both Base variants, Small Q5 and auto detection.
+            if(language=="ru"&&id=="small"&&extra>=1024L*1024*1024)return 5
             return if(id!="tiny"&&extra>=512L*1024*1024)3 else 1
         }
+        fun preserveInput(language:String,hasStem:Boolean)=language=="ru"&&!hasStem&&id=="small"
         val russianAdvice get()=when(id){
             "tiny","base-q5_1","base"->"Русский: низкая точность в QA30; для быстрого черновика"
-            "small-q5_1","small"->"Русский: промежуточный вариант, требуются правки"
+            "small-q5_1"->"Русский: 3 ошибки из 7 слов в QA30; 4 в QA32"
+            "small"->"Русский: 2 ошибки из 7 слов в QA32"
             "medium-q5_0"->"Русский: 1 ошибка из 7 слов в QA30"
             "large-v3-turbo-q5_0","large-v3-q5_0"->"Русский: 0 ошибок из 7 слов в QA30"
             else->"Точность русского не измерена"
@@ -47,6 +45,9 @@ object WhisperModelSpec {
         Model("large-v3-turbo-q5_0",574041195L,"394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2",3072L*1024*1024,"0b364b566045a405be7225ee1e415a073e04da77"),
         Model("large-v3-q5_0",1081140203L,"d75795ecff3f83b5faa89d1900604ad8c780abd5739fae406de19f23ecd98ad1",4096L*1024*1024,"fb5ed9369c26eaf08392504d8446da431e0fffb9")
     )
+    data class DecodeProfile(val beam:Int,val rawInput:Boolean){
+        init{require(beam in listOf(1,3,5))}
+    }
     enum class Fit { READY, LOW_RAM, LOW_STORAGE }
     /** Evaluate the same temporary-file and free-memory limits as activation.
      * The currently installed model does not require a new download. */
@@ -55,7 +56,7 @@ object WhisperModelSpec {
         if(model.id!=installedId&&freeStorage<=model.size+32L*1024*1024)return Fit.LOW_STORAGE
         return Fit.READY
     }
-    private val russianOrder=listOf("large-v3-turbo-q5_0","medium-q5_0","large-v3-q5_0","small-q5_1","small","base","base-q5_1","tiny")
+    private val russianOrder=listOf("large-v3-turbo-q5_0","medium-q5_0","large-v3-q5_0","small","small-q5_1","base","base-q5_1","tiny")
     fun recommend(availableRam:Long,lowMemory:Boolean,freeStorage:Long,installedId:String?):Model? =
         russianOrder.mapNotNull{id->models.firstOrNull{it.id==id}}.firstOrNull{fit(it,availableRam,lowMemory,freeStorage,installedId)==Fit.READY}
     val maxBytes get()=models.maxOf{it.size}
