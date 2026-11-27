@@ -25,6 +25,7 @@ for name,path,filled in [
     ('search','M10,3 A7,7 0 1 0 10,17 A7,7 0 1 0 10,3 M15,15 L21,21',False),
     ('chevron','M9,5 L16,12 L9,19',False),
 ]:vector(name,path,filled)
+(draw/'remix_artwork.xml').write_text('<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="88dp" android:height="88dp" android:viewportWidth="88" android:viewportHeight="88"><path android:fillColor="#267E73AB" android:pathData="M44,4 A40,40 0,1 0,44 84 A40,40 0,1 0,44 4"/><path android:fillColor="#00FFFFFF" android:strokeColor="#BDB6D2" android:strokeWidth="3.2" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M39,55 V31 L61,26 V49 M39,55 C39,62 25,64 25,57 C25,50 34,48 39,52 M61,49 C61,56 47,58 47,51 C47,44 56,42 61,46"/></vector>')
 # Maintain touch targets and text semantics but visually replace symbol glyphs with vectors.
 replace('    private var transportMode=-1',r'''    private val transportIconState=mutableMapOf<Button,Pair<Int,Int>>()
     private fun transportIcon(button:Button,res:Int,tint:Int){
@@ -65,7 +66,7 @@ replace('        val tools=row()\n        tools.addView(iconButton(R.drawable.re
         action(R.drawable.remix_versions,"Версии композиции","Версии"){screen="Версии";render()}
         action(R.drawable.remix_effects,"Эффекты","Эффекты"){quickPresetSheet()}
         body.addView(tools)''')
-replace('contentDescription="Обложка композиции";scaleType=ImageView.ScaleType.CENTER;setImageResource(R.drawable.remix_music)', '''contentDescription="Обложка композиции";scaleType=ImageView.ScaleType.CENTER_INSIDE;setImageDrawable(getDrawable(R.drawable.remix_music)?.mutate()?.apply{setTint(muted)})''')
+replace('contentDescription="Обложка композиции";scaleType=ImageView.ScaleType.CENTER;setImageResource(R.drawable.remix_music)', '''contentDescription="Обложка композиции";scaleType=ImageView.ScaleType.CENTER_INSIDE;setImageResource(R.drawable.remix_artwork)''')
 replace('val side=dp(minOf(300,resources.configuration.screenWidthDp-64,(resources.configuration.screenHeightDp*.36).toInt()).coerceAtLeast(120))','val side=dp(minOf(320,resources.configuration.screenWidthDp-56,(resources.configuration.screenHeightDp*.34).toInt()).coerceAtLeast(100))')
 # All sheets use the same typography, top-only corners, and measured scroll cap.
 section('    private fun sheet(title:String,','    private fun toast(s:String)',r'''    private fun sheet(title:String,subtitle:String="",actions:List<Pair<String,()->Unit>>){
