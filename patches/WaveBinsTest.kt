@@ -13,5 +13,13 @@ fun main(){
     }
     check(WaveBins(1_000_000,8000).finish()==null)
     val b=ByteBuffer.allocate(16000).order(ByteOrder.LITTLE_ENDIAN);repeat(8000){b.putShort(if(it==0)Short.MIN_VALUE else 0)};b.flip();val wave=WaveBins(1_000_000,8000);wave.add(b,1,false,0);check(wave.finish()!![0]==1f);check(wave.finish()!!.drop(1).all{it==0f})
+    // Format changes and nonfinite floats preserve the previous exact peak.
+    val mixed=WaveBins(1_000_000,8000,16)
+    val floats=ByteBuffer.allocate(4000*4).order(ByteOrder.LITTLE_ENDIAN)
+    repeat(4000){floats.putFloat(when(it%5){0->Float.NaN;1->Float.POSITIVE_INFINITY;2->-.6f;else->0f})}
+    floats.flip();mixed.add(floats,1,true,0)
+    val shorts=ByteBuffer.allocate(4000*2).order(ByteOrder.LITTLE_ENDIAN)
+    repeat(4000){shorts.putShort((-16384).toShort())};shorts.flip();mixed.add(shorts,1,false,500_000)
+    check(mixed.finish()!!.contentEquals(FloatArray(16){if(it<8).6f else .5f}))
     println("PASS: 500 randomized waveforms exact against per-frame reference, five rates, mono/stereo, float/PCM16, irregular chunks, silence and incomplete input")
 }

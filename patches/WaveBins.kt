@@ -6,7 +6,7 @@ internal class WaveBins(private val durationUs:Long,private val rate:Int,private
     init{require(durationUs in 1..900_000_000L&&rate in 8000..384000&&bins in 16..512)}
     private val total=(durationUs*rate+999999)/1000000
     private val peaks=FloatArray(bins)
-    private var covered=0L
+    private val coverage=LongArray(bins)
     private var end=0L
     private var previousStart=-1L
     private var ordered=true
@@ -26,9 +26,26 @@ internal class WaveBins(private val durationUs:Long,private val rate:Int,private
             val n=minOf(remaining.toLong(),boundary-frame,total-frame).toInt()
             if(n<=0)break
             var peak=peaks[index]
-            repeat(n*channels){val v=if(floatPcm)abs(buffer.float)else abs(buffer.short.toInt())/32768f;if(v.isFinite()&&v>peak)peak=v.coerceAtMost(1f)}
-            peaks[index]=peak;val next=frame+n;covered+=(next-maxOf(end,frame)).coerceAtLeast(0);end=maxOf(end,next);frame=next;remaining-=n
+            if(floatPcm){
+                repeat(n*channels){val v=abs(buffer.float);if(v.isFinite()&&v>peak)peak=v.coerceAtMost(1f)}
+            }else{
+                var pcmPeak=0
+                repeat(n*channels){val v=abs(buffer.short.toInt());if(v>pcmPeak)pcmPeak=v}
+                peak=maxOf(peak,pcmPeak/32768f)
+            }
+            peaks[index]=peak;val next=frame+n;coverage[index]+=(next-maxOf(end,frame)).coerceAtLeast(0);end=maxOf(end,next);frame=next;remaining-=n
         }
     }
-    fun finish():FloatArray?=if(ordered&&covered>=total-total/20)peaks.copyOf()else null
+    private fun full(i:Int):Boolean {
+        val start=(i.toLong()*total+bins-1)/bins
+        val stop=((i+1L)*total+bins-1)/bins
+        return stop>start&&coverage[i]==stop-start
+    }
+    // Unknown bins stay NaN in previews; complete cache entries never contain NaN.
+    fun preview():Pair<FloatArray,Int>?{
+        if(!ordered)return null
+        val ready=(bins-1 downTo 0).firstOrNull(::full)?.plus(1)?:return null
+        return FloatArray(bins){i->if(full(i))peaks[i] else Float.NaN} to ready
+    }
+    fun finish():FloatArray?=if(ordered&&(0 until bins).all(::full))peaks.copyOf()else null
 }

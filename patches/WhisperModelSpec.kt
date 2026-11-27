@@ -3,9 +3,26 @@ package app.remix.player
 /** Pinned multilingual GGML artifacts. Memory thresholds are conservative heuristics, not benchmarks. */
 object WhisperModelSpec {
     data class Model(val id:String,val size:Long,val sha:String,val minFreeRam:Long,val revision:String="main"){
-        /** Extra memory margin for three competing decoder hypotheses; not a measured peak. */
-        fun beamSize(available:Long,lowMemory:Boolean):Int=
-            if(id!="tiny"&&!lowMemory&&available>=minFreeRam+512L*1024*1024)3 else 1
+        /** Conservative extra memory margins; not a measured peak. */
+        fun beamSize(available:Long,lowMemory:Boolean,language:String="en"):Int {
+            if(lowMemory||available<minFreeRam)return 1
+            val extra=available-minFreeRam
+            val lightweight=id in listOf("tiny","base-q5_1","base","small-q5_1","small")
+            // Russian and automatic detection benefit from more hypotheses on smaller models.
+            // Keep heavy-model latency and previous English settings unchanged.
+            if(language in listOf("ru","auto")&&lightweight){
+                if(extra>=1024L*1024*1024)return 5
+                if(extra>=512L*1024*1024)return 3
+            }
+            return if(id!="tiny"&&extra>=512L*1024*1024)3 else 1
+        }
+        val russianAdvice get()=when(id){
+            "tiny","base-q5_1","base"->"Русский: низкая точность в QA30; для быстрого черновика"
+            "small-q5_1","small"->"Русский: промежуточный вариант, требуются правки"
+            "medium-q5_0"->"Русский: 1 ошибка из 7 слов в QA30"
+            "large-v3-turbo-q5_0","large-v3-q5_0"->"Русский: 0 ошибок из 7 слов в QA30"
+            else->"Точность русского не измерена"
+        }
         val description get()=when(id){
             "tiny"->"Быстрая проверка · на пении часто пропускает слова"
             "base-q5_1"->"Экономная Base · сжатые веса"
