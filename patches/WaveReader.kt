@@ -6,7 +6,7 @@ import android.os.SystemClock
 import java.nio.ByteOrder
 /** Lightweight waveform-only decode: no FFT, tempo analysis, temporary file or AI model. */
 internal object WaveReader {
-    fun read(context:Context,uri:Uri):FloatArray?{
+    fun read(context:Context,uri:Uri,onPreview:((FloatArray,Int)->Unit)?=null):FloatArray?{
         val extractor=MediaExtractor();var codec:MediaCodec?=null
         try{
             extractor.setDataSource(context,uri,null)
@@ -19,7 +19,7 @@ internal object WaveReader {
             var bins=WaveBins(duration,rate);var gotPcm=false
             val decoder=MediaCodec.createDecoderByType(mime);codec=decoder;decoder.configure(format,null,null,0);decoder.start()
             val info=MediaCodec.BufferInfo();var inputDone=false;var outputDone=false;var idle=0
-            val deadline=SystemClock.elapsedRealtime()+25000
+            val deadline=SystemClock.elapsedRealtime()+25000;var lastPreview=0L
             while(!outputDone&&idle<150&&SystemClock.elapsedRealtime()<deadline&&!Thread.currentThread().isInterrupted){
                 var progressed=false
                 if(!inputDone){val i=decoder.dequeueInputBuffer(5000);if(i>=0){
@@ -43,6 +43,7 @@ internal object WaveReader {
                                 if(channels !in 1..8||encoding !in listOf(AudioFormat.ENCODING_PCM_16BIT,AudioFormat.ENCODING_PCM_FLOAT))return null
                                 b.position(info.offset);b.limit(info.offset+info.size);b.order(ByteOrder.nativeOrder())
                                 bins.add(b,channels,encoding==AudioFormat.ENCODING_PCM_FLOAT,info.presentationTimeUs);gotPcm=true
+                                val now=SystemClock.elapsedRealtime();if(onPreview!=null&&now-lastPreview>=250){bins.preview()?.let{onPreview(it.first,it.second);lastPreview=now}}
                             }
                             outputDone=info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM!=0
                         }finally{decoder.releaseOutputBuffer(i,false)}
@@ -51,7 +52,10 @@ internal object WaveReader {
                 }
                 idle=if(progressed)0 else idle+1
             }
-            return if(outputDone&&gotPcm&&!Thread.currentThread().isInterrupted)bins.finish()else null
+            if(!gotPcm||Thread.currentThread().isInterrupted)return null
+            val complete=if(outputDone)bins.finish()else null
+            if(complete==null)bins.preview()?.let{onPreview?.invoke(it.first,it.second)}
+            return complete
         }finally{runCatching{codec?.stop()};runCatching{codec?.release()};extractor.release()}
     }
 }
