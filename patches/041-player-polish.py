@@ -103,7 +103,7 @@ section('    private fun whisperModelDialog(){','    private fun recognizeWhispe
         val recommended=WhisperModelSpec.models.sortedBy{when(it.id){"large-v3-turbo-q5_0"->0;"medium-q5_0"->1;"large-v3-q5_0"->2;else->3}}
         val actions=recommended.map{spec->
             ((if(spec.id=="large-v3-turbo-q5_0")"Рекомендуем для русского · " else "")+spec.title+" · "+spec.description) to {
-                sheet(spec.title,spec.description+"\nСвободная ОЗУ: ориентир "+(spec.minFreeRam/1048576)+" МиБ. Аудио остаётся на устройстве. Точность пения не гарантирована.",listOf("Скачать модель" to {
+                sheet(spec.title,spec.description+"\n"+spec.russianAdvice+" (синтетическая речь, не пение).\nСвободная ОЗУ: ориентир "+(spec.minFreeRam/1048576)+" МиБ. Аудио остаётся на устройстве. Точность пения не гарантирована.",listOf("Скачать модель" to {
                     if(!stemBusy)stemWork("Загрузка Whisper…",{WhisperLocal.download(this,spec){updateWork("Whisper: $it%")}}){id->toast("Whisper $id установлен");render()}
                 }))
             }
