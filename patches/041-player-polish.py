@@ -110,6 +110,11 @@ section('    private fun whisperModelDialog(){','    private fun recognizeWhispe
         sheet("Распознавание вокала","Установлена: "+active,actions+listOf("Импорт файла" to {whisperPicker.launch(arrayOf("*/*"))}))
     }
 ''')
+replace('time=label("0:00 / 0:00",12,muted);bar.addView(time);addQuickEffects()', 'time=label("0:00",12,muted);timeEnd=label("0:00",12,muted);timeRow=row();timeRow.addView(time,weight());timeRow.addView(timeEnd);bar.addView(timeRow);addQuickEffects()')
+replace('    private lateinit var libraryTabs:LinearLayout','    private lateinit var libraryTabs:LinearLayout\n    private lateinit var timeRow:LinearLayout\n    private lateinit var timeEnd:TextView')
+replace('time.visibility=if(full)View.VISIBLE else View.GONE','timeRow.visibility=if(full)View.VISIBLE else View.GONE')
+replace('setTextChanged(time,"${fmt(pos)} / ${fmt(dur)}")','run{setTextChanged(time,fmt(pos));setTextChanged(timeEnd,fmt(dur))}')
+replace('setTextChanged(time,"${fmt(preview)} / ${fmt(duration)}")','run{setTextChanged(time,fmt(preview));setTextChanged(timeEnd,fmt(duration))}')
 replace('runCatching{WaveReader.read(app,Uri.parse(uri))}',r'''runCatching{WaveDiskCache.readOrDecode(app,Uri.parse(uri)){values,ready->
                 if(!Thread.currentThread().isInterrupted)runOnUiThread{
                     if(!isDestroyed&&generation==waveEpoch&&uiStarted&&current()?.uri==uri&&!MixerSession.active)bar.setWaveformPreview(values,ready)
