@@ -122,7 +122,8 @@ replace('runCatching{WaveReader.read(app,Uri.parse(uri))}',r'''runCatching{WaveD
             }}''')
 replace('if(result!=null){waveCache.put(uri,result);bar.setWaveform(result)}','if(result!=null){waveCache.put(uri,result);bar.setWaveform(result)}else bar.setWaveform(null)')
 p.write_text(s)
-for name in ['LyricsLookup.kt','LyricsMatch.kt','WaveDiskCache.kt']:shutil.copyfile(Path(__file__).parent/name,src/name)
+for name in ['LyricsLookup.kt','LyricsMatch.kt','WaveDiskCache.kt','LibrarySearch.kt']:shutil.copyfile(Path(__file__).parent/name,src/name)
+core=root/'tests/run-core.sh';coreText=core.read_text();assert coreText.count('TimedLineEdit,LibrarySearch,')==1;core.write_text(coreText.replace('TimedLineEdit,LibrarySearch,','TimedLineEdit,LibrarySearch,LyricsMatch,'))
 styles=res/'values/styles.xml';xml=styles.read_text()
 assert '</style></resources>' in xml
 xml=xml.replace('</style></resources>','<item name="android:alertDialogTheme">@style/RemixAlert</item></style><style name="RemixAlert" parent="android:style/Theme.Material.Dialog.Alert"><item name="android:fontFamily">sans</item><item name="android:colorAccent">#C0B0FF</item><item name="android:colorBackgroundFloating">#1D202B</item><item name="android:textColorPrimary">#F5F3FA</item><item name="android:textColorSecondary">#BCB8CB</item><item name="android:windowBackground">@drawable/remix_dialog_bg</item></style></resources>')
