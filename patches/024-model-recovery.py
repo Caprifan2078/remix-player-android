@@ -86,6 +86,10 @@ p.write_text(s)
 replace("WhisperLocal.kt","private external fun recognize(handle:Long,pcm:FloatArray,language:String,threads:Int):ByteArray?","private external fun recognize(handle:Long,pcm:FloatArray,language:String,threads:Int,beam:Int):ByteArray?")
 replace("WhisperLocal.kt","handle=open(model(c).absolutePath);check(handle!=0L)","checkMemory(c,spec);val memory=android.app.ActivityManager.MemoryInfo();(c.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager).getMemoryInfo(memory);val beam=spec.beamSize(memory.availMem,memory.lowMemory,language);status(if(beam>1)\"Whisper · точный поиск\" else \"Whisper · обычный поиск\");handle=open(model(c).absolutePath);check(handle!=0L)")
 replace("WhisperLocal.kt","availableProcessors().coerceIn(1,4))?:error","availableProcessors().coerceIn(1,4),beam)?:error")
+# Keep native speech transients for the small Russian models, without changing
+# English or the heavy Russian path that passed QA30. Separate vocal stems
+# retain their existing conditioning.
+replace("WhisperLocal.kt","block[n++]=filter.sample(it)/32768f","block[n++]=(if(stem==null&&language==\"ru\"&&spec.id in listOf(\"tiny\",\"base-q5_1\",\"base\",\"small-q5_1\",\"small\"))it else filter.sample(it))/32768f")
 bridge=Path(sys.argv[1])/'native/whisper/bridge.cpp'
 s=bridge.read_text()
 def native(a,b):
