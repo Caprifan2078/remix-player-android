@@ -90,6 +90,35 @@ class DirectWhisperDownloadTest {
             val result=org.json.JSONObject().put("id",id).put("language",lang).put("modelBytes",spec.size).put("downloadMs",downloadMs).put("inferenceMs",inferenceMs).put("words",expected.size).put("edits",errors).put("wer",errors.toDouble()/expected.size).put("availableRamAfter",memory.availMem).put("transcript",actual.joinToString(" ")).put("peakPssKiB",peakPssKiB).put("pssSamples",pssSamples).put("minAvailableRam",minAvailableRam)
             report.writeText(result.toString())
             }
+            // Separate experiments: change only one variable at a time.
+            // Do not choose production output using the known fixture transcript.
+            if(id in listOf("tiny","base-q5_1","base","small-q5_1","small")){
+                val target=File(c.filesDir,"qa-ablation-$id.json");target.delete()
+                val uri=FileProvider.getUriForFile(c,"app.remix.player.files",File(c.filesDir,"mixes/qa-whisper-ru.wav"))
+                val expected=tokens("Музыка играет. Послушай песню сегодня. Это тест.")
+                val legacy=if(id=="tiny")1 else 3
+                val rows=org.json.JSONArray()
+                for((name,profile) in listOf(
+                    "filtered-wide" to WhisperModelSpec.DecodeProfile(5,false),
+                    "raw-legacy" to WhisperModelSpec.DecodeProfile(legacy,true)
+                )){
+                    val start=android.os.SystemClock.elapsedRealtime()
+                    val row=org.json.JSONObject().put("profile",name).put("beam",profile.beam).put("rawInput",profile.rawInput)
+                    try{
+                        val raw=WhisperLocal.transcribeProfile(c,uri,null,"ru",profile){println(it)}
+                        val parsed=Lrc.parse(raw)
+                        assertTrue(parsed.isNotEmpty()&&parsed.all{it.ms in 0..19999})
+                        val actual=tokens(parsed.joinToString(" "){WordLyrics.parse(it).text})
+                        val errors=edits(expected,actual)
+                        row.put("transcript",actual.joinToString(" ")).put("edits",errors).put("wer",errors.toDouble()/expected.size)
+                    }catch(e:Exception){
+                        row.put("error",e.message?:"diagnostic inference failed")
+                    }
+                    row.put("inferenceMs",android.os.SystemClock.elapsedRealtime()-start)
+                    rows.put(row)
+                    target.writeText(org.json.JSONObject().put("id",id).put("language","ru").put("experiments",rows).toString())
+                }
+            }
             println("PASS: Android downloaded publisher weights over HTTPS, verified SHA, activated native model, recognized fixture speech")
         }finally{model.delete()}
     }
