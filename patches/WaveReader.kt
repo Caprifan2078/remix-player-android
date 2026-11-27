@@ -52,7 +52,10 @@ internal object WaveReader {
                 }
                 idle=if(progressed)0 else idle+1
             }
-            return if(outputDone&&gotPcm&&!Thread.currentThread().isInterrupted)bins.finish()else null
+            if(!gotPcm||Thread.currentThread().isInterrupted)return null
+            val complete=if(outputDone)bins.finish()else null
+            if(complete==null)bins.preview()?.let{onPreview?.invoke(it.first,it.second)}
+            return complete
         }finally{runCatching{codec?.stop()};runCatching{codec?.release()};extractor.release()}
     }
 }
