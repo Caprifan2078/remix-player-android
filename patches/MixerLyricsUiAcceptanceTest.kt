@@ -194,6 +194,33 @@ class MixerLyricsUiAcceptanceTest {
             capture("lyrics-clean")
         }
     }
+    @Test fun quickEffectSelectionKeepsPlayerAndGroupedSettings(){
+        fixture(twoTracks=true){p->
+            val old=Presets.active
+            try{
+                click("Музыка")
+                fun control(desc:String)=activity()?.window?.decorView?.let{views(it).firstOrNull{v->v.isShown&&v.contentDescription==desc}}
+                await("Mini-player missing"){control("Открыть экран воспроизведения")!=null}
+                main{assertTrue(control("Открыть экран воспроизведения")!!.performClick())}
+                await("Effects action missing"){control("Эффекты")!=null}
+                var cover:View?=null
+                main{cover=control("Обложка композиции");p.pause();assertTrue(control("Эффекты")!!.performClick())}
+                clickSheetText(if(old.name=="Sped Up")"Оригинал" else "Sped Up")
+                val target=if(old.name=="Sped Up")"Оригинал" else "Sped Up"
+                await("Quick preset not applied",2000){Presets.active.name==target&&p.playbackParameters.speed==Presets.active.speed}
+                main{assertSame("Applying preset rebuilt artwork",cover,control("Обложка композиции"));assertEquals(0,p.currentMediaItemIndex);assertFalse(p.playWhenReady)}
+                main{assertTrue(control("Назад к музыке")!!.performClick())}
+                await("Settings shortcut missing"){control("Настройки")!=null}
+                main{assertTrue(control("Настройки")!!.performClick())}
+                await("Settings groups not shown"){control("Модели и нейросети, свернуто")!=null&&control("Резервные копии, свернуто")!=null&&control("Хранилище и кеш, свернуто")!=null}
+                main{assertTrue(texts().none{it.isShown&&it.text.toString().startsWith("Whisper · установить")})}
+                capture("settings-grouped")
+                main{assertTrue(control("Модели и нейросети, свернуто")!!.performClick())}
+                await("Models group did not expand"){control("Модели и нейросети, раскрыто")!=null&&texts().any{it.isShown&&it.text.toString()=="Модели на устройстве"}}
+                capture("settings-models")
+            }finally{main{Presets.active=old;p.playbackParameters=androidx.media3.common.PlaybackParameters(old.speed,old.pitch)}}
+        }
+    }
     @Test fun artworkSwipeBothDirectionsAndTransitionDiscovery(){
         fixture(twoTracks=true){p->
             click("Музыка")
