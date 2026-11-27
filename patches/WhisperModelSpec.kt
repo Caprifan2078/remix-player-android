@@ -47,6 +47,17 @@ object WhisperModelSpec {
         Model("large-v3-turbo-q5_0",574041195L,"394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2",3072L*1024*1024,"0b364b566045a405be7225ee1e415a073e04da77"),
         Model("large-v3-q5_0",1081140203L,"d75795ecff3f83b5faa89d1900604ad8c780abd5739fae406de19f23ecd98ad1",4096L*1024*1024,"fb5ed9369c26eaf08392504d8446da431e0fffb9")
     )
+    enum class Fit { READY, LOW_RAM, LOW_STORAGE }
+    /** Evaluate the same temporary-file and free-memory limits as activation.
+     * The currently installed model does not require a new download. */
+    fun fit(model:Model,availableRam:Long,lowMemory:Boolean,freeStorage:Long,installedId:String?):Fit {
+        if(lowMemory||availableRam<model.minFreeRam)return Fit.LOW_RAM
+        if(model.id!=installedId&&freeStorage<=model.size+32L*1024*1024)return Fit.LOW_STORAGE
+        return Fit.READY
+    }
+    private val russianOrder=listOf("large-v3-turbo-q5_0","medium-q5_0","large-v3-q5_0","small-q5_1","small","base","base-q5_1","tiny")
+    fun recommend(availableRam:Long,lowMemory:Boolean,freeStorage:Long,installedId:String?):Model? =
+        russianOrder.mapNotNull{id->models.firstOrNull{it.id==id}}.firstOrNull{fit(it,availableRam,lowMemory,freeStorage,installedId)==Fit.READY}
     val maxBytes get()=models.maxOf{it.size}
     fun bySize(size:Long)=models.singleOrNull{it.size==size}
     fun matches(size:Long,sha:String)=bySize(size)?.sha?.equals(sha,true)==true
