@@ -123,6 +123,16 @@ class MixerLyricsUiAcceptanceTest {
             capture("mixer-paused")
         }
     }
+    private fun clickSheetText(text:String){
+        val end=SystemClock.elapsedRealtime()+8000
+        while(SystemClock.elapsedRealtime()<end){
+            val root=inst.uiAutomation.rootInActiveWindow
+            val node=root?.findAccessibilityNodeInfosByText(text)?.firstOrNull{it.text?.toString()==text&&it.isClickable&&it.isVisibleToUser}
+            if(node!=null&&node.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK))return
+            SystemClock.sleep(100)
+        }
+        fail("Sheet action unavailable: "+text)
+    }
     @Test fun compactLibraryAndExpandedPlayerHaveOneTitleAndVisibleSeek(){
         fixture { p->
             click("Музыка")
@@ -158,6 +168,24 @@ class MixerLyricsUiAcceptanceTest {
                 }finally{bmp.recycle()}
             }
             capture("expanded-player")
+            main{
+                for(desc in listOf("Случайный порядок воспроизведения","Предыдущая композиция","Следующая композиция","Режим повтора")){
+                    val v=control(desc) as? Button?:error("Transport control missing: "+desc)
+                    assertTrue("Transport must use vector foreground: "+desc,v.foreground is android.graphics.drawable.LayerDrawable)
+                }
+                assertTrue(control("Эффекты")!!.performClick())
+            }
+            clickSheetText("Все эффекты")
+            val until=SystemClock.elapsedRealtime()+8000
+            var catalog=false
+            while(SystemClock.elapsedRealtime()<until&&!catalog){
+                catalog=inst.uiAutomation.rootInActiveWindow?.findAccessibilityNodeInfosByText("Все эффекты")?.any{it.text?.toString()=="Все эффекты"}==true
+                if(!catalog)SystemClock.sleep(100)
+            }
+            assertTrue("Full effect catalog not visible",catalog)
+            capture("effects-catalog")
+            shell("input keyevent 4")
+            await("Effect catalog navigated away from playback"){control("Текст песни")!=null&&control("Очередь")!=null}
             main{assertTrue(control("Текст песни")!!.performClick())}
             await("Lyrics screen lacks synchronized content"){texts().any{it.isShown&&it.text.toString().startsWith("Первое второе третье")}}
             capture("lyrics-clean")
