@@ -58,6 +58,21 @@ t=t.replace('    println("PASS:', '''    val mib=1024L*1024
         check(m.beamSize(m.minFreeRam+1024*mib,false,"auto")==if(light)5 else 3)
         check(m.beamSize(m.minFreeRam+1024*mib,false,"en")==if(m.id=="tiny")1 else 3)
     }
+    val turbo=models.single{it.id=="large-v3-turbo-q5_0"}
+    val base=models.single{it.id=="base"}
+    val smallQ=models.single{it.id=="small-q5_1"}
+    check(WhisperModelSpec.recommend(8L*1024*mib,false,8L*1024*mib,null)==turbo)
+    check(WhisperModelSpec.recommend(2L*1024*mib,false,8L*1024*mib,null)==smallQ)
+    check(WhisperModelSpec.recommend(8L*1024*mib,true,8L*1024*mib,null)==null)
+    check(WhisperModelSpec.recommend(0L,false,8L*1024*mib,null)==null)
+    check(WhisperModelSpec.recommend(8L*1024*mib,false,0L,null)==null)
+    check(WhisperModelSpec.recommend(8L*1024*mib,false,0L,"base")==base)
+    for(m in models){
+        check(WhisperModelSpec.fit(m,m.minFreeRam-1,false,Long.MAX_VALUE,null)==WhisperModelSpec.Fit.LOW_RAM)
+        check(WhisperModelSpec.fit(m,m.minFreeRam,false,m.size+32*mib,null)==WhisperModelSpec.Fit.LOW_STORAGE)
+        check(WhisperModelSpec.fit(m,m.minFreeRam,false,m.size+32*mib+1,null)==WhisperModelSpec.Fit.READY)
+        check(WhisperModelSpec.fit(m,m.minFreeRam,false,0L,m.id)==WhisperModelSpec.Fit.READY)
+    }
     println("PASS:''',1)
 test.write_text(t)
 # Direct Whisper download, sharing the same checked activation as local import.
