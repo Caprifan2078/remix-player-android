@@ -253,6 +253,7 @@ jobs:
           python3 patches/quality-audit.py "source/$PROJECT"
           python3 patches/check-test-identities.py --selftest
           python3 model-qa/test_verify_benchmark.py
+          python3 model-qa/test_compare_qa30.py
       - name: Studio sound regression
         run: bash patches/run-studio-upgrade.sh "source/$PROJECT"
       - name: Karaoke and adaptive overlap regression
