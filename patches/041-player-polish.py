@@ -120,7 +120,7 @@ replace('runCatching{WaveReader.read(app,Uri.parse(uri))}',r'''runCatching{WaveD
                     if(!isDestroyed&&generation==waveEpoch&&uiStarted&&current()?.uri==uri&&!MixerSession.active)bar.setWaveformPreview(values,ready)
                 }
             }}''')
-replace('if(result!=null){waveCache.put(uri,result);bar.setWaveform(result)}','if(result!=null){waveCache.put(uri,result);bar.setWaveform(result)}else bar.setWaveform(null)')
+replace('if(result!=null){waveCache.put(uri,result);bar.setWaveform(result)}','if(result!=null){waveCache.put(uri,result);bar.setWaveform(result)}')
 p.write_text(s)
 for name in ['LyricsLookup.kt','LyricsMatch.kt','WaveDiskCache.kt','LibrarySearch.kt']:shutil.copyfile(Path(__file__).parent/name,src/name)
 core=root/'tests/run-core.sh';coreText=core.read_text();assert coreText.count('TimedLineEdit,LibrarySearch,')==1;core.write_text(coreText.replace('TimedLineEdit,LibrarySearch,','TimedLineEdit,LibrarySearch,LyricsMatch,'))
