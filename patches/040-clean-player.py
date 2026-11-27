@@ -14,9 +14,11 @@ icons={
 'heart':'M12,21 L3.7,12.9 C-1,8.2 5.5,1.3 12,7 C18.5,1.3 25,8.2 20.3,12.9 Z',
 'heart_on':'M12,21 L3.7,12.9 C-1,8.2 5.5,1.3 12,7 C18.5,1.3 25,8.2 20.3,12.9 Z',
 'queue':'M3,5 H21 M3,10 H21 M3,15 H15 M3,20 H12 M18,14 L22,18 L18,22 Z',
-'versions':'M8,3 H21 V16 H8 Z M5,7 H3 V21 H17 V19',
+'versions':'M3,12 H5 M7,8 V16 M11,4 V20 M15,9 V15 M19,6 V18 M22,12 H23',
+'menu':'M4,6 H20 M4,12 H20 M4,18 H20',
+'close':'M6,6 L18,18 M18,6 L6,18',
 'more':'M12,4 A1.5,1.5 0,1 0,12 7 A1.5,1.5 0,1 0,12 4 M12,10.5 A1.5,1.5 0,1 0,12 13.5 A1.5,1.5 0,1 0,12 10.5 M12,17 A1.5,1.5 0,1 0,12 20 A1.5,1.5 0,1 0,12 17',
-'lyrics':'M3,5 H21 M3,5 V8 M21,5 V8 M12,5 V20 M8,20 H16',
+'lyrics':'M4,4 H20 V17 H10 L5,21 V17 H4 Z M8,8 H16 M8,12 H14',
 'back':'M4,12 H21 M4,12 L11,5 M4,12 L11,19',
 'plus':'M12,4 V20 M4,12 H20',
 'settings':'M4,6 H20 M4,12 H20 M4,18 H20 M8,3 V9 M16,9 V15 M10,15 V21',
@@ -39,7 +41,7 @@ replace('    private fun toast(s:String)',r'''    private fun iconButton(res:Int
     private fun sheet(title:String,subtitle:String="",actions:List<Pair<String,()->Unit>>){
         val dialog=android.app.Dialog(this)
         val panel=column().apply{setPadding(dp(18),dp(14),dp(18),dp(18));background=rounded(surface,24)}
-        val top=row();top.addView(label(title,20,Color.WHITE,true),weight());top.addView(iconButton(R.drawable.remix_back,"Закрыть меню"){dialog.dismiss()});panel.addView(top)
+        val top=row();top.addView(label(title,20,Color.WHITE,true),weight());top.addView(iconButton(R.drawable.remix_close,"Закрыть меню"){dialog.dismiss()});panel.addView(top)
         if(subtitle.isNotBlank())panel.addView(label(subtitle,14,muted))
         val items=column()
         actions.forEach{(name,action)->val item=label(name,16,Color.WHITE).apply{
@@ -65,9 +67,10 @@ replace('bar.addView(controls);root.addView(nav)', '''transportControls=controls
         for(i in 0 until controls.childCount){(controls.getChildAt(i) as? Button)?.apply{
             textSize=if(this===play)26f else 20f
             background=android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x22FFFFFF),rounded(if(this===play)accent else Color.TRANSPARENT,30),rounded(Color.WHITE,30))
-            if(this===play)setTextColor(bg)
+            if(this===play){setTextColor(bg);layoutParams=LinearLayout.LayoutParams(dp(60),dp(60));background=rounded(accent,30)}
         }}''')
-replace('    private fun nowPlaying(){',r'''    private lateinit var mainHeader:LinearLayout
+replace('    private fun nowPlaying(){',r'''    private var transportMode=-1
+    private lateinit var mainHeader:LinearLayout
     private lateinit var mainNav:LinearLayout
     private lateinit var compactTransport:LinearLayout
     private lateinit var compactPlay:Button
@@ -79,6 +82,8 @@ replace('    private fun nowPlaying(){',r'''    private lateinit var mainHeader:
         mainHeader.visibility=if(player)View.GONE else View.VISIBLE
         mainNav.visibility=if(player)View.GONE else View.VISIBLE
         if(screen!="Микшер")bar.visibility=if(hasTrack)View.VISIBLE else View.GONE
+        val mode=if(full)1 else 0
+        if(mode!=transportMode){transportMode=mode;bar.background=if(full)rounded(Color.TRANSPARENT,0) else rounded(surface,16);bar.setPadding(dp(if(full)4 else 10),dp(2),dp(if(full)4 else 10),dp(4))}
         compactTransport.visibility=if(full)View.GONE else View.VISIBLE
         seek.visibility=if(full)View.VISIBLE else View.GONE
         time.visibility=if(full)View.VISIBLE else View.GONE
@@ -92,7 +97,12 @@ replace('    private fun nowPlaying(){',r'''    private lateinit var mainHeader:
         val choices=names.mapNotNull{name->Presets.all.firstOrNull{it.name==name}?.let{preset->
             (if(preset==Presets.active)"✓ "+name else name) to {if(current()!=null&&!MixerSession.active){applyPreset(preset);render()};Unit}
         }}
-        sheet("Эффекты",actions=choices+listOf("Все эффекты и ремиксы" to {screen="Студия";render()}))
+        sheet("Эффекты",actions=choices+listOf("Все эффекты" to {allEffectsSheet()}))
+    }
+    private fun allEffectsSheet(){
+        val entries=(Presets.all+customPresets).distinctBy{it.name}
+        val actions=entries.map{preset->(if(preset==Presets.active)"✓ " else "")+preset.name+" · "+preset.speed+"×" to {if(current()!=null&&!MixerSession.active){applyPreset(preset);render()};Unit}}
+        sheet("Все эффекты","Применяются сразу, без перехода в студию",actions+listOf("Открыть студию ремиксов" to {screen="Студия";render()}))
     }
     private fun nowPlaying(){''')
 replace('        updateQuickEffects()\n        if(!::seek.isInitialized)return','        updateTransportLayout()\n        if(!::seek.isInitialized)return')
@@ -181,13 +191,16 @@ replace('r.addView(btn(if(t.favorite)"♥" else "♡"){t.favorite=!t.favorite;sa
 replace('    private fun lyrics(){',r'''    private fun collapseLyricsTools(){
         val tools=column()
         while(body.childCount>1){val view=body.getChildAt(1);body.removeViewAt(1);tools.addView(view)}
-        val toggle=iconButton(R.drawable.remix_more,"Инструменты текста"){}
-        toggle.setOnClickListener{lyricToolsExpanded=!lyricToolsExpanded;tools.visibility=if(lyricToolsExpanded||stemBusy)View.VISIBLE else View.GONE}
-        val row=row();row.addView(label(if(lyricToolsExpanded)"Инструменты текста" else "Текст и синхронизация",13,muted),weight());row.addView(toggle);body.addView(row)
-        tools.visibility=if(lyricToolsExpanded||stemBusy)View.VISIBLE else View.GONE;body.addView(tools)
+        val actions=mutableListOf<Pair<String,()->Unit>>()
+        for(i in 0 until tools.childCount){val v=tools.getChildAt(i);if(v is Button)actions.add(v.text.toString() to {v.performClick();Unit})}
+        val track=libraryIndex.get(MixerSession.request?.source)?:current()
+        if(track!=null)actions.add(0,"Найти по названию и исполнителю…" to {manualLyricsSearch(track)})
+        val row=row();row.addView(label(track?.title.orEmpty(),14,muted).apply{maxLines=1;ellipsize=android.text.TextUtils.TruncateAt.END},weight())
+        row.addView(iconButton(R.drawable.remix_more,"Инструменты текста"){sheet("Текст и синхронизация",actions=actions)});body.addView(row)
+        if(stemBusy)body.addView(label(stemStatus,14,accent))
     }
     private fun lyrics(){''')
-replace('if(activeLyrics.isEmpty()){body.addView(label(if(raw.isBlank())','if(activeLyrics.isEmpty()){collapseLyricsTools();body.addView(label(if(raw.isBlank())')
+replace('if(activeLyrics.isEmpty()){body.addView(label(if(raw.isBlank())','if(activeLyrics.isEmpty()){collapseLyricsTools();if(raw.isBlank())body.addView(btn("Найти текст песни"){manualLyricsSearch(t)});body.addView(label(if(raw.isBlank())')
 a='val tools=column();while(body.childCount>1){val view=body.getChildAt(1);body.removeViewAt(1);tools.addView(view)};val toggle=btn(if(lyricToolsExpanded)"Скрыть инструменты текста" else "Инструменты текста…"){};toggle.setOnClickListener{lyricToolsExpanded=!lyricToolsExpanded;tools.visibility=if(lyricToolsExpanded)View.VISIBLE else View.GONE;toggle.text=if(lyricToolsExpanded)"Скрыть инструменты текста" else "Инструменты текста…"};body.addView(toggle);tools.visibility=if(lyricToolsExpanded||stemBusy)View.VISIBLE else View.GONE;body.addView(tools);'
 replace(a,'collapseLyricsTools();')
 replace('body.addView(follow)\n        val scroll=ScrollView(this);lyricScroll=scroll;', 'follow.background=rounded(Color.TRANSPARENT,12);body.addView(follow)\n        val scroll=ScrollView(this);lyricScroll=scroll;scroll.isVerticalScrollBarEnabled=false;')
@@ -195,5 +208,10 @@ replace('body.addView(scroll,LinearLayout.LayoutParams(-1,dp(330)))','body.addVi
 replace('label(wordLines[idx].text,22,muted,true).apply{','label(wordLines[idx].text,28,0xff858594.toInt(),true).apply{setPadding(dp(8),dp(14),dp(8),dp(14));setLineSpacing(dp(3).toFloat(),1f);')
 replace('label(visibleTranslation[idx],15,muted)','label(visibleTranslation[idx],17,muted)')
 replace('v.setTextColor(accent);if(lyricFollow)','v.setTextColor(Color.WHITE);if(lyricFollow)')
+# Start decoding while the user is on the library screen, not after opening the player.
+replace('android.util.LruCache<String,FloatArray>(16)','android.util.LruCache<String,FloatArray>(32)')
+replace('if(uiStarted&&screen=="Плеер"&&!MixerSession.active&&!stemBusy)current()else null','if(uiStarted&&!MixerSession.active&&!stemBusy)current()else null')
+replace('&&uiStarted&&screen=="Плеер"&&current()?.uri==uri','&&uiStarted&&current()?.uri==uri')
+replace('android.os.Process.THREAD_PRIORITY_BACKGROUND','android.os.Process.THREAD_PRIORITY_DEFAULT+2')
 p.write_text(s)
 print('PASS: compact library, distinct mini/full transport, vector icons, readable loop sheet and lyrics-first layout')
