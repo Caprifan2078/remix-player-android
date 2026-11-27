@@ -24,7 +24,7 @@ done
 for test in downloadActivateAndTranscribeOnDevice quantizedBaseSpeech fullBaseSpeech quantizedSmallSpeech fullSmallSpeech quantizedMediumSpeech turboSpeech fullLargeV3Speech; do
   log="model-results/$test.txt"
   adb shell am force-stop app.remix.player
-  adb shell run-as app.remix.player rm -f files/whisper/model.bin || true
+  adb shell run-as app.remix.player rm -f files/whisper-tiny.bin || true
   timeout 2400 adb shell am instrument -w -r -e class "app.remix.player.DirectWhisperDownloadTest#$test" app.remix.player.test/androidx.test.runner.AndroidJUnitRunner | tee "$log" || status=1
   python3 model-qa/verify_model_log.py "$log" "$test" || status=1
   case "$test" in
@@ -45,4 +45,5 @@ for test in downloadActivateAndTranscribeOnDevice quantizedBaseSpeech fullBaseSp
   adb exec-out run-as app.remix.player cat "files/qa-whisper-$id-ru.json" > "$report" || status=1
   python3 model-qa/verify_benchmark.py "$report" "$id" ru >> model-results/whisper-benchmark.txt || status=1
 done
+python3 model-qa/compare_qa30.py model-results > model-results/qa30-comparison.txt || status=1
 exit "$status"
