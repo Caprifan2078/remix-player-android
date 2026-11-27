@@ -106,7 +106,7 @@ section('    private fun whisperModelDialog(){','    private fun recognizeWhispe
         val recommendation=WhisperModelSpec.recommend(info.availMem,info.lowMemory,disk,active?.id)
         fun fit(spec:WhisperModelSpec.Model,m:android.app.ActivityManager.MemoryInfo=info)=WhisperModelSpec.fit(spec,m.availMem,m.lowMemory,filesDir.usableSpace,WhisperLocal.installed(this)?.id)
         fun reason(f:WhisperModelSpec.Fit)=when(f){
-            WhisperModelSpec.Fit.READY->"Готова к запуску или загрузке"
+            WhisperModelSpec.Fit.READY->"По оценке, ресурсов достаточно"
             WhisperModelSpec.Fit.LOW_RAM->"Мало свободной ОЗУ"
             WhisperModelSpec.Fit.LOW_STORAGE->"Мало места для загрузки"
         }
@@ -120,7 +120,7 @@ section('    private fun whisperModelDialog(){','    private fun recognizeWhispe
                 val state=fit(spec,fresh)
                 val summary=spec.description+"\n"+spec.russianAdvice+" (синтетическая речь, не пение).\n"+reason(state)+". Нужно свободной ОЗУ: около "+(spec.minFreeRam/1048576)+" МиБ. Аудио остаётся на устройстве."
                 val choices=when{
-                    current?.id==spec.id->listOf<Pair<String,()->Unit>>("Модель уже установлена" to {})
+                    current?.id==spec.id->listOf<Pair<String,()->Unit>>("К списку моделей" to {whisperModelDialog()})
                     state!=WhisperModelSpec.Fit.READY->listOf<Pair<String,()->Unit>>("Проверить память снова" to {whisperModelDialog()})
                     else->listOf<Pair<String,()->Unit>>("Скачать и активировать" to {
                         if(!stemBusy){
