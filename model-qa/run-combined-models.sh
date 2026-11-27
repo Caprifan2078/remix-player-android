@@ -44,6 +44,12 @@ for test in downloadActivateAndTranscribeOnDevice quantizedBaseSpeech fullBaseSp
   report="model-results/whisper-$id-ru.json"
   adb exec-out run-as app.remix.player cat "files/qa-whisper-$id-ru.json" > "$report" || status=1
   python3 model-qa/verify_benchmark.py "$report" "$id" ru >> model-results/whisper-benchmark.txt || status=1
+  case "$id" in
+    tiny|base-q5_1|base|small-q5_1|small)
+      adb exec-out run-as app.remix.player cat "files/qa-ablation-$id.json" > "model-results/ablation-$id.json" || status=1
+      ;;
+  esac
 done
+python3 model-qa/verify_ablation.py model-results > model-results/ablation-summary.txt || status=1
 python3 model-qa/compare_qa30.py model-results > model-results/qa30-comparison.txt || status=1
 exit "$status"
