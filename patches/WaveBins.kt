@@ -26,7 +26,13 @@ internal class WaveBins(private val durationUs:Long,private val rate:Int,private
             val n=minOf(remaining.toLong(),boundary-frame,total-frame).toInt()
             if(n<=0)break
             var peak=peaks[index]
-            repeat(n*channels){val v=if(floatPcm)abs(buffer.float)else abs(buffer.short.toInt())/32768f;if(v.isFinite()&&v>peak)peak=v.coerceAtMost(1f)}
+            if(floatPcm){
+                repeat(n*channels){val v=abs(buffer.float);if(v.isFinite()&&v>peak)peak=v.coerceAtMost(1f)}
+            }else{
+                var pcmPeak=0
+                repeat(n*channels){val v=abs(buffer.short.toInt());if(v>pcmPeak)pcmPeak=v}
+                peak=maxOf(peak,pcmPeak/32768f)
+            }
             peaks[index]=peak;val next=frame+n;covered+=(next-maxOf(end,frame)).coerceAtLeast(0);end=maxOf(end,next);frame=next;remaining-=n
         }
     }
