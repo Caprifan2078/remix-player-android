@@ -6,7 +6,7 @@ internal class WaveBins(private val durationUs:Long,private val rate:Int,private
     init{require(durationUs in 1..900_000_000L&&rate in 8000..384000&&bins in 16..512)}
     private val total=(durationUs*rate+999999)/1000000
     private val peaks=FloatArray(bins)
-    private var covered=0L
+    private val coverage=LongArray(bins)
     private var end=0L
     private var previousStart=-1L
     private var ordered=true
@@ -33,14 +33,19 @@ internal class WaveBins(private val durationUs:Long,private val rate:Int,private
                 repeat(n*channels){val v=abs(buffer.short.toInt());if(v>pcmPeak)pcmPeak=v}
                 peak=maxOf(peak,pcmPeak/32768f)
             }
-            peaks[index]=peak;val next=frame+n;covered+=(next-maxOf(end,frame)).coerceAtLeast(0);end=maxOf(end,next);frame=next;remaining-=n
+            peaks[index]=peak;val next=frame+n;coverage[index]+=(next-maxOf(end,frame)).coerceAtLeast(0);end=maxOf(end,next);frame=next;remaining-=n
         }
     }
-    /** Only advertise complete prefix bins, never present unknown data as silence. */
-    fun preview():Pair<FloatArray,Int>?{
-        if(!ordered||covered!=end)return null
-        val ready=(end*bins/total).toInt().coerceIn(0,bins)
-        return if(ready>0)peaks.copyOf() to ready else null
+    private fun full(i:Int):Boolean {
+        val start=(i.toLong()*total+bins-1)/bins
+        val stop=((i+1L)*total+bins-1)/bins
+        return stop>start&&coverage[i]==stop-start
     }
-    fun finish():FloatArray?=if(ordered&&covered>=total-total/20)peaks.copyOf()else null
+    // Unknown bins stay NaN in previews; complete cache entries never contain NaN.
+    fun preview():Pair<FloatArray,Int>?{
+        if(!ordered)return null
+        val ready=(bins-1 downTo 0).firstOrNull(::full)?.plus(1)?:return null
+        return FloatArray(bins){i->if(full(i))peaks[i] else Float.NaN} to ready
+    }
+    fun finish():FloatArray?=if(ordered&&(0 until bins).all(::full))peaks.copyOf()else null
 }
