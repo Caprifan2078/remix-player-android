@@ -13,12 +13,12 @@ replace('setContentView(root)','val frame=android.widget.FrameLayout(this);drawe
 replace('val header=row();mainHeader=header;header.addView(label("REMIX",22,accent,true),weight());','val header=row();mainHeader=header;header.addView(iconButton(R.drawable.remix_menu,"Меню навигации"){openDrawer()});header.addView(label("REMIX",22,accent,true),weight());')
 replace('transportControls=controls;bar.addView(controls);root.addView(nav)','transportControls=controls;bar.addView(controls);installLibraryTabs();installDrawer(nav)')
 replace('if(screen!="Музыка"){screen="Музыка";render()}else{isEnabled=false;', 'if(::drawerOverlay.isInitialized&&drawerOverlay.visibility==View.VISIBLE){closeDrawer()}else if(screen!="Музыка"){screen="Музыка";render()}else{isEnabled=false;')
-replace('private fun render(){if(!::body.isInitialized)return;', 'private fun render(){if(!::body.isInitialized)return;closeDrawer();')
+replace('val button=btn(name){screen=name;render()}','val button=btn(name){closeDrawer();screen=name;render()}')
 replace('    private lateinit var mainHeader:LinearLayout',r'''    private lateinit var drawerHost:android.widget.FrameLayout
     private lateinit var drawerOverlay:android.widget.FrameLayout
     private lateinit var libraryTabs:LinearLayout
-    private fun openDrawer(){if(::drawerOverlay.isInitialized)drawerOverlay.visibility=View.VISIBLE}
-    private fun closeDrawer(){if(::drawerOverlay.isInitialized)drawerOverlay.visibility=View.GONE}
+    private fun openDrawer(){if(::drawerOverlay.isInitialized){drawerOverlay.setPadding(0,root.paddingTop,0,root.paddingBottom);drawerOverlay.visibility=View.VISIBLE;root.importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS}}
+    private fun closeDrawer(){if(::drawerOverlay.isInitialized){drawerOverlay.visibility=View.GONE;root.importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_AUTO}}
     private fun installDrawer(nav:LinearLayout){
         drawerOverlay=android.widget.FrameLayout(this).apply{visibility=View.GONE;setBackgroundColor(0x99000000.toInt());setOnClickListener{closeDrawer()}}
         val panel=column().apply{background=rounded(surface,18);isClickable=true;setPadding(dp(12),dp(16),dp(12),dp(12))}
@@ -26,8 +26,8 @@ replace('    private lateinit var mainHeader:LinearLayout',r'''    private latei
         nav.orientation=LinearLayout.VERTICAL
         for(i in 0 until nav.childCount){val v=nav.getChildAt(i) as Button;v.layoutParams=LinearLayout.LayoutParams(-1,dp(52));v.gravity=Gravity.CENTER_VERTICAL or Gravity.START;v.setPadding(dp(16),dp(4),dp(12),dp(4));v.setAutoSizeTextTypeWithDefaults(TextView.AUTO_SIZE_TEXT_TYPE_NONE);v.textSize=16f}
         panel.addView(nav)
-        panel.addView(btn("Настройки и память"){screen="Настройки";render()})
-        panel.addView(btn("История"){screen="История";render()})
+        panel.addView(btn("Настройки и память"){closeDrawer();screen="Настройки";render()})
+        panel.addView(btn("История"){closeDrawer();screen="История";render()})
         val scroll=ScrollView(this).apply{addView(panel);setBackgroundColor(surface)}
         drawerOverlay.addView(scroll,android.widget.FrameLayout.LayoutParams(dp(minOf(300,resources.configuration.screenWidthDp-48)), -1,Gravity.START))
         drawerHost.addView(drawerOverlay,android.widget.FrameLayout.LayoutParams(-1,-1))
@@ -70,7 +70,7 @@ replace('    private fun lyrics(){',r'''    private fun manualLyricsSearch(t:Tra
         val title=EditText(this).apply{hint="Название";setSingleLine();setText(cleaned.title)}
         val artist=EditText(this).apply{hint="Исполнитель (необязательно)";setSingleLine();setText(cleaned.artist)}
         panel.addView(title);panel.addView(artist)
-        panel.addView(label("Выберите правильную запись. Обычный текст не будет выдаваться за синхронный.",13,muted))
+        panel.addView(label("Можно писать по-русски, по-английски или транслитом. Название и исполнитель отправляются в LRCLIB. Выберите правильную запись: обычный текст не выдаётся за синхронный.",13,muted))
         panel.addView(btn("Найти"){
             val q=title.text.toString().trim();val a=artist.text.toString().trim()
             if(q.isBlank()||q.length>200||a.length>200){toast("Уточните название");return@btn}
