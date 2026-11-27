@@ -26,6 +26,31 @@ class StudioAcceptanceTest {
     }
     private fun decode(f:File,dst:File)=StemEngine.decode(c,FileProvider.getUriForFile(c,"app.remix.player.files",f),dst)
     private fun hash(f:File)=MessageDigest.getInstance("SHA-256").digest(f.readBytes()).joinToString(""){"%02x".format(it)}
+    @Test fun waveformFallbackIsVisibleAndTracksPosition(){
+        val inst=InstrumentationRegistry.getInstrumentation()
+        inst.runOnMainSync{
+            val view=WaveSeekBar(c);view.max=1000;view.progress=500
+            val density=c.resources.displayMetrics.density
+            val width=(300*density).toInt();val height=(48*density).toInt()
+            view.measure(android.view.View.MeasureSpec.makeMeasureSpec(width,android.view.View.MeasureSpec.EXACTLY),android.view.View.MeasureSpec.makeMeasureSpec(height,android.view.View.MeasureSpec.EXACTLY))
+            view.layout(0,0,width,height)
+            val bitmap=android.graphics.Bitmap.createBitmap(width,height,android.graphics.Bitmap.Config.ARGB_8888)
+            val canvas=android.graphics.Canvas(bitmap)
+            val left=view.paddingLeft;val right=width-view.paddingRight;val middle=(left+right)/2;val y=(view.paddingTop+height-view.paddingBottom)/2
+            try{
+                canvas.drawColor(0xff101019.toInt());view.draw(canvas)
+                assertEquals("Fallback played track",0xffc0b0ff.toInt(),bitmap.getPixel((left+middle)/2,y))
+                assertEquals("Fallback remaining track",0xff70677e.toInt(),bitmap.getPixel((middle+right)/2,y))
+                assertEquals("Fallback playhead",0xffe8dfff.toInt(),bitmap.getPixel(middle,y))
+                view.setWaveform(FloatArray(160){.5f});canvas.drawColor(0xff101019.toInt());view.draw(canvas)
+                assertEquals("Waveform playhead",0xffe8dfff.toInt(),bitmap.getPixel(middle,y))
+                view.progress=250;canvas.drawColor(0xff101019.toInt());view.draw(canvas)
+                assertEquals("Updated playhead",0xffe8dfff.toInt(),bitmap.getPixel(left+(right-left)/4,y))
+                view.setWaveform(null);view.progress=750;canvas.drawColor(0xff101019.toInt());view.draw(canvas)
+                assertEquals("Fallback after clearing waveform",0xffe8dfff.toInt(),bitmap.getPixel(left+(right-left)*3/4,y))
+            }finally{bitmap.recycle()}
+        }
+    }
     @Test fun allOfflineEffectsAndAndroidDecoder(){
         val dir=folder()
         try{
@@ -61,6 +86,76 @@ class StudioAcceptanceTest {
             assertTrue(dir.listFiles()!!.none{it.name.startsWith("pitch-")||it.name.startsWith("stretch-")})
             println("PASS Android: 44 effect exports + independent MediaCodec WAV decode")
         }finally{dir.deleteRecursively()}
+    }
+    @androidx.media3.common.util.UnstableApi
+    @Test fun realCrossfadeContinuesIncomingAndCancelsOnSeek(){
+        val dir=folder()
+        val inst=InstrumentationRegistry.getInstrumentation()
+        val pcm=File(dir,"crossfade.pcm")
+        val first=File(dir,"a.wav");val second=File(dir,"b.wav")
+        var player:androidx.media3.exoplayer.ExoPlayer?=null
+        var coordinator:LiveOverlap?=null
+        try{
+            raw(pcm,44100*14,440.0);wav(pcm,first)
+            raw(pcm,44100*14,660.0);wav(pcm,second)
+            val uriA=FileProvider.getUriForFile(c,"app.remix.player.files",first)
+            val uriB=FileProvider.getUriForFile(c,"app.remix.player.files",second)
+            inst.runOnMainSync{
+                val p=androidx.media3.exoplayer.ExoPlayer.Builder(c).build();player=p
+                p.setAudioAttributes(androidx.media3.common.AudioAttributes.Builder().setUsage(androidx.media3.common.C.USAGE_MEDIA).setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MUSIC).build(),false)
+                p.setMediaItems(listOf(
+                    androidx.media3.common.MediaItem.Builder().setUri(uriA).setMediaId("crossfade-a").build(),
+                    androidx.media3.common.MediaItem.Builder().setUri(uriB).setMediaId("crossfade-b").build()
+                ),0,5500)
+                coordinator=LiveOverlap(c,p)
+                p.prepare();p.play()
+            }
+            var firstAudible=-1L;var lastAudible=-1L;var mixed=false;var done=false
+            val deadline=android.os.SystemClock.elapsedRealtime()+26000
+            while(!done&&android.os.SystemClock.elapsedRealtime()<deadline){
+                inst.runOnMainSync{
+                    val p=player!!
+                    val owned=coordinator!!.tick(3000,true)
+                    if(p.currentMediaItemIndex==0&&owned&&p.volume<.9f)mixed=true
+                    if(p.currentMediaItemIndex==1&&p.isPlaying&&p.volume>.2f){
+                        val position=p.currentPosition
+                        if(firstAudible<0)firstAudible=position
+                        if(lastAudible>=0)assertTrue("Incoming restarted after audible handoff: $lastAudible -> $position",position+200>=lastAudible)
+                        lastAudible=position
+                        done=!owned&&p.volume>.98f&&position>firstAudible+350
+                    }
+                    assertNull(p.playerError)
+                }
+                android.os.SystemClock.sleep(25)
+            }
+            assertTrue("No audible overlap before transition",mixed)
+            assertTrue("Incoming intro replayed: first audible position $firstAudible",firstAudible>=1000)
+            assertTrue("Handoff never completed",done)
+            println("PASS Android crossfade: incoming first audible position=$firstAudible ms, no sampled backward restart")
+            inst.runOnMainSync{
+                val p=player!!;coordinator!!.close()
+                p.seekTo(0,8500);coordinator=LiveOverlap(c,p);p.play()
+            }
+            var cancelled=false
+            val cancelDeadline=android.os.SystemClock.elapsedRealtime()+12000
+            while(!cancelled&&android.os.SystemClock.elapsedRealtime()<cancelDeadline){
+                inst.runOnMainSync{
+                    val p=player!!;val owned=coordinator!!.tick(3000,true)
+                    if(owned&&p.currentMediaItemIndex==0&&p.volume<.9f){
+                        p.seekTo(0,3000)
+                        coordinator!!.tick(3000,true)
+                        assertTrue("Volume remained attenuated after manual seek",p.volume>.98f)
+                        assertEquals(0,p.currentMediaItemIndex)
+                        cancelled=true
+                    }
+                }
+                android.os.SystemClock.sleep(25)
+            }
+            assertTrue("Never entered overlap for manual seek test",cancelled)
+        }finally{
+            inst.runOnMainSync{coordinator?.close();player?.release()}
+            dir.deleteRecursively()
+        }
     }
     @Test fun thirtyGenresDistinctDecodableAndNonSilent(){
         val dir=folder()
@@ -156,6 +251,9 @@ class StudioAcceptanceTest {
             val input=File(dir,"input.pcm");raw(input,44100*4);val source=File(dir,"source.wav");wav(input,source)
             val report=TrackAnalyzer.report(c,FileProvider.getUriForFile(c,"app.remix.player.files",source))?:error("Analysis rejected valid audio")
             assertEquals(4.0,report.duration,.02);assertTrue(report.rms>.01)
+            val waveform=WaveReader.read(c,FileProvider.getUriForFile(c,"app.remix.player.files",source))?:error("Waveform rejected valid WAV")
+            assertEquals(160,waveform.size);assertTrue(waveform.all{it.isFinite()&&it in .05f.. .2f})
+            println("PASS Android: actual MediaCodec waveform of four-second synthetic WAV")
             val bad=File(dir,"invalid.wav");bad.writeText("not an audio file")
             assertTrue(runCatching{decode(bad,File(dir,"bad.pcm"))}.isFailure)
             println("PASS Android: actual media analysis duration, non-silent signal, invalid audio rejected")
