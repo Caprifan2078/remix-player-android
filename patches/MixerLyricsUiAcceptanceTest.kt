@@ -117,6 +117,46 @@ class MixerLyricsUiAcceptanceTest {
             capture("mixer-paused")
         }
     }
+    @Test fun compactLibraryAndExpandedPlayerHaveOneTitleAndVisibleSeek(){
+        fixture { p->
+            click("Музыка")
+            fun shown()=activity()?.window?.decorView?.let{views(it).filter{v->v.isShown}.toList()}.orEmpty()
+            fun control(desc:String)=shown().firstOrNull{it.contentDescription==desc&&it.isClickable}
+            await("Library mini-player missing"){control("Открыть экран воспроизведения")!=null}
+            main{
+                assertNull("Full transport must not be visible on library",shown().filterIsInstance<WaveSeekBar>().firstOrNull())
+                assertTrue("Library action wall is still visible",texts().none{it.isShown&&it.text.toString() in listOf("Инструменты библиотеки…","Темп / скорость…","Добавить найденные песни в очередь…")})
+                assertNotNull(control("Фильтры и инструменты"))
+            }
+            capture("compact-library")
+            main{assertTrue(control("Открыть экран воспроизведения")!!.performClick())}
+            await("Expanded player missing visible timeline"){
+                val wave=shown().filterIsInstance<WaveSeekBar>().singleOrNull()
+                val rect=android.graphics.Rect()
+                wave!=null&&wave.getGlobalVisibleRect(rect)&&rect.height()>=((48*c.resources.displayMetrics.density).toInt()-1)&&rect.width()>100
+            }
+            main{
+                assertEquals("Expanded track title repeated",1,texts().count{it.isShown&&it.text.toString()=="QA UI synthetic"})
+                assertNull("Mini-player remains visible in full player",control("Открыть экран воспроизведения"))
+                for(desc in listOf("В избранное","Версии композиции","Ещё","Очередь","Текст песни","Случайный порядок воспроизведения","Предыдущая композиция","Следующая композиция","Режим повтора")){
+                    val v=control(desc)?:error("Missing action: "+desc)
+                    val min=(48*c.resources.displayMetrics.density).toInt()-1
+                    assertTrue("Touch target too small: "+desc,v.width>=min&&v.height>=min)
+                }
+                val wave=shown().filterIsInstance<WaveSeekBar>().single()
+                val bmp=android.graphics.Bitmap.createBitmap(wave.width,wave.height,android.graphics.Bitmap.Config.ARGB_8888)
+                try{
+                    wave.draw(android.graphics.Canvas(bmp))
+                    val y=(wave.paddingTop+wave.height-wave.paddingBottom)/2
+                    assertTrue("No visible timeline pixels",(wave.paddingLeft until wave.width-wave.paddingRight).any{x->bmp.getPixel(x,y)==0xff70677e.toInt()||bmp.getPixel(x,y)==0xffc0b0ff.toInt()||bmp.getPixel(x,y)==0xffe8dfff.toInt()})
+                }finally{bmp.recycle()}
+            }
+            capture("expanded-player")
+            main{assertTrue(control("Текст песни")!!.performClick())}
+            await("Lyrics screen lacks synchronized content"){texts().any{it.isShown&&it.text.toString().startsWith("Первое второе третье")}}
+            capture("lyrics-clean")
+        }
+    }
     @Test fun karaokeActualWordSpansSeekAndFollowToggle(){
         fixture { p->
             click("Текст")
