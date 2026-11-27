@@ -82,6 +82,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/041-player-polish.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/042-ui-refinement.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/043-player-gestures.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/044-smart-crossfade.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
           test -f "source/$PROJECT/app/build.gradle.kts"
@@ -232,6 +233,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/041-player-polish.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/042-ui-refinement.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/043-player-gestures.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/044-smart-crossfade.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/setup-java@v4
@@ -291,6 +293,8 @@ jobs:
           java -jar "$tmp/lyrics.jar"
           kotlinc patches/LyricsMatch.kt patches/LibrarySearch.kt patches/BilingualLibraryTest.kt -include-runtime -d "$tmp/bilingual-library.jar"
           java -jar "$tmp/bilingual-library.jar"
+          kotlinc patches/SmartCrossfade.kt patches/SmartCrossfadeTest.kt -include-runtime -d "$tmp/smart-crossfade.jar"
+          java -jar "$tmp/smart-crossfade.jar"
       - name: Full regression
         working-directory: source/RemixPlayer_v0.66
         env:
@@ -371,6 +375,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/041-player-polish.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/042-ui-refinement.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/043-player-gestures.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/044-smart-crossfade.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/download-artifact@v4
@@ -446,6 +451,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/041-player-polish.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/042-ui-refinement.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/043-player-gestures.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/044-smart-crossfade.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/download-artifact@v4
@@ -528,6 +534,7 @@ jobs:
           python3 "$GITHUB_WORKSPACE/patches/041-player-polish.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/042-ui-refinement.py" "source/$PROJECT"
           python3 "$GITHUB_WORKSPACE/patches/043-player-gestures.py" "source/$PROJECT"
+          python3 "$GITHUB_WORKSPACE/patches/044-smart-crossfade.py" "source/$PROJECT"
           cp "$GITHUB_WORKSPACE/patches/MixerLyricsUiAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/MixerLyricsUiAcceptanceTest.kt"
           cp "$GITHUB_WORKSPACE/patches/StudioAcceptanceTest.kt" "source/$PROJECT/app/src/androidTest/java/app/remix/player/StudioAcceptanceTest.kt"
       - uses: actions/setup-java@v4
