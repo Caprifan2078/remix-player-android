@@ -8,6 +8,7 @@ import androidx.appcompat.widget.AppCompatSeekBar
 /** Native SeekBar keeps accessibility and keyboard controls; only the track is drawn differently. */
 internal class WaveSeekBar(context:Context):AppCompatSeekBar(context){
     private var peaks:FloatArray?=null
+    private var readyBins=0
     private val density=resources.displayMetrics.density
     init{
         minimumHeight=(48*density+.5f).toInt()
@@ -19,9 +20,13 @@ internal class WaveSeekBar(context:Context):AppCompatSeekBar(context){
     private var geometryDirty=true
     private var lastWidth=-1;private var lastHeight=-1;private var lastLeft=-1;private var lastRight=-1;private var lastTop=-1;private var lastBottom=-1
     fun setWaveform(value:FloatArray?){
-        if(peaks===value)return
-        peaks=value
+        if(peaks===value&&readyBins==(value?.size?:0))return
+        peaks=value;readyBins=value?.size?:0
         geometryDirty=true;invalidate()
+    }
+    fun setWaveformPreview(value:FloatArray,ready:Int){
+        if(value.isEmpty()||ready !in 1..value.size)return
+        peaks=value;readyBins=ready;geometryDirty=true;invalidate()
     }
     private fun rebuild(values:FloatArray,w:Float,h:Float){
         geometry.reset()
@@ -47,11 +52,13 @@ internal class WaveSeekBar(context:Context):AppCompatSeekBar(context){
         paint.color=0xff70677e.toInt()
         if(values!=null&&values.isNotEmpty()){
             if(geometryDirty||lastWidth!=width||lastHeight!=height||lastLeft!=paddingLeft||lastRight!=paddingRight||lastTop!=paddingTop||lastBottom!=paddingBottom)rebuild(values,w,h)
-            canvas.drawPath(geometry,paint)
+            val coveredRight=left+w*readyBins.toFloat()/values.size
+            if(readyBins<values.size){val radius=2*density;canvas.drawRoundRect(left,y-radius,right,y+radius,radius,radius,paint)}
+            val known=canvas.save();canvas.clipRect(left,top,coveredRight,bottom);canvas.drawPath(geometry,paint)
             val save=canvas.save()
             canvas.clipRect(left,top,x,bottom)
             paint.color=0xffc0b0ff.toInt();canvas.drawPath(geometry,paint)
-            canvas.restoreToCount(save)
+            canvas.restoreToCount(save);canvas.restoreToCount(known)
         }else{
             val radius=2*density
             canvas.drawRoundRect(left,y-radius,right,y+radius,radius,radius,paint)
