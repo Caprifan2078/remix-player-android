@@ -11,7 +11,12 @@ class DirectWhisperDownloadTest {
     @Test fun downloadActivateAndTranscribeOnDevice(){benchmark("tiny")}
     @Test fun quantizedBaseSpeech(){benchmark("base-q5_1")}
     @Test fun turboSpeech(){benchmark("large-v3-turbo-q5_0")}
-    private fun tokens(s:String)=Regex("[a-z]+").findAll(s.lowercase(java.util.Locale.ROOT)).map{it.value}.toList()
+    @Test fun fullBaseSpeech(){benchmark("base")}
+    @Test fun quantizedSmallSpeech(){benchmark("small-q5_1")}
+    @Test fun fullSmallSpeech(){benchmark("small")}
+    @Test fun quantizedMediumSpeech(){benchmark("medium-q5_0")}
+    @Test fun fullLargeV3Speech(){benchmark("large-v3-q5_0")}
+    private fun tokens(s:String)=Regex("[\\p{L}]+").findAll(s.lowercase(java.util.Locale.ROOT)).map{it.value}.toList()
     private fun edits(expected:List<String>,actual:List<String>):Int{
         var prior=IntArray(actual.size+1){it}
         for(i in expected.indices){
@@ -23,11 +28,10 @@ class DirectWhisperDownloadTest {
     }
     private fun benchmark(id:String){
         val c=InstrumentationRegistry.getInstrumentation().targetContext
-        val file=File(c.filesDir,"mixes/qa-whisper.wav")
         val spec=WhisperModelSpec.models.single{it.id==id}
         val model=WhisperLocal.model(c)
-        val report=File(c.filesDir,"qa-whisper-$id.json")
-        report.delete()
+        val reports=listOf("en","ru").associateWith{lang->File(c.filesDir,if(lang=="en")"qa-whisper-$id.json" else "qa-whisper-$id-ru.json")}
+        reports.values.forEach{it.delete()}
         assertFalse("Fixture must not contain predownloaded weights",model.exists())
         try{
             val progress=mutableListOf<Int>()
@@ -37,6 +41,10 @@ class DirectWhisperDownloadTest {
             assertEquals(id,installed);assertEquals(spec,WhisperLocal.installed(c))
             assertEquals(spec.size,model.length());assertTrue(VerifiedDownload.matches(model,spec.sha))
             assertTrue(progress.isNotEmpty()&&progress.last()==100&&progress.zipWithNext().all{it.first<=it.second})
+            for(lang in listOf("en","ru")){
+            val file=File(c.filesDir,if(lang=="en")"mixes/qa-whisper.wav" else "mixes/qa-whisper-ru.wav")
+            assertTrue("Missing "+lang+" speech fixture",file.isFile)
+            val report=reports.getValue(lang)
             val uri=FileProvider.getUriForFile(c,"app.remix.player.files",file)
             val am=c.getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager
             var peakPssKiB=0L
@@ -61,7 +69,7 @@ class DirectWhisperDownloadTest {
             val start=android.os.SystemClock.elapsedRealtime()
             var inferenceMs=0L
             val text=try{
-                WhisperLocal.transcribe(c,uri,null,"en"){println(it)}
+                WhisperLocal.transcribe(c,uri,null,lang){println(it)}
             }finally{
                 inferenceMs=android.os.SystemClock.elapsedRealtime()-start
                 stop.countDown();sampler.join()
@@ -72,16 +80,16 @@ class DirectWhisperDownloadTest {
             val parsed=Lrc.parse(text)
             assertTrue(parsed.isNotEmpty())
             assertTrue(parsed.all{it.ms>=0&&it.ms<20000}&&parsed.zipWithNext().all{(a,b)->a.ms<=b.ms})
-            val expected=tokens("The music is playing. Listen to the song today. This is a test.")
+            val expected=tokens(if(lang=="en")"The music is playing. Listen to the song today. This is a test." else "Музыка играет. Послушай песню сегодня. Это тест.")
             val actual=tokens(parsed.joinToString(" "){WordLyrics.parse(it).text})
             val errors=edits(expected,actual)
             val memory=android.app.ActivityManager.MemoryInfo()
             (c.getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager).getMemoryInfo(memory)
             println("BENCHMARK Whisper $id modelBytes=${spec.size} downloadMs=$downloadMs inferenceMs=$inferenceMs words=${expected.size} edits=$errors WER=${errors.toDouble()/expected.size} availableRamAfter=${memory.availMem}")
             println("BENCHMARK transcript $id: "+actual.joinToString(" "))
-            assertTrue("Recognized speech must contain fixture vocabulary",text.lowercase().contains("music")||text.lowercase().contains("song"))
-            val result=org.json.JSONObject().put("id",id).put("modelBytes",spec.size).put("downloadMs",downloadMs).put("inferenceMs",inferenceMs).put("words",expected.size).put("edits",errors).put("wer",errors.toDouble()/expected.size).put("availableRamAfter",memory.availMem).put("transcript",actual.joinToString(" ")).put("peakPssKiB",peakPssKiB).put("pssSamples",pssSamples).put("minAvailableRam",minAvailableRam)
+            val result=org.json.JSONObject().put("id",id).put("language",lang).put("modelBytes",spec.size).put("downloadMs",downloadMs).put("inferenceMs",inferenceMs).put("words",expected.size).put("edits",errors).put("wer",errors.toDouble()/expected.size).put("availableRamAfter",memory.availMem).put("transcript",actual.joinToString(" ")).put("peakPssKiB",peakPssKiB).put("pssSamples",pssSamples).put("minAvailableRam",minAvailableRam)
             report.writeText(result.toString())
+            }
             println("PASS: Android downloaded publisher weights over HTTPS, verified SHA, activated native model, recognized fixture speech")
         }finally{model.delete()}
     }

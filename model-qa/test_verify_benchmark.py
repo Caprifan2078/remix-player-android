@@ -5,6 +5,11 @@ class BenchmarkTest(unittest.TestCase):
         return dict(id=id,modelBytes=SIZES[id],downloadMs=500,inferenceMs=6000,words=13,edits=1,wer=1/13,availableRamAfter=100,transcript="the music is playing listen to the song today this is a",peakPssKiB=1000,pssSamples=2,minAvailableRam=90)
     def test_valid(self):
         for id in SIZES:self.assertIn(id,verify(self.sample(id),id))
+    def test_russian(self):
+        sample=self.sample("large-v3-q5_0")|dict(language="ru",words=7,edits=0,wer=0,transcript="музыка играет послушай песню сегодня это тест")
+        self.assertIn("(ru)",verify(sample,"large-v3-q5_0","ru"))
+        with self.assertRaises(ValueError):verify(sample,"large-v3-q5_0","en")
+        with self.assertRaises(ValueError):verify(sample|dict(transcript="music"),"large-v3-q5_0","ru")
     def test_invalid(self):
         for key,value in [("id","wrong"),("modelBytes",0),("words",12),("inferenceMs",0),("edits",-1),("wer",float("nan")),("wer",0),("transcript",""),("availableRamAfter",True),("peakPssKiB",0),("pssSamples",0),("minAvailableRam",-1)]:
             with self.subTest(key=key,value=value):
