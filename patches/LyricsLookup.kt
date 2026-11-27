@@ -28,11 +28,23 @@ object LyricsLookup {
         if(title.isBlank()||synced==null&&plain==null)return null
         return Result(title,artist,seconds,synced,plain)
     }
-    fun search(title:String,artist:String):List<Result>{
+    private fun candidates(rows:List<Result>)=rows.map{LyricsMatch.Candidate(it.title,it.artist,it.seconds,it.synced!=null)}
+    fun search(title:String,artist:String,durationSeconds:Long?=null):List<Result>{
         val q=LyricsMatch.query(title,artist);if(q.title.isBlank())return emptyList()
         fun load(path:String):List<Result>{val text=request(path)?:return emptyList();val arr=JSONArray(text);return (0 until minOf(arr.length(),30)).mapNotNull{i->arr.optJSONObject(i)?.let(::row)}}
-        val first=load("search?track_name="+enc(q.title)+(if(q.artist.isBlank())"" else "&artist_name="+enc(q.artist)))
-        return if(first.isNotEmpty())first else load("search?q="+enc(listOf(q.artist,q.title).filter{it.isNotBlank()}.joinToString(" ")))
+        val variants=LyricsMatch.variants(q)
+        val paths=(variants.map{v->"search?track_name="+enc(v.title)+(if(v.artist.isBlank())"" else "&artist_name="+enc(v.artist))}+
+            "search?q="+enc(listOf(q.artist,q.title).filter{it.isNotBlank()}.joinToString(" "))).distinct().take(5)
+        val all=linkedSetOf<Result>()
+        for(path in paths){
+            check(!Thread.currentThread().isInterrupted)
+            all.addAll(load(path))
+            val rows=all.toList()
+            if(durationSeconds!=null&&LyricsMatch.choose(q,durationSeconds,candidates(rows))!=null)return rows
+            if(durationSeconds==null&&rows.any{LyricsMatch.key(it.title)==LyricsMatch.key(q.title)&&
+                    (q.artist.isBlank()||LyricsMatch.key(it.artist)==LyricsMatch.key(q.artist))})return rows
+        }
+        return all.take(60)
     }
     fun fetch(title:String,artist:String,durationSeconds:Long?):String?{
         val q=LyricsMatch.query(title,artist);if(q.title.isBlank())return null
@@ -40,8 +52,8 @@ object LyricsLookup {
             val exact=request("get?track_name="+enc(q.title)+"&artist_name="+enc(q.artist)+(durationSeconds?.takeIf{it>0}?.let{"&duration=$it"}?:""),true)
             if(exact!=null){val r=row(JSONObject(exact));if(r!=null&&LyricsMatch.choose(q,durationSeconds,listOf(LyricsMatch.Candidate(r.title,r.artist,r.seconds,r.synced!=null)))==0)return r.synced}
         }
-        val rows=search(q.title,q.artist)
-        val index=LyricsMatch.choose(q,durationSeconds,rows.map{LyricsMatch.Candidate(it.title,it.artist,it.seconds,it.synced!=null)})
+        val rows=search(q.title,q.artist,durationSeconds)
+        val index=LyricsMatch.choose(q,durationSeconds,candidates(rows))
         return index?.let{rows[it].synced}
     }
 }
