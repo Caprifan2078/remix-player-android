@@ -99,16 +99,42 @@ replace('    private fun lyrics(){',r'''    private fun manualLyricsSearch(t:Tra
 section('    private fun whisperModelDialog(){','    private fun recognizeWhisper(',r'''    private fun whisperModelDialog(){
         if(stemBusy)return
         if(!WhisperLocal.available){toast("Whisper не включён в сборку");return}
-        val active=WhisperLocal.installed(this)?.title?:"не установлена"
-        val recommended=WhisperModelSpec.models.sortedBy{when(it.id){"large-v3-turbo-q5_0"->0;"medium-q5_0"->1;"large-v3-q5_0"->2;else->3}}
-        val actions=recommended.map{spec->
-            ((if(spec.id=="large-v3-turbo-q5_0")"Рекомендуем для русского · " else "")+spec.title+" · "+spec.description) to {
-                sheet(spec.title,spec.description+"\n"+spec.russianAdvice+" (синтетическая речь, не пение).\nСвободная ОЗУ: ориентир "+(spec.minFreeRam/1048576)+" МиБ. Аудио остаётся на устройстве. Точность пения не гарантирована.",listOf("Скачать модель" to {
-                    if(!stemBusy)stemWork("Загрузка Whisper…",{WhisperLocal.download(this,spec){updateWork("Whisper: $it%")}}){id->toast("Whisper $id установлен");render()}
-                }))
+        val active=WhisperLocal.installed(this)
+        val am=getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+        fun memory()=android.app.ActivityManager.MemoryInfo().also{am.getMemoryInfo(it)}
+        val info=memory();val disk=filesDir.usableSpace
+        val recommendation=WhisperModelSpec.recommend(info.availMem,info.lowMemory,disk,active?.id)
+        fun fit(spec:WhisperModelSpec.Model,m:android.app.ActivityManager.MemoryInfo=info)=WhisperModelSpec.fit(spec,m.availMem,m.lowMemory,filesDir.usableSpace,WhisperLocal.installed(this)?.id)
+        fun reason(f:WhisperModelSpec.Fit)=when(f){
+            WhisperModelSpec.Fit.READY->"Готова к запуску или загрузке"
+            WhisperModelSpec.Fit.LOW_RAM->"Мало свободной ОЗУ"
+            WhisperModelSpec.Fit.LOW_STORAGE->"Мало места для загрузки"
+        }
+        val models=WhisperModelSpec.models.sortedWith(compareBy<WhisperModelSpec.Model>{if(it.id==active?.id)0 else if(it.id==recommendation?.id)1 else if(fit(it)==WhisperModelSpec.Fit.READY)2 else 3}.thenBy{it.size})
+        val actions=models.map{spec->
+            val prefix=when(spec.id){active?.id->"✓ ";recommendation?.id->"Подходит · ";else->""}
+            val suffix=if(fit(spec)!=WhisperModelSpec.Fit.READY)" · "+reason(fit(spec))else ""
+            (prefix+spec.title+suffix) to {
+                val current=WhisperLocal.installed(this)
+                val fresh=memory()
+                val state=fit(spec,fresh)
+                val summary=spec.description+"\n"+spec.russianAdvice+" (синтетическая речь, не пение).\n"+reason(state)+". Нужно свободной ОЗУ: около "+(spec.minFreeRam/1048576)+" МиБ. Аудио остаётся на устройстве."
+                val choices=when{
+                    current?.id==spec.id->listOf<Pair<String,()->Unit>>("Модель уже установлена" to {})
+                    state!=WhisperModelSpec.Fit.READY->listOf<Pair<String,()->Unit>>("Проверить память снова" to {whisperModelDialog()})
+                    else->listOf<Pair<String,()->Unit>>("Скачать и активировать" to {
+                        if(!stemBusy){
+                            val latest=memory()
+                            if(fit(spec,latest)!=WhisperModelSpec.Fit.READY)toast("Недостаточно памяти; проверьте снова")
+                            else stemWork("Загрузка Whisper…",{WhisperLocal.download(this,spec){updateWork("Whisper: $it%")}}){id->toast("Whisper $id установлен");render()}
+                        }
+                    })
+                }
+                sheet(spec.title,summary,choices)
             }
         }
-        sheet("Распознавание вокала","Установлена: "+active,actions+listOf("Импорт файла" to {whisperPicker.launch(arrayOf("*/*"))}))
+        val summary="Установлена: "+(active?.title?:"нет")+"\nСвободно ОЗУ: "+(info.availMem/1048576)+" МиБ · место: "+(disk/1048576)+" МиБ\n"+(recommendation?.let{"Для русского по QA30: "+it.id}?:"Сейчас нет модели, проходящей проверку ресурсов")
+        sheet("Распознавание вокала",summary,actions+listOf("Импорт файла" to {whisperPicker.launch(arrayOf("*/*"))}))
     }
 ''')
 replace('time=label("0:00 / 0:00",12,muted);bar.addView(time);addQuickEffects()', 'time=label("0:00",12,muted);timeEnd=label("0:00",12,muted);timeRow=row();timeRow.addView(time,weight());timeRow.addView(timeEnd);bar.addView(timeRow);addQuickEffects()')
